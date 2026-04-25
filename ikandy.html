@@ -1,0 +1,4589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>iKandy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & TOKENS ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #060608;
+  --surface: rgba(255,255,255,.04);
+  --bdr: rgba(255,255,255,.12);
+  --bdr2: rgba(255,255,255,.06);
+  --txt: #f0ece4;
+  --dim: #7a7a94;
+  --acc: #d4a843;
+  --acc-dim: rgba(212,168,67,.15);
+  --acc-txt: #f5d080;
+  --sp:  #1DB954;
+  --red: #e05050;
+  --r: 6px;
+  --pw: 280px;
+  --sb-bg: rgba(6,6,10,.98);
+  --ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --display: 'Bebas Neue', sans-serif;
+}
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--txt);
+  font-family: var(--ui); user-select: none; touch-action: none;
+}
+
+/* ─── CANVASES ─── */
+/* ─── VIBE LAYERS ─── */
+#bg-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 0; display: none;
+}
+#grain-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 2; pointer-events: none; opacity: 0; transition: opacity .4s;
+  mix-blend-mode: overlay;
+}
+#vignette-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 19; pointer-events: none;
+}
+#scanline-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 2; pointer-events: none; opacity: 0; transition: opacity .4s;
+  mix-blend-mode: overlay;
+}
+#viz { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+
+/* ─── LOADING ─── */
+#loading {
+  position: fixed; inset: 0; z-index: 100;
+  background: #060608; /* solid fallback — no flicker before var(--bg) resolves */
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 20px;
+  transition: opacity .5s;
+}
+#loading.fade { opacity: 0; pointer-events: none; }
+#loading.gone { display: none; }
+.ld-logo { font-family: var(--display); font-size: 60px; letter-spacing: .2em; color: var(--acc); }
+.ld-sub  { font-size: 11px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
+#ld-bar  { width: 200px; height: 2px; background: rgba(255,255,255,.06); border-radius: 1px; overflow: hidden; }
+#ld-fill { height: 100%; background: var(--acc); width: 0%; transition: width .35s; }
+
+/* ─── LOGIN SCREEN ─── */
+#login {
+  position: fixed; inset: 0; z-index: 90;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 28px;
+}
+.login-logo   { display: none; }
+.login-sub    { display: none; }
+#sp-login-btn {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--sp); color: #000;
+  border: none; border-radius: 50px;
+  padding: 16px 36px;
+  font-family: var(--ui); font-size: 15px; font-weight: 700;
+  cursor: pointer; letter-spacing: .04em;
+  transition: transform .12s, background .12s;
+}
+#sp-login-btn:hover { background: #1ed760; transform: scale(1.03); }
+#sp-login-btn svg   { width: 22px; height: 22px; flex-shrink: 0; }
+.login-note {
+  font-size: 11px; color: var(--dim); text-align: center;
+  line-height: 1.7; max-width: 300px;
+}
+.login-note a { color: var(--acc); text-decoration: none; }
+
+/* ─── SETUP SCREEN ─── */
+#setup {
+  position: fixed; inset: 0; z-index: 95;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px;
+}
+#setup .setup-logo  { font-family: var(--display); font-size: 72px; letter-spacing: .2em; color: var(--acc); }
+#setup .setup-sub   { font-size: 13px; letter-spacing: .16em; color: var(--dim); text-transform: uppercase; }
+#setup .setup-note  { font-size: 11px; color: var(--dim); text-align: center; line-height: 1.7; max-width: 340px; }
+#setup .setup-note a { color: var(--acc); text-decoration: none; }
+#setup .setup-note code { color: var(--acc); }
+#client-id-input {
+  width: 320px; padding: 12px 16px;
+  background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
+  border-radius: var(--r); color: var(--txt);
+  font-family: var(--ui); font-size: 13px; letter-spacing: .04em;
+  outline: none;
+}
+#client-id-input:focus { border-color: var(--acc); }
+#client-id-input::placeholder { color: var(--dim); }
+#setup-save-btn {
+  width: 320px; padding: 14px;
+  background: var(--acc); color: #000;
+  border: none; border-radius: 50px;
+  font-family: var(--ui); font-size: 14px; font-weight: 700;
+  cursor: pointer; letter-spacing: .06em;
+  transition: opacity .12s;
+}
+#setup-save-btn:hover { opacity: .85; }
+#setup-error { display:none; font-size:11px; color:var(--red); }
+
+/* ─── NOW-PLAYING HUD (bottom) ─── */
+#hud {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+  mix-blend-mode: screen;
+  background: linear-gradient(to top,
+    rgba(6,6,8,.96) 0%,
+    rgba(6,6,8,.45) 65%,
+    transparent 100%);
+  padding: 16px 28px 88px;
+  display: flex; align-items: flex-end; gap: 20px;
+  pointer-events: none; transition: opacity .5s;
+}
+#hud.hidden { opacity: 0; }
+#hud-art {
+  width: 86px; height: 86px; border-radius: 8px; flex-shrink: 0;
+  object-fit: cover; display: none;
+  box-shadow: 0 8px 32px rgba(0,0,0,.7);
+}
+#hud-art.show { display: block; }
+#hud-title {
+  font-family: var(--display); font-size: 34px;
+  letter-spacing: .08em; color: #fff; line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#hud-artist {
+  font-size: 15px; font-weight: 500; color: var(--acc);
+  margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#hud-album {
+  font-size: 13px; color: var(--dim); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#hud-prog {
+  height: 3px; background: rgba(255,255,255,.1); border-radius: 2px;
+  margin-top: 12px; cursor: pointer; pointer-events: all;
+  transition: height .15s; position: relative;
+}
+#hud-prog:hover { height: 7px; }
+#hud-bar  { height: 100%; background: var(--sp); width: 0%; border-radius: 2px; transition: width .9s linear; }
+
+/* ─── 5-BUTTON PLAYBACK CONTROLS ─── */
+#controls {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 21;
+  display: flex; align-items: center; gap: 8px;
+  pointer-events: all;
+}
+.cb {  /* control button */
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(6,6,8,.8); border: 1px solid var(--bdr);
+  color: var(--dim); cursor: pointer; transition: all .13s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cb svg { width: 17px; height: 17px; fill: currentColor; }
+.cb:hover { border-color: var(--acc); color: var(--acc); }
+.cb.on   { border-color: var(--sp);  color: var(--sp); }
+#cb-pp { width: 48px; height: 48px; }
+#cb-pp svg { width: 21px; height: 21px; }
+
+/* Volume row */
+#vol-row {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(6,6,8,.7); border: 1px solid var(--bdr);
+  border-radius: 20px; padding: 6px 12px;
+}
+#vol-row svg { width: 14px; height: 14px; fill: var(--dim); flex-shrink: 0; }
+#vol-sl { width: 72px; accent-color: var(--sp); cursor: pointer; }
+
+/* ─── PRESET NAV (top-center) ─── */
+#pnav {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20;
+  display: flex; gap: 6px; align-items: center; pointer-events: all;
+}
+.nvb {
+  font-family: var(--ui); font-size: 11px; font-weight: 600;
+  padding: 7px 13px; border: 1px solid rgba(255,255,255,.18);
+  background: rgba(4,4,6,.88); color: rgba(255,255,255,.75);
+  cursor: pointer; border-radius: var(--r);
+  transition: all .12s; white-space: nowrap;
+  backdrop-filter: blur(6px);
+  text-shadow: 0 1px 4px rgba(0,0,0,.8);
+}
+.nvb:hover      { border-color: var(--acc); color: var(--acc-txt); }
+.nvb.on         { border-color: var(--sp);  color: var(--sp);  background: rgba(29,185,84,.12); }
+.nvb.nav-arrow  { border-color: transparent !important; color: rgba(255,255,255,.4); background: rgba(4,4,6,.6) !important; backdrop-filter: blur(4px); outline: none !important; }
+.nvb.nav-arrow:hover { border-color: rgba(255,255,255,.2) !important; color: rgba(255,255,255,.8) !important; }
+.nvb.nav-arrow:focus, .nvb.nav-arrow:focus-visible { outline: none !important; border-color: transparent !important; }
+#pname {
+  font-size: 10px; color: rgba(255,255,255,.6); max-width: 200px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0,0,0,.9);
+}
+
+/* ─── STATUS BADGE (top-left) ─── */
+#status-badge {
+  position: fixed; top: 12px; left: 14px; z-index: 20;
+  display: flex; align-items: center; gap: 8px; pointer-events: all;
+  background: rgba(4,4,6,.82); border: 1px solid rgba(255,255,255,.12);
+  border-radius: var(--r); padding: 5px 10px;
+  backdrop-filter: blur(6px);
+}
+#status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--dim); flex-shrink: 0;
+  transition: background .3s;
+}
+#status-dot.live { background: var(--sp); animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.3} }
+#status-label { font-size: 11px; color: rgba(255,255,255,.7); text-shadow: 0 1px 4px rgba(0,0,0,.9); }
+#logout-btn {
+  font-size: 10px; font-family: var(--ui); font-weight: 500;
+  background: none; border: 1px solid var(--bdr); color: var(--dim);
+  padding: 3px 9px; border-radius: 20px; cursor: pointer;
+  transition: all .12s; display: none;
+}
+#logout-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* ─── LYRIC OVERLAY ─── */
+#lyric-wrap {
+  position: fixed;
+  bottom: 220px;
+  left: 0;
+  right: 0;
+  z-index: 19; text-align: center; pointer-events: none;
+}
+#lyric-line {
+  display: inline-block;
+  font-family: var(--ui);
+  font-size: clamp(14px, 1.8vw, 24px);
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: rgba(255,255,255,.92);
+  max-width: 70vw;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: none;  /* no background box */
+  padding: 0;
+  text-shadow:
+    0 1px 3px rgba(0,0,0,1),
+    0 0 20px rgba(0,0,0,.9),
+    0 0 40px rgba(0,0,0,.7);
+  transition: opacity .3s ease, transform .3s ease;
+  transform: translateY(0);
+}
+#lyric-line.blank {
+  opacity: 0;
+  transform: translateY(4px);
+}
+#lyric-line:not(.blank) {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── UI HIDE MODE ─── */
+/* When .ui-hidden is on body, everything except the canvas fades out */
+body.ui-hidden #pnav,
+body.ui-hidden #ptab,
+body.ui-hidden #controls,
+body.ui-hidden #hud,
+body.ui-hidden #lyric-wrap,
+body.ui-hidden #status-badge {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity .5s ease;
+}
+/* Restore on mouse move — handled in JS */
+#pnav, #ptab, #controls, #hud, #lyric-wrap, #status-badge {
+  transition: opacity .5s ease;
+}
+
+/* ─── SIDEBAR TAB ─── */
+#ptab {
+  position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 31;
+  background: rgba(6,6,8,.92); border: 1px solid var(--bdr); border-right: none;
+  border-radius: var(--r) 0 0 var(--r); padding: 12px 8px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 5px; align-items: center;
+  transition: right .22s cubic-bezier(.4,0,.2,1);
+  backdrop-filter: blur(8px);
+}
+#ptab.shifted { right: var(--pw); }
+#ptab span {
+  display: block; width: 15px; height: 1.5px; background: var(--acc);
+  transition: transform .18s, opacity .18s;
+}
+#ptab.open span:nth-child(1) { transform: rotate(45deg) translate(2px, 2px); }
+#ptab.open span:nth-child(2) { opacity: 0; }
+#ptab.open span:nth-child(3) { transform: rotate(-45deg) translate(2px, -2px); }
+
+/* ─── SIDEBAR ─── */
+#sb {
+  position: fixed; right: 0; top: 0; bottom: 0; width: var(--pw); z-index: 30;
+  background: var(--sb-bg); border-left: 1px solid var(--bdr);
+  display: flex; flex-direction: column;
+  transform: translateX(var(--pw));
+  transition: transform .22s cubic-bezier(.4,0,.2,1);
+  backdrop-filter: blur(12px);
+}
+#sb.open { transform: translateX(0); }
+#sbi { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 24px; }
+#sbi::-webkit-scrollbar { width: 2px; }
+#sbi::-webkit-scrollbar-thumb { background: rgba(255,255,255,.06); }
+
+/* ─── COLOR PALETTE ─── */
+#palette-grid {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  gap: 5px; margin-bottom: 10px;
+}
+.pal-sw {
+  width: 100%; aspect-ratio: 1/1; border-radius: 4px; cursor: pointer;
+  border: 2px solid transparent; transition: transform .12s, border-color .12s;
+}
+.pal-sw:hover { transform: scale(1.15); }
+.pal-sw.active { border-color: rgba(255,255,255,.8); }
+
+/* ─── VIBE PICKER ─── */
+.vibe-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; margin-bottom:10px; }
+.vibe-btn {
+  padding:7px 4px; border-radius:var(--r); border:1px solid var(--bdr);
+  background:rgba(255,255,255,.03); color:var(--dim);
+  font-family:var(--ui); font-size:10px; font-weight:600; letter-spacing:.04em;
+  cursor:pointer; text-align:center; text-transform:uppercase;
+  transition:all .13s;
+}
+.vibe-btn:hover { border-color:var(--acc); color:var(--acc-txt); }
+.vibe-btn.active { border-color:var(--acc); color:var(--acc-txt); background:var(--acc-dim); }
+#bg-upload-btn {
+  width:100%; padding:8px; border:1px dashed var(--bdr); border-radius:var(--r);
+  background:transparent; color:var(--dim); font-family:var(--ui); font-size:11px;
+  cursor:pointer; transition:all .13s; margin-bottom:5px; text-transform:uppercase;
+  font-weight:600; letter-spacing:.04em;
+}
+#bg-upload-btn:hover { border-color:var(--acc); color:var(--acc); }
+#bg-filename { font-size:10px; color:var(--dim); margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* ─── PLAYLIST LIST ─── */
+
+#pl-search {
+  width:100%; padding:7px 10px; margin-bottom:4px;
+  background:rgba(255,255,255,.05); border:1px solid var(--bdr);
+  border-radius:var(--r); color:var(--txt); font-family:var(--ui);
+  font-size:12px; outline:none;
+}
+#pl-search:focus { border-color:var(--acc); }
+#pl-search::placeholder { color:var(--dim); }
+
+/* ─── ACCORDION ─── */
+.acc-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--bdr2);
+  font-size: 10px; letter-spacing: .1em; font-weight: 700;
+  color: var(--acc); text-transform: uppercase;
+  transition: background .12s, color .12s; user-select: none;
+}
+.acc-hd:hover { background: rgba(255,255,255,.02); color: var(--acc-txt); }
+.acc-hd .chev { transition: transform .2s; font-size: 10px; color: var(--dim); }
+.acc-hd.open .chev { transform: rotate(90deg); }
+.acc-bd { display: none; padding: 12px 14px 8px; border-bottom: 1px solid var(--bdr2); }
+.acc-bd.open { display: block; }
+
+/* ─── FORM ELEMENTS ─── */
+#physics-wrap {
+  position: fixed; inset: 0; pointer-events: none; z-index: 18; overflow: hidden;
+}
+.pw {
+  position: absolute;
+  font-family: var(--ui, 'Inter', sans-serif);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,.9), 0 0 30px rgba(0,0,0,.8);
+  transform-origin: center;
+  will-change: transform, opacity;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.lbl {
+  font-size: 10px; font-weight: 600; color: var(--dim);
+  text-transform: uppercase; letter-spacing: .06em;
+  margin-bottom: 4px; display: block;
+}
+.lbl-hint { display: none; }
+#app-brand {
+  padding: 16px 14px 10px;
+  border-bottom: 1px solid var(--bdr2);
+}
+#app-name {
+  font-family: var(--display);
+  font-size: 18px; letter-spacing: .2em;
+  color: var(--acc-txt); line-height: 1;
+}
+#app-tagline {
+  font-size: 9px; color: rgba(255,255,255,.2);
+  letter-spacing: .1em; margin-top: 4px;
+  text-transform: uppercase;
+}
+#theme-swatches {
+  display: flex; gap: 6px; margin-top: 10px;
+}
+.theme-sw {
+  width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: transform .12s, border-color .12s;
+  flex-shrink: 0;
+}
+.theme-sw:hover { transform: scale(1.2); }
+.theme-sw.active { border-color: rgba(255,255,255,.6); }
+.svr { display: grid; grid-template-columns: 1fr 34px; align-items: center; gap: 6px; margin-bottom: 8px; }
+.svv { font-size: 10px; color: var(--acc); text-align: right; }
+input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
+
+/* ─── SIDEBAR BUTTONS ─── */
+.btn {
+  font-family: var(--ui); font-size: 11px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase;
+  padding: 8px 12px; border: 1px solid var(--bdr); background: transparent;
+  color: var(--dim); cursor: pointer; border-radius: var(--r);
+  transition: all .12s; width: 100%; margin-bottom: 6px;
+  display: block; text-align: center;
+}
+.btn:hover   { border-color: var(--acc); color: var(--acc-txt); }
+.btn.primary { border-color: var(--acc); background: var(--acc-dim); color: var(--acc-txt); }
+.btn.green   { border-color: var(--sp);  background: rgba(29,185,84,.09);  color: var(--sp); }
+.btn.danger  { border-color: var(--red); color: var(--red); }
+
+/* ─── PLAYLIST PANEL ─── */
+#playlist-panel {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(6,6,8,.98);
+  display: flex; flex-direction: column;
+  transform: translateY(100%);
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+}
+#playlist-panel.open { transform: translateY(0); }
+#plp-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+}
+#plp-header h2 {
+  font-family: var(--display); font-size: 32px; letter-spacing: .1em;
+  color: var(--sp); flex: 1; margin: 0;
+}
+#plp-count { font-size: 12px; color: var(--dim); }
+#plp-close {
+  font-size: 24px; color: var(--dim); cursor: pointer;
+  background: none; border: none; padding: 4px 8px;
+  transition: color .12s; line-height: 1;
+}
+#plp-close:hover { color: var(--txt); }
+#plp-toolbar {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 20px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+}
+#plp-search {
+  flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
+  color: var(--txt); font-family: var(--ui); font-size: 13px;
+  padding: 10px 13px; border-radius: var(--r); outline: none;
+}
+#plp-search:focus { border-color: var(--sp); }
+#plp-search::placeholder { color: var(--dim); }
+#plp-grid {
+  flex: 1; overflow-y: auto; padding: 14px 20px 28px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px; align-content: start;
+}
+#plp-grid::-webkit-scrollbar { width: 4px; }
+#plp-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+.plcard {
+  border: 1px solid var(--bdr); border-radius: 8px;
+  background: var(--surface); cursor: pointer;
+  transition: all .14s; position: relative;
+  overflow: hidden; padding: 0; aspect-ratio: 1/1;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.plcard:hover  { border-color: var(--sp); transform: scale(1.02); z-index: 2; }
+.plcard.active { border-color: var(--sp); box-shadow: 0 0 0 1px var(--sp); }
+.plcard-art {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; display: block;
+  background: rgba(255,255,255,.04);
+}
+.plcard-noart {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 36px; color: rgba(255,255,255,.08);
+}
+.plcard-info {
+  position: relative; z-index: 2; padding: 8px 10px 7px;
+  background: linear-gradient(transparent, rgba(0,0,0,.9));
+}
+.plcard-name {
+  font-size: 12px; font-weight: 600; color: var(--txt); line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.plcard.active .plcard-name { color: var(--sp); }
+#plp-empty { color: var(--dim); font-size: 13px; text-align: center; padding: 48px; display: none; }
+
+/* ─── PRESET PANEL ─── */
+#preset-panel {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(6,6,8,.98);
+  display: flex; flex-direction: column;
+  transform: translateY(100%);
+  transition: transform .28s cubic-bezier(.4,0,.2,1);
+}
+#preset-panel.open { transform: translateY(0); }
+#pp-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+}
+#pp-header h2 {
+  font-family: var(--display); font-size: 32px; letter-spacing: .1em;
+  color: var(--acc); flex: 1; margin: 0;
+}
+#pp-count { font-size: 12px; color: var(--dim); }
+#pp-close {
+  font-size: 24px; color: var(--dim); cursor: pointer;
+  background: none; border: none; padding: 4px 8px;
+  transition: color .12s; line-height: 1;
+}
+#pp-close:hover { color: var(--txt); }
+#pp-toolbar {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 20px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+}
+#pp-search {
+  flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
+  color: var(--txt); font-family: var(--ui); font-size: 13px;
+  padding: 10px 13px; border-radius: var(--r); outline: none;
+}
+#pp-search:focus { border-color: var(--acc); }
+#pp-search::placeholder { color: var(--dim); }
+#pp-rand {
+  background: rgba(255,255,255,.05); border: 1px solid var(--bdr);
+  color: var(--dim); cursor: pointer; font-size: 18px;
+  padding: 8px 13px; border-radius: var(--r);
+  transition: all .12s;
+}
+#pp-rand:hover { border-color: var(--acc); color: var(--acc); }
+#pp-cats {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 10px 20px 8px; flex-shrink: 0; border-bottom: 1px solid var(--bdr2);
+}
+.pp-pill {
+  font-size: 12px; font-weight: 500; padding: 5px 14px;
+  border: 1px solid var(--bdr); background: rgba(255,255,255,.03);
+  color: var(--dim); cursor: pointer; border-radius: 20px;
+  transition: all .12s; white-space: nowrap;
+}
+.pp-pill:hover  { border-color: rgba(184,154,90,.5); color: var(--txt); }
+.pp-pill.active { border-color: var(--acc); background: rgba(184,154,90,.12); color: var(--acc); }
+#pp-body {
+  flex: 1; display: flex; overflow: hidden;
+}
+#pp-grid-wrap {
+  flex: 1; overflow-y: auto; padding: 14px 20px 28px;
+}
+#pp-grid-wrap::-webkit-scrollbar { width: 4px; }
+#pp-grid-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+#pp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min, 185px), 1fr));
+  gap: 10px; align-content: start;
+}
+
+/* ── Large centered flyout for list hover ── */
+#pp-list-flyout {
+  display: none;
+  position: fixed; z-index: 500; pointer-events: none;
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--acc);
+  box-shadow: 0 24px 80px rgba(0,0,0,.9);
+  opacity: 0; transition: opacity .2s;
+}
+#pp-list-flyout.show { display: block; opacity: 1; }
+#pp-list-flyout canvas { display: block; }
+#pp-list-flyout-name {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 10px 14px; font-size: 13px; font-weight: 600;
+  color: var(--acc-txt); background: linear-gradient(transparent, rgba(0,0,0,.85));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--display); letter-spacing: .05em;
+}
+.pcard {
+  border: 1px solid var(--bdr); border-radius: 8px;
+  background: var(--surface); cursor: pointer;
+  transition: all .14s; position: relative;
+  overflow: hidden; padding: 0;
+  aspect-ratio: 16/9;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.pcard:hover  { border-color: var(--acc); transform: scale(1.02); z-index: 2; }
+.pcard.active { border-color: var(--acc); }
+.pcard-thumb {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; opacity: 0; transition: opacity .4s;
+}
+.pcard-thumb.loaded { opacity: 1; }
+.pcard-pending {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: rgba(255,255,255,.15); letter-spacing: .06em;
+}
+.pcard-info {
+  position: relative; z-index: 2; padding: 7px 9px 6px;
+  background: linear-gradient(transparent, rgba(0,0,0,.88));
+}
+.pcard-name {
+  font-size: clamp(10px, calc(var(--card-min, 225px) * 0.052), 14px);
+  font-weight: 600; color: var(--txt); line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pcard.active .pcard-name { color: var(--acc-txt); }
+.pcard-author { font-size: clamp(8px, calc(var(--card-min, 225px) * 0.036), 11px); color: var(--dim); margin-top: 1px; }
+.pcard-now {
+  display: none; align-items: center; gap: 4px;
+  font-size: 9px; color: var(--sp); margin-top: 2px;
+}
+.pcard.active .pcard-now { display: flex; }
+
+/* ── LIST mode ── */
+#pp-grid.list-mode {
+  grid-template-columns: 1fr;
+  gap: 3px;
+}
+#pp-grid.list-mode .pcard {
+  aspect-ratio: unset;          /* kill the 16:10 ratio */
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 10px;
+  gap: 10px;
+  height: 44px;                 /* fixed row height */
+}
+#pp-grid.list-mode .pcard-thumb {
+  position: relative;
+  inset: unset;
+  width: 32px; height: 32px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  opacity: 1;
+  object-fit: cover;
+}
+#pp-grid.list-mode .pcard-thumb:not(.loaded) { opacity: 0.2; }
+#pp-grid.list-mode .pcard-pending { display: none; }
+#pp-grid.list-mode .pcard-info {
+  background: none; padding: 0;
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center;
+}
+#pp-grid.list-mode .pcard-name  { font-size: 12px; -webkit-line-clamp: 1; }
+#pp-grid.list-mode .pcard-author { font-size: 10px; }
+#pp-grid.list-mode .pcard:hover { transform: none; background: rgba(255,255,255,.05); }
+
+/* ── LARGE mode — 2 columns max so cards don't get tiny ── */
+#pp-grid.large-mode {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* Hover live preview popup */
+#pp-live-preview {
+  display: block;
+  position: fixed; z-index: 299; pointer-events: none;
+  opacity: 0; transition: opacity .15s;
+  left: -9999px; top: -9999px; /* park offscreen until positioned */
+}
+#pp-live-preview.show { opacity: 1; }
+#pp-live-preview canvas { width: 100%; height: 100%; display: block; }
+#pp-live-label { display: none; }
+
+.pbar { width: 3px; border-radius: 2px; background: var(--sp); animation: bars .7s ease-in-out infinite alternate; }
+.pbar:nth-child(2) { animation-delay: .15s; }
+.pbar:nth-child(3) { animation-delay: .3s; }
+@keyframes bars { from { height: 3px } to { height: 10px } }
+#pp-empty { color: var(--dim); font-size: 13px; text-align: center; padding: 48px; display: none; }
+
+/* ─── PALETTE SWATCHES ─── */
+.psw {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+  transition: transform .12s, border-color .12s; flex-shrink: 0;
+}
+.psw:hover, .psw.active { transform: scale(1.3); border-color: rgba(255,255,255,.8); }
+
+/* ─── LYRICS SIDEBAR ─── */
+#lyrics-box {
+  display: none; max-height: 190px; overflow-y: auto;
+  background: rgba(255,255,255,.03); border: 1px solid var(--bdr);
+  border-radius: var(--r); padding: 8px;
+  margin-top: 8px;
+}
+#lyrics-box::-webkit-scrollbar { width: 2px; }
+#lyrics-box::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
+.ll { font-size: 12px; color: var(--dim); padding: 3px 0; line-height: 1.5; transition: color .25s, font-size .18s; }
+.ll.active { color: var(--acc); font-size: 13px; }
+
+/* ─── TOAST ─── */
+#toast {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 60; font-size: 12px; letter-spacing: .08em; color: var(--acc);
+  background: rgba(6,6,8,.95); border: 1px solid var(--acc);
+  border-radius: var(--r); padding: 8px 18px; opacity: 0;
+  transition: opacity .3s; pointer-events: none; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+/* ─── DROP ─── */
+#drop {
+  position: fixed; inset: 0; z-index: 50; display: none;
+  align-items: center; justify-content: center;
+  background: rgba(0,0,0,.78); border: 3px dashed var(--acc); pointer-events: none;
+}
+#drop.show { display: flex; }
+#drop p { font-family: var(--display); font-size: 42px; letter-spacing: .18em; color: var(--acc); }
+
+
+#audio-gate.show { display: flex; }
+
+
+
+
+
+
+/* ─── INITIALIZE GATE ─── */
+
+
+/* ─── TOOLTIP TOUR ─── */
+#tk-box {
+  display: none;
+  position: fixed;
+  z-index: 99999;
+  background: #1a1918;
+  border: 1px solid var(--acc, #d4a843);
+  border-radius: 10px;
+  padding: 14px 16px 12px;
+  width: 260px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.7);
+  font-family: var(--sans, sans-serif);
+  pointer-events: all;
+}
+#tk-box.visible { display: block; }
+#tk-mask {
+  display: none;
+  position: fixed; inset: 0;
+  z-index: 99990;
+  pointer-events: all;
+}
+#tk-mask.visible { display: block; }
+#tk-hole {
+  position: absolute;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.65);
+  pointer-events: all;
+  transition: all .3s ease;
+}
+#tk-label {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--acc, #d4a843); font-weight: 700; margin-bottom: 5px;
+}
+#tk-title {
+  font-size: 13px; font-weight: 600; color: #f0ece4; margin-bottom: 4px;
+}
+#tk-body {
+  font-size: 11px; color: #7a7a94; line-height: 1.6; margin-bottom: 12px;
+}
+#tk-footer {
+  display: flex; justify-content: space-between; align-items: center;
+}
+#tk-skip {
+  font-size: 10px; color: #555; background: none; border: none;
+  cursor: pointer; font-family: inherit; letter-spacing: .08em;
+  text-transform: uppercase; padding: 0;
+}
+#tk-skip:hover { color: #aaa; }
+#tk-next {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; background: var(--acc, #d4a843);
+  color: #000; border: none; border-radius: 5px;
+  padding: 6px 14px; cursor: pointer; font-family: inherit;
+}
+#tk-next:hover { opacity: .85; }
+#tk-dots { display: flex; gap: 4px; align-items: center; }
+.tk-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #444; transition: background .2s;
+}
+.tk-dot.on { background: var(--acc, #d4a843); }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 480px) {
+  :root { --pw: 260px; }
+  #hud-art    { width: 60px; height: 60px; }
+  #hud-title  { font-size: 22px; }
+  #hud-artist { font-size: 12px; }
+  #pnav       { display: none; }
+  #controls   { bottom: 10px; left: 50%; transform: translateX(-50%); gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<div id="pp-list-flyout">
+  <canvas id="pp-flyout-canvas" width="480" height="300"></canvas>
+  <div id="pp-list-flyout-name"></div>
+</div>
+
+<div id="pp-live-preview">
+  <canvas id="pp-live-canvas" width="200" height="125"></canvas>
+  <div id="pp-live-label"></div>
+</div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="ld-logo">IKANDY</div>
+  <div class="ld-sub">MilkDrop Engine</div>
+  <div id="ld-bar"><div id="ld-fill"></div></div>
+</div>
+
+<!-- LOGIN -->
+<div id="setup">
+  <div class="setup-logo">IKANDY</div>
+  <div class="setup-sub">First-time setup</div>
+  <p class="setup-note">
+    Enter your Spotify Client ID.<br>
+    <a href="https://developer.spotify.com/dashboard" target="_blank">Create an app</a> at the Spotify Dashboard,
+    then add <code>http://127.0.0.1:8888/callback</code> as a Redirect URI.
+  </p>
+  <input id="client-id-input" type="text" placeholder="Spotify Client ID (32 hex chars)" spellcheck="false" />
+  <div id="setup-error">Please enter a valid Client ID.</div>
+  <button id="setup-save-btn" onclick="saveSetup()">SAVE & CONTINUE</button>
+  <div style="margin-top:16px;">
+    <a onclick="skipToLocal()" style="font-size:11px;color:var(--dim);letter-spacing:.08em;
+      text-transform:uppercase;cursor:pointer;text-decoration:none;opacity:0.6;
+      transition:opacity .2s;" onmouseover="this.style.opacity='1'"
+      onmouseout="this.style.opacity='0.6'">
+      Continue with VLC or Local Audio →
+    </a>
+  </div>
+</div>
+
+<div id="login">
+  <div class="login-logo">IKANDY</div>
+  <div class="login-sub">Music Visualizer</div>
+  <button id="sp-login-btn" onclick="startLogin()">
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+    </svg>
+    Connect with Spotify
+  </button>
+  <div id="auth-error" style="display:none;background:rgba(224,80,80,.12);border:1px solid rgba(224,80,80,.4);
+    border-radius:6px;padding:10px 16px;max-width:320px;text-align:center;">
+    <div style="font-size:12px;color:#e08080;font-weight:600;margin-bottom:4px;" id="auth-error-title">Auth Error</div>
+    <div style="font-size:11px;color:rgba(224,128,128,.8);line-height:1.5;" id="auth-error-body"></div>
+  </div>
+  <p class="login-note">
+    Requires <strong>Spotify Premium</strong> for in-browser playback.<br>
+    Your credentials are never stored on any server.<br>
+    <a href="https://developer.spotify.com/dashboard" target="_blank">Spotify Dashboard</a> → Settings → Redirect URIs → add <code style="color:var(--acc);">http://127.0.0.1:8888/callback</code>
+  </p>
+  <div style="margin-top:16px;">
+    <a onclick="skipToLocal()" style="font-size:11px;color:var(--dim);letter-spacing:.08em;
+      text-transform:uppercase;cursor:pointer;text-decoration:none;opacity:0.6;
+      transition:opacity .2s;" onmouseover="this.style.opacity='1'"
+      onmouseout="this.style.opacity='0.6'">
+      Continue with VLC or Local Audio →
+    </a>
+  </div>
+</div>
+
+<!-- CANVASES -->
+<div id="color-bg" style="position:fixed;inset:0;z-index:0;background:transparent;transition:background .4s;"></div>
+<canvas id="bg-canvas"></canvas>
+<canvas id="viz"></canvas>
+
+<canvas id="vignette-canvas"></canvas>
+<canvas id="grain-canvas"></canvas>
+<canvas id="scanline-canvas"></canvas>
+
+<input type="file" id="bg-file-input" accept="image/*" style="display:none" onchange="onBgFileChange(this)">
+<div id="drop"><p>DROP AUDIO HERE</p></div>
+
+<!-- AUDIO CONTEXT START GATE (visible modal — required by browser autoplay policy) -->
+
+
+<!-- STATUS BADGE (top-left) -->
+<div id="status-badge">
+  <div id="status-dot"></div>
+  <span id="status-label">Not connected</span>
+  <button id="logout-btn" onclick="logout()">Disconnect</button>
+</div>
+
+<!-- PRESET NAV (top-right) -->
+<div id="pnav">
+  <button class="nvb nav-arrow" onclick="prevPreset()" title="Previous preset">‹</button>
+  <div id="pname">—</div>
+  <button class="nvb nav-arrow" onclick="nextPreset()" title="Next preset">›</button>
+  <button class="nvb" id="auto-btn" onclick="toggleAuto()" title="Auto-cycle">AUTO</button>
+  <button class="nvb" id="presets-btn" onclick="openPresetPanel()" title="Browse presets">PRESETS</button>
+  <button class="nvb" id="fs-btn" onclick="toggleFullscreen()" title="Fullscreen (F)">⛶</button>
+  <button class="nvb" id="hide-btn" onclick="toggleUI()" title="Hide UI (H)">◎</button>
+  <button class="nvb" id="tour-btn" onclick="tkRestart()" title="Restart tour">?</button>
+</div>
+
+<!-- NOW-PLAYING HUD -->
+<div id="hud">
+  <img id="hud-art" src="" alt="Album art">
+  <div id="hud-local-art" style="display:none;width:66px;height:66px;border-radius:6px;
+    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+    display:none;align-items:center;justify-content:center;flex-shrink:0;">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4"  y="14" width="4" height="8"  rx="2" fill="rgba(255,255,255,0.5)"/>
+      <rect x="10" y="8"  width="4" height="20" rx="2" fill="rgba(255,255,255,0.7)"/>
+      <rect x="16" y="4"  width="4" height="28" rx="2" fill="rgba(255,255,255,0.9)"/>
+      <rect x="22" y="8"  width="4" height="20" rx="2" fill="rgba(255,255,255,0.7)"/>
+      <rect x="28" y="14" width="4" height="8"  rx="2" fill="rgba(255,255,255,0.5)"/>
+    </svg>
+  </div>
+  <div id="hud-info">
+    <div id="hud-title">iKandy</div>
+    <div id="hud-artist">Connect Spotify to begin</div>
+    <div id="hud-album"></div>
+    <div id="hud-prog" onclick="seekTrack(event)"><div id="hud-bar"></div></div>
+  </div>
+</div>
+
+<!-- LYRIC OVERLAY -->
+<div id="lyric-wrap"><div id="lyric-line" class="blank"></div></div>
+<div id="physics-wrap"></div>
+
+<!-- 5-BUTTON CONTROLS -->
+<div id="controls">
+  <div id="free-note" style="display:none;position:fixed;bottom:60px;left:50%;transform:translateX(-50%);
+    font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.06em;white-space:nowrap;">
+    Controls require Spotify Premium
+  </div>
+
+  <!-- Skip Back -->
+  <button class="cb" id="cb-prev" onclick="spAction('prev')" title="Previous">
+    <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+  </button>
+  <!-- Play/Pause -->
+  <button class="cb" id="cb-pp" onclick="spAction('playpause')" title="Play / Pause">
+    <svg id="pp-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+  </button>
+  <!-- Skip Forward -->
+  <button class="cb" id="cb-next" onclick="spAction('next')" title="Next">
+    <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+  </button>
+  <!-- Volume (controls Spotify directly via API) -->
+  <div id="vol-row">
+    <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+    <input type="range" id="vol-sl" min="0" max="100" value="80"
+      oninput="setVolume(+this.value)" title="Volume (Spotify)">
+  </div>
+</div>
+
+<!-- PLAYLIST PANEL -->
+<div id="playlist-panel">
+  <div id="plp-header">
+    <h2>PLAYLISTS</h2>
+    <span id="plp-count"></span>
+    <button id="plp-close" onclick="closePlaylistPanel()">✕</button>
+  </div>
+  <div id="plp-toolbar">
+    <input type="text" id="plp-search" placeholder="Search playlists…" oninput="plpFilter(this.value)">
+  </div>
+  <div id="plp-grid"></div>
+  <div id="plp-empty">No playlists found</div>
+</div>
+
+<!-- PRESET PANEL (slides up from bottom) -->
+<div id="preset-panel">
+  <div id="pp-header">
+    <h2>PRESETS</h2>
+    <span id="pp-count"></span>
+    <button id="pp-close" onclick="closePresetPanel()">✕</button>
+  </div>
+  <div id="pp-toolbar">
+    <div style="display:flex;align-items:center;gap:4px;margin-left:auto;">
+      <button onclick="setViewMode('list')"  id="vm-list"  title="List"  style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:var(--r);background:transparent;color:var(--dim);cursor:pointer;font-family:var(--ui);letter-spacing:.04em;transition:all .15s;">LIST</button>
+      <button onclick="setViewMode('grid')"  id="vm-grid"  title="Grid"  style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:var(--r);background:transparent;color:var(--dim);cursor:pointer;font-family:var(--ui);letter-spacing:.04em;transition:all .15s;">GRID</button>
+      <button onclick="setViewMode('large')" id="vm-large" title="Large" style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:var(--r);background:transparent;color:var(--dim);cursor:pointer;font-family:var(--ui);letter-spacing:.04em;transition:all .15s;">LARGE</button>
+    </div>
+    <input type="text" id="pp-search" placeholder="Search presets…" oninput="ppFilter(this.value)">
+    <button id="pp-rand" onclick="randPreset(false); closePresetPanel();" title="Random">⟳</button>
+  </div>
+  <div id="pp-cats">
+    <button class="pp-pill active" data-cat="all"      onclick="ppCat('all')">All</button>
+    <button class="pp-pill" data-cat="flexi"     onclick="ppCat('flexi')">Flexi</button>
+    <button class="pp-pill" data-cat="martin"    onclick="ppCat('martin')">Martin</button>
+    <button class="pp-pill" data-cat="geiss"     onclick="ppCat('geiss')">Geiss</button>
+    <button class="pp-pill" data-cat="bmelton"   onclick="ppCat('bmelton')">bmelton</button>
+    <button class="pp-pill" data-cat="unchained" onclick="ppCat('unchained')">Unchained</button>
+    <button class="pp-pill" data-cat="other"     onclick="ppCat('other')">Other</button>
+  </div>
+  <div id="pp-body">
+    <div id="pp-grid-wrap">
+      <div id="pp-grid"></div>
+      <div id="pp-empty">No presets match</div>
+    </div>
+  </div>
+</div>
+
+<!-- SIDEBAR TOGGLE TAB -->
+<div id="ptab" onclick="toggleSidebar()"><span></span><span></span><span></span></div>
+
+<!-- SIDEBAR -->
+<div id="sb">
+<div id="sbi">
+
+  <!-- APP BRANDING -->
+  <div id="app-brand">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div id="app-name">IKANDY</div>
+      <button id="acc-all-btn" onclick="accToggleAll()" title="Expand / Collapse all"
+        style="background:none;border:1px solid var(--bdr);border-radius:4px;color:var(--dim);
+        font-family:var(--ui);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+        padding:3px 8px;cursor:pointer;transition:all .15s;white-space:nowrap;"
+        onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc-txt)'"
+        onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'">
+        ⊞ All
+      </button>
+    </div>
+    <div id="app-tagline">Visual music &nbsp;·&nbsp; v1.0</div>
+    <div id="theme-swatches">
+      <div class="theme-sw active" data-theme="gold"      style="background:#d4a843;" onclick="setTheme('gold')"      title="Gold"></div>
+      <div class="theme-sw"        data-theme="neon"      style="background:#ff2d8a;" onclick="setTheme('neon')"      title="Neon"></div>
+      <div class="theme-sw"        data-theme="forest"    style="background:#4caf7d;" onclick="setTheme('forest')"    title="Forest"></div>
+      <div class="theme-sw"        data-theme="dusk"      style="background:#9b72cf;" onclick="setTheme('dusk')"      title="Dusk"></div>
+      <div class="theme-sw"        data-theme="ice"       style="background:#5bc8f5;" onclick="setTheme('ice')"       title="Ice"></div>
+      <div class="theme-sw"        data-theme="white"     style="background:#e8e8e8;" onclick="setTheme('white')"     title="White"></div>
+    </div>
+  </div>
+
+  <!-- SOURCE -->
+  <div class="acc-hd open" onclick="accToggle(this)">
+    <span>Source</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd open">
+    <!-- Mode toggle -->
+    <div style="display:flex;gap:6px;margin-bottom:14px;">
+      <button id="src-spotify-btn" class="btn primary" style="flex:1;margin:0;font-size:11px;"
+        onclick="setSourceMode('spotify')">Spotify</button>
+      <button id="src-vlc-btn" class="btn" style="flex:1;margin:0;font-size:11px;"
+        onclick="setSourceMode('vlc')">VLC</button>
+      <button id="src-local-btn" class="btn" style="flex:1;margin:0;font-size:11px;"
+        onclick="setSourceMode('local')">Local</button>
+    </div>
+
+    <!-- Audio capture — always visible regardless of source -->
+    <button class="btn" id="recapture-btn" onclick="startSystemAudioCapture()"
+      style="margin-bottom:8px;border-color:var(--sp);color:var(--sp);">
+      🎤 Reconnect System Audio
+    </button>
+
+    <!-- Spotify panel -->
+    <div id="src-spotify-panel">
+      <div id="sp-info" style="font-size:12px;color:var(--dim);line-height:1.6;margin-bottom:12px;">
+        Not connected.
+      </div>
+      <button class="btn green" id="sb-connect" onclick="startLogin()">Connect Spotify</button>
+      <div style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6;">
+        Open Spotify and start playing something before using iKandy's controls.
+      </div>
+      <button class="btn" id="sb-playlists-btn" onclick="openPlaylistPanel()" style="display:none;border-color:var(--sp);color:var(--sp);margin-top:4px;">Playlists</button>
+      <button class="btn danger" id="sb-disconnect" onclick="logout()" style="display:none;">Disconnect</button>
+      <button class="btn" id="sb-change-client" onclick="changeClientId()" style="display:none;font-size:10px;padding:5px;color:var(--dim);margin-top:4px;">Change Client ID</button>
+      <div id="sp-device" style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;"></div>
+      <button class="btn" id="manual-fetch-btn" onclick="manualFetchOnce()"
+        style="display:none;margin-top:8px;font-size:11px;padding:7px 12px;">
+        Fetch Current Track (manual)
+      </button>
+    </div>
+
+    <!-- VLC panel -->
+    <div id="src-vlc-panel" style="display:none;">
+      <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:10px;">
+        Enable VLC's Web interface:<br>
+        <span style="color:var(--acc);">Tools → Preferences → All → Interface → Main interfaces → check "Web"</span><br>
+        Set a password, restart VLC.
+      </div>
+      <input id="vlc-port-input" type="number" value="8080" min="1" max="65535"
+        placeholder="Port (default 8080)"
+        style="width:100%;margin-bottom:6px;padding:8px 10px;background:rgba(255,255,255,.06);
+        border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);
+        font-family:var(--ui);font-size:12px;outline:none;">
+      <input id="vlc-pass-input" type="password" placeholder="VLC Web password"
+        style="width:100%;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,.06);
+        border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);
+        font-family:var(--ui);font-size:12px;outline:none;">
+      <button class="btn green" onclick="vlcConnect()">Connect VLC</button>
+      <div id="vlc-status" style="font-size:11px;margin-top:8px;color:var(--dim);line-height:1.5;"></div>
+    </div>
+
+    <!-- Local Audio panel -->
+    <div id="src-local-info" style="display:none;font-size:11px;color:var(--dim);line-height:1.6;padding:4px 0;">
+      Click <span style="color:var(--acc-txt);">🎤 System Audio</span> above, pick your audio source and check <span style="color:var(--acc-txt);">"Share audio"</span> to start the visualizer.
+    </div>
+  </div>
+
+  <!-- PRESETS -->
+  <div class="acc-hd open" id="acc-presets" onclick="accToggle(this)">
+    <span>Presets</span>
+    <span id="pc-count" style="font-size:10px;color:var(--dim);font-weight:400;margin-left:4px;"></span>
+    <span class="chev">›</span>
+  </div>
+  <div class="acc-bd open">
+    <div style="font-size:12px;color:var(--dim);margin-bottom:10px;">
+      Now: <span id="pname-sb" style="color:var(--acc);">—</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button class="btn primary" style="margin:0;flex:1;" onclick="openPresetPanel()">Browse All →</button>
+      <button class="btn" style="width:auto;padding:10px 14px;margin:0;" onclick="randPreset(false)" title="Random (keeps auto)">⟳</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <button class="btn" style="width:auto;padding:5px 12px;margin:0;font-size:11px;" id="auto-sb" onclick="toggleAuto()">Auto-cycle</button>
+      <input type="number" id="cycle-s" value="20" min="5" max="300"
+        style="width:50px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);
+        color:var(--txt);font-family:var(--ui);font-size:12px;padding:5px 7px;
+        border-radius:var(--r);outline:none;">
+      <span style="font-size:11px;color:var(--dim);">s · blend</span>
+      <input type="number" id="blend-s" value="2.5" min="0" max="10" step=".5"
+        style="width:50px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);
+        color:var(--txt);font-family:var(--ui);font-size:12px;padding:5px 7px;
+        border-radius:var(--r);outline:none;">
+      <span style="font-size:11px;color:var(--dim);">s</span>
+    </div>
+  </div>
+
+  <!-- VISUALS -->
+  <div class="acc-hd" id="acc-visuals" onclick="accToggle(this)">
+    <span>Visuals</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd">
+
+    <span class="lbl">Speed
+      <span class="lbl-hint">How fast the animation moves</span>
+    </span>
+    <div class="svr">
+      <input type="range" id="speed-sl" min="1" max="5" step="1" value="3"
+        oninput="setSpeed(+this.value)">
+      <span class="svv" id="speed-v">3</span>
+    </div>
+
+    <span class="lbl">Reactivity
+      <span class="lbl-hint">How much the visuals respond to music</span>
+    </span>
+    <div class="svr">
+      <input type="range" id="sens-sl" min=".3" max="4" step=".05" value="1.5"
+        oninput="setSensitivity(+this.value)">
+      <span class="svv" id="sens-v">1.50</span>
+    </div>
+
+    <span class="lbl">Smoothness
+      <span class="lbl-hint">Higher = slower, dreamier motion</span>
+    </span>
+    <div class="svr">
+      <input type="range" id="sm-sl" min=".4" max=".98" step=".01" value=".75"
+        oninput="setSmoothing(+this.value)">
+      <span class="svv" id="sm-v">.75</span>
+    </div>
+
+    <span class="lbl">Viz Opacity</span>
+    <div class="svr">
+      <input type="range" id="viz-opacity-sl" min="0" max="1" step=".05" value="1"
+        oninput="setVizOpacity(+this.value)">
+      <span class="svv" id="viz-opacity-v">1.0</span>
+    </div>
+
+  </div>
+
+  <!-- VIBE -->
+  <div class="acc-hd" id="acc-vibe" onclick="accToggle(this)">
+    <span>Vibe</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd">
+
+    <!-- BACKGROUND SOURCE -->
+    <span class="lbl">Background</span>
+    <button id="bg-upload-btn" onclick="el('bg-file-input').click()">📷 Single Image</button>
+    <button id="bg-folder-btn" onclick="pickBgFolder()" style="width:100%;padding:8px;border:1px dashed var(--bdr);border-radius:var(--r);background:transparent;color:var(--dim);font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .13s;margin-bottom:5px;">📁 Cycle Folder</button>
+    <div style="font-size:10px;color:var(--dim);margin-bottom:8px;">Best: 1920×1080 or any 16:9</div>
+    <div id="bg-filename" style="display:none;"></div>
+    <div id="bg-cycle-row" style="display:none;align-items:center;gap:8px;margin-bottom:8px;">
+      <span style="font-size:11px;color:var(--dim);">Every</span>
+      <input type="number" id="bg-cycle-s" value="15" min="3" max="300"
+        style="width:55px;padding:5px 7px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);
+        border-radius:var(--r);color:var(--txt);font-family:var(--ui);font-size:12px;outline:none;"
+        oninput="setBgCycleTime(+this.value)">
+      <span style="font-size:11px;color:var(--dim);">s</span>
+    </div>
+    <button class="btn" id="bg-clear-btn" onclick="clearBgImage()" style="display:none;font-size:11px;padding:5px 10px;margin-bottom:10px;">✕ Remove</button>
+
+    <!-- FX MODE — always visible -->
+    <span class="lbl" style="margin-top:4px;">FX Mode</span>
+    <!-- ALL 12 FX — always visible, single select -->
+    <div id="imgfx-row">
+      <div style="font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">Lo-Fi</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px;">
+        <button class="vibe-btn" id="ifx-raindrops" onclick="setImgFx('raindrops')">Rain</button>
+        <button class="vibe-btn" id="ifx-inkbleed"   onclick="setImgFx('inkbleed')">Ink</button>
+        <button class="vibe-btn" id="ifx-vhswarp"    onclick="setImgFx('vhswarp')">VHS</button>
+        <button class="vibe-btn" id="ifx-fog"        onclick="setImgFx('fog')">Fog</button>
+        <button class="vibe-btn" id="ifx-watercolor" onclick="setImgFx('watercolor')">Paint</button>
+        <button class="vibe-btn" id="ifx-dustfilm"   onclick="setImgFx('dustfilm')">Film</button>
+      </div>
+      <div style="font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">Cyber</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:10px;">
+        <button class="vibe-btn" id="ifx-liquidmetal" onclick="setImgFx('liquidmetal')">Metal</button>
+        <button class="vibe-btn" id="ifx-shatter"     onclick="setImgFx('shatter')">Shatter</button>
+        <button class="vibe-btn" id="ifx-datacorrupt" onclick="setImgFx('datacorrupt')">Corrupt</button>
+        <button class="vibe-btn" id="ifx-plasmaarc"   onclick="setImgFx('plasmaarc')">Plasma</button>
+        <button class="vibe-btn" id="ifx-hologram"    onclick="setImgFx('hologram')">Holo</button>
+        <button class="vibe-btn" id="ifx-heatwave"    onclick="setImgFx('heatwave')">Heat</button>
+      </div>
+      <span class="lbl">Strength</span>
+      <div class="svr" style="margin-bottom:8px;">
+        <input type="range" id="fx-strength-sl" min="0" max="2" step="0.05" value="1"
+          oninput="setFxStrength(+this.value)">
+        <span class="svv" id="fx-strength-v">1.0</span>
+      </div>
+
+    </div>
+
+    <span class="lbl">Grain</span>
+    <div class="svr">
+      <input type="range" id="grain-sl" min="0" max="1" step=".05" value="0"
+        oninput="setGrain(+this.value)">
+      <span class="svv" id="grain-v">0</span>
+    </div>
+
+    <span class="lbl">Scanlines</span>
+    <div class="svr">
+      <input type="range" id="scan-sl" min="0" max=".8" step=".05" value="0"
+        oninput="setScanlines(+this.value)">
+      <span class="svv" id="scan-v">0</span>
+    </div>
+  </div>
+
+  <!-- LYRICS -->
+  <div class="acc-hd" id="acc-lyrics" onclick="accToggle(this)">
+    <span>Lyrics</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span id="lyric-status" style="font-size:12px;color:var(--dim);">—</span>
+      <button class="btn" id="overlay-btn" onclick="toggleOverlay()"
+        style="width:auto;padding:4px 10px;margin:0;font-size:11px;">Overlay ON</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
+      <button class="btn" id="lyric-classic-btn" onclick="setLyricMode('classic')"
+        style="flex:1;padding:5px 8px;font-size:11px;margin:0;border-color:var(--sp);color:var(--sp);">Classic</button>
+      <button class="btn" id="lyric-physics-btn" onclick="setLyricMode('physics')"
+        style="flex:1;padding:5px 8px;font-size:11px;margin:0;">Physics</button>
+    </div>
+    <div id="physics-size-row" style="display:none;">
+      <span class="lbl">Word Size</span>
+      <div class="svr">
+        <input type="range" id="physics-size-sl" min="0.5" max="4" step="0.1" value="1.25"
+          oninput="setPhysicsSize(+this.value)">
+        <span class="svv" id="physics-size-v">1.25×</span>
+      </div>
+    </div>
+    <div id="lyrics-box"></div>
+  </div>
+
+
+</div></div><!-- /sidebar -->
+
+<div id="toast"></div>
+
+
+
+<!-- Butterchurn CDN -->
+<script src="https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js" defer></script>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════
+   iKANDY — Renderer
+   All Spotify auth/polling is in main.js (Node).
+   This renderer receives push data via IPC and handles visuals.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const el  = id => document.getElementById(id);
+const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ── CANVAS / VISUALIZER ── */
+const vizCanvas = el('viz');
+let W = window.innerWidth, H = window.innerHeight;
+let visualizer = null;
+let allNames = [], allPresets = [], currentIdx = 0;
+let autoCycle = true, cycleTimer = null;
+
+/* ── AUDIO ── */
+let audioCtx = null, analyserNode = null, gainNode = null;
+let _systemAudioStream = null, _systemAudioSrc = null;
+
+/* ── PLAYBACK STATE (fed by main.js via IPC) ── */
+let trackId = null, trackProgress = 0, trackDuration = 0;
+let trackPlaying = false;
+let _pollAnchorProgress = 0, _pollAnchorTime = 0;
+const LYRIC_LOOKAHEAD = 100;
+let lyrics = [], lyricsSync = false, lyricsOn = true, lastLyricIdx = -1;
+let ppCatFilter = 'all', ppSearchStr = '';
+
+/* ── RESIZE ── */
+function resize() {
+  W = vizCanvas.width = window.innerWidth;
+  H = vizCanvas.height = window.innerHeight;
+  if (visualizer) visualizer.setRendererSize(W, H);
+  grainCanvas.style.width  = W + 'px';
+  grainCanvas.style.height = H + 'px';
+  resizeScan();
+  resizeVig();
+}
+window.addEventListener('resize', resize);
+
+/* ── RENDER LOOP — speed-controlled ── */
+let _frameskip = 0;
+let _lastRafTs = 0;
+let _skipCount = 0;
+let _speedSkip = 1;
+function renderLoop(ts) {
+  requestAnimationFrame(renderLoop);
+  if (_speedSkip > 0) {
+    _skipCount++;
+    if (_skipCount <= _speedSkip) return;
+    _skipCount = 0;
+  }
+  if (trackPlaying && _pollAnchorTime > 0 && trackDuration > 0) {
+    const elapsed = performance.now() - _pollAnchorTime;
+    trackProgress = Math.min(_pollAnchorProgress + elapsed, trackDuration);
+  }
+  _lastRafTs = ts;
+  if (visualizer) visualizer.render();
+  // Feed audio to fx + drive grain/vignette
+  if (analyserNode) {
+    const d = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteFrequencyData(d);
+    const binCount = d.length;
+
+    // Bass — low 8% of bins (kick, bass)
+    const bassEnd  = Math.floor(binCount * 0.08);
+    let bassSum = 0;
+    for (let i = 0; i < bassEnd; i++) bassSum += d[i];
+    const bassRaw = bassSum / bassEnd / 255;
+
+    // Treble — top 25% of bins (hi-hats, cymbals, sibilance)
+    const trebleStart = Math.floor(binCount * 0.75);
+    let trebSum = 0;
+    for (let i = trebleStart; i < binCount; i++) trebSum += d[i];
+    const trebleRaw = trebSum / (binCount - trebleStart) / 255;
+
+    // Overall peak for image FX shader
+    const peak = Math.max(...d) / 255;
+
+    // Smooth bass for vignette (fast attack, slow release)
+    _vigBass = Math.max(bassRaw, _vigBass * 0.88);
+    drawVignette(_vigBass);
+
+    // Grain sync to treble — modulate on top of user setting
+    if (_grainOpacity > 0) {
+      const trebleBoost = _grainOpacity + trebleRaw * 0.4;
+      grainCanvas.style.opacity = Math.min(1, trebleBoost).toFixed(3);
+    }
+
+    if (_bgTexture) updateRippleAmp(peak);
+  }
+  drawLyricOverlay();
+  if (trackDuration > 0) updateProgressBar(trackProgress, trackDuration);
+}
+
+let _lastLyricText = '';
+let _lyricMode = 'classic'; // 'classic' or 'physics'
+
+let _physicsSizeMultiplier = 1.25; // 25% bigger than base by default
+
+function setPhysicsSize(val) {
+  _physicsSizeMultiplier = val;
+  const v = el('physics-size-v');
+  if (v) v.textContent = val.toFixed(1) + '×';
+  // Respawn current lyric at new size so change is immediate
+  if (_lyricMode === 'physics' && _lastLyricText) {
+    _physicsWords = [];
+    spawnPhysicsWords(_lastLyricText);
+  }
+}
+
+function setLyricMode(mode) {
+  _lyricMode = mode;
+  const classicBtn = el('lyric-classic-btn');
+  const physicsBtn = el('lyric-physics-btn');
+  if (classicBtn) { classicBtn.style.borderColor = mode === 'classic' ? 'var(--sp)' : ''; classicBtn.style.color = mode === 'classic' ? 'var(--sp)' : ''; }
+  if (physicsBtn) { physicsBtn.style.borderColor = mode === 'physics' ? 'var(--sp)' : ''; physicsBtn.style.color = mode === 'physics' ? 'var(--sp)' : ''; }
+  // Show size slider only in physics mode
+  const sizeRow = el('physics-size-row');
+  if (sizeRow) sizeRow.style.display = mode === 'physics' ? 'block' : 'none';
+  // Clear physics canvas when switching
+  const wrap = el('physics-wrap');
+  if (wrap) wrap.innerHTML = '';
+  _physicsWords = [];
+  el('lyric-line').classList.add('blank');
+}
+
+function drawLyricOverlay() {
+  const lineEl = el('lyric-line');
+  if (!lyricsOn || !lyrics.length) {
+    lineEl.classList.add('blank');
+    return;
+  }
+  const line = getCurrentLyric();
+  if (_lyricMode === 'physics') {
+    lineEl.classList.add('blank'); // hide classic overlay
+    if (line && line !== _lastLyricText) {
+      _lastLyricText = line;
+      spawnPhysicsWords(line);
+    }
+    renderPhysicsWords();
+  } else {
+    // Classic mode
+    const pc = el('physics-canvas');
+    if (pc) { const ctx = pc.getContext('2d'); ctx.clearRect(0, 0, window.innerWidth, window.innerHeight); }
+    if (line) {
+      if (line !== _lastLyricText) {
+        _lastLyricText = line;
+        lineEl.classList.add('blank');
+        setTimeout(() => { lineEl.textContent = line; lineEl.classList.remove('blank'); }, 150);
+      } else {
+        lineEl.classList.remove('blank');
+      }
+    } else {
+      lineEl.classList.add('blank');
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHYSICS LYRICS ENGINE
+   ═══════════════════════════════════════════════════════════════════ */
+let _physicsWords = [];
+
+function initPhysicsCanvas() {
+  // No canvas needed — we use DOM divs which scale perfectly always
+  console.log('[iKandy] Physics DOM mode ready');
+}
+
+function getBassEnergy() {
+  if (!analyserNode) return 0;
+  const data = new Uint8Array(analyserNode.frequencyBinCount);
+  analyserNode.getByteFrequencyData(data);
+  let bass = 0;
+  for (let i = 1; i < 9; i++) bass += data[i];
+  return bass / 8 / 255; // 0-1
+}
+
+function spawnPhysicsWords(line) {
+  const wrap = el('physics-wrap');
+  if (!wrap) return;
+
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  const cx = W / 2, cy = H / 2;
+  const words = line.trim().split(/\s+/).filter(Boolean);
+  const bass   = getBassEnergy();
+  const energy = 0.5 + bass * 2.5;
+
+  // Fade out existing words fast
+  _physicsWords.forEach(w => { w.ttl = Math.min(w.ttl, 400); });
+
+  // Font size from slider
+  const fontSize = Math.round(40 * _physicsSizeMultiplier);
+
+  words.forEach((word, i) => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (2 + Math.random() * 4) * energy;
+    const hue   = Math.random() < 0.25 ? Math.random() * 360 : -1;
+
+    setTimeout(() => {
+      const div = document.createElement('div');
+      div.className = 'pw';
+      div.textContent = word;
+      div.style.fontSize = fontSize + 'px';
+      if (hue >= 0) div.style.color = `hsl(${hue}, 90%, 70%)`;
+
+      // Spawn near center with slight scatter
+      const x = cx + (Math.random() - 0.5) * W * 0.2;
+      const y = cy + (Math.random() - 0.5) * H * 0.2;
+      div.style.left    = x + 'px';
+      div.style.top     = y + 'px';
+      div.style.opacity = '0';
+      wrap.appendChild(div);
+
+      _physicsWords.push({
+        el:       div,
+        x, y,
+        vx:       Math.cos(angle) * speed,
+        vy:       Math.sin(angle) * speed - 1.5,
+        rotation: (Math.random() - 0.5) * 20,
+        rotSpeed: (Math.random() - 0.5) * 2,
+        alpha:    0,
+        ttl:      2500 + Math.random() * 1000,
+        born:     performance.now(),
+        mass:     0.85 + Math.random() * 0.3,
+        // No zone bounds — full screen chaos
+        bx1: 40, bx2: W - 40, by1: 40, by2: H - 40,
+      });
+    }, i * 45);
+  });
+}
+function renderPhysicsWords() {
+  if (!_physicsWords.length) return;
+  const now  = performance.now();
+  const bass = getBassEnergy();
+  const W    = window.innerWidth;
+  const H    = window.innerHeight;
+
+  // Beat impulse
+  if (bass > 0.35) {
+    const impulse = (bass - 0.35) * 5;
+    _physicsWords.forEach(w => {
+      if (!w.el) return;
+      const cx = (w.bx1 + w.bx2) / 2;
+      const cy = (w.by1 + w.by2) / 2;
+      const dx = w.x - cx, dy = w.y - cy;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      w.vx += (dx / dist) * impulse;
+      w.vy += (dy / dist) * impulse;
+    });
+  }
+
+  _physicsWords = _physicsWords.filter(w => {
+    if (!w.el) return false;
+    const age    = now - w.born;
+    const fading = age > w.ttl - 400;
+
+    // Physics
+    w.vy       += 0.04 * w.mass;
+    w.vx       *= 0.985;
+    w.vy       *= 0.985;
+    w.x        += w.vx;
+    w.y        += w.vy;
+    w.rotation += w.rotSpeed;
+    w.rotSpeed *= 0.98;
+
+    // Bounce
+    if (w.x < w.bx1)  { w.x = w.bx1;  w.vx =  Math.abs(w.vx) * 0.5; }
+    if (w.x > w.bx2)  { w.x = w.bx2;  w.vx = -Math.abs(w.vx) * 0.5; }
+    if (w.y < w.by1)  { w.y = w.by1;  w.vy =  Math.abs(w.vy) * 0.5; }
+    if (w.y > w.by2)  { w.y = w.by2;  w.vy = -Math.abs(w.vy) * 0.6; }
+
+    // Alpha
+    if (fading) w.alpha = Math.max(0, w.alpha - 0.03);
+    else        w.alpha = Math.min(0.95, w.alpha + 0.08);
+
+    // Apply to DOM
+    w.el.style.transform = `translate(-50%, -50%) rotate(${w.rotation}deg)`;
+    w.el.style.left    = w.x + 'px';
+    w.el.style.top     = w.y + 'px';
+    w.el.style.opacity = w.alpha;
+
+    // Remove when invisible and expired
+    if (w.alpha <= 0 && age > w.ttl) {
+      w.el.remove();
+      return false;
+    }
+    return true;
+  });
+}
+
+/* ── AUDIO ENGINE ── */
+/* ── Resume AudioContext on first user gesture ── */
+let _audioResumed = false;
+async function ensureAudioRunning() {
+  if (_audioResumed) return;
+  if (audioCtx && audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+    console.log('[iKandy] AudioContext resumed on user gesture');
+  }
+  _audioResumed = true;
+}
+
+
+/* ── Listen for any user gesture to resume audio ── */
+function setupAudioResumeOnGesture() {
+  const resume = () => { ensureAudioRunning(); };
+  document.addEventListener('click', resume, { once: true });
+  document.addEventListener('keydown', resume, { once: true });
+}
+
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyserNode = audioCtx.createAnalyser();
+  analyserNode.fftSize = 2048;
+  analyserNode.smoothingTimeConstant = 0.75;
+  analyserNode.minDecibels = -100;
+  analyserNode.maxDecibels = 0;
+  gainNode = audioCtx.createGain();
+  gainNode.gain.value = 0.8;
+  gainNode.connect(audioCtx.destination);
+}
+
+function initButterchurn() {
+  const bc = butterchurn.default || butterchurn;
+  visualizer = bc.createVisualizer(audioCtx, vizCanvas, {
+    width: W || window.innerWidth, height: H || window.innerHeight,
+    pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+  });
+  visualizer.connectAudio(analyserNode);
+}
+
+/* ── Auto-connect system audio on load (Electron bypasses picker) ── */
+async function autoConnectSystemAudio() {
+  if (_systemAudioStream) return; // already connected
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { width: 1, height: 1, frameRate: 1 },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 44100 },
+    });
+    stream.getVideoTracks().forEach(t => t.stop());
+    if (!stream.getAudioTracks().length) {
+      console.warn('[iKandy] Auto-connect: no audio track — user will need to click 🎤');
+      return;
+    }
+    await connectAudioStream(stream, 'System Audio', true);
+    console.log('[iKandy] System audio auto-connected on load');
+  } catch(e) {
+    // Silently fail — user can click 🎤 manually
+    console.warn('[iKandy] Auto-connect audio failed:', e.message);
+  }
+}
+
+/* ── SYSTEM AUDIO CAPTURE ── */
+async function startSystemAudioCapture() {
+  // Init audio context if not already done (Local mode before init gate)
+  if (!audioCtx) {
+    initAudio();
+    // Can't connect Butterchurn yet if not initialized — that's ok for local mode
+  }
+  if (audioCtx && audioCtx.state !== 'running') await audioCtx.resume();
+  if (_systemAudioStream) { _systemAudioStream.getTracks().forEach(t => t.stop()); _systemAudioStream = null; }
+  if (_systemAudioSrc)    { try { _systemAudioSrc.disconnect(); } catch(e) {} _systemAudioSrc = null; }
+  try {
+    toast('🎵 Pick the Spotify window → check "Share audio" → click Share');
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { width: 1, height: 1, frameRate: 1 },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 44100 },
+    });
+    stream.getVideoTracks().forEach(t => t.stop());
+    if (!stream.getAudioTracks().length) {
+      toast('⚠ No audio captured — tick "Share audio" and try again'); return;
+    }
+    console.log('[iKandy] Screen share audio track:', stream.getAudioTracks()[0].label);
+    await connectAudioStream(stream, 'Application audio');
+  } catch(e) {
+    if (e.name === 'NotAllowedError') toast('Capture cancelled — click 🎤 Reconnect System Audio to try again');
+    else { toast('Audio capture failed: ' + e.message); console.error('[iKandy] getDisplayMedia error:', e); }
+  }
+}
+
+async function connectAudioStream(stream, label, silent = false) {
+  if (_systemAudioSrc) { try { _systemAudioSrc.disconnect(); } catch(e) {} _systemAudioSrc = null; }
+  _systemAudioStream = stream;
+  if (audioCtx.state !== 'running') await audioCtx.resume();
+  _systemAudioSrc = audioCtx.createMediaStreamSource(stream);
+  const boostGain = audioCtx.createGain();
+  boostGain.gain.value = 4.0;
+  window._boostGainNode = boostGain;
+  _systemAudioSrc.connect(boostGain);
+  boostGain.connect(analyserNode);
+  console.log('[iKandy] Audio chain: stream → boost(4x) → analyser [visuals only, no echo]');
+  if (!silent) {
+    setTimeout(() => {
+      const data = new Uint8Array(analyserNode.frequencyBinCount);
+      analyserNode.getByteFrequencyData(data);
+      const peak = Math.max(...data);
+      console.log('[iKandy] Signal check — peak:', peak, '| AudioCtx:', audioCtx.state);
+      if (peak < 5) toast('⚠ No audio signal detected. Make sure music is playing.');
+      else toast('✓ Audio signal active — visuals reacting to music');
+    }, 3000);
+    toast('🎵 ' + label + ' — visuals reacting to audio');
+  }
+  updateBadge(true, 'Connected · audio active');
+  stream.getTracks()[0].onended = () => {
+    updateBadge(true, 'Connected · audio capture ended');
+    toast('Audio capture ended — click "🎤 Reconnect System Audio"');
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SPOTIFY — ALL VIA IPC FROM MAIN.JS
+   ═══════════════════════════════════════════════════════════════════ */
+function fadeLoading() {
+  const ld = el('loading');
+  if (!ld) return;
+  ld.classList.add('fade');
+  setTimeout(() => ld.classList.add('gone'), 550);
+}
+function setupSpotifyIPC() {
+  window.ikandy.onAuthResult(state => {
+    console.log('[iKandy] auth-result:', state);
+    if (state.needsSetup) {
+      fadeLoading();
+      el('setup').style.display = 'flex';
+      el('login').style.display = 'none';
+      el('client-id-input').value = '';
+      el('setup-error').style.display = 'none';
+      if (sidebarOpen) toggleSidebar();
+      setTimeout(() => {}, 0); // setup screen shown
+      return;
+    }
+    if (state.success) {
+      fadeLoading();
+      el('login').style.display  = 'none';
+      el('setup').style.display  = 'none';
+      ensureAudioRunning();
+      // Auto-connect system audio — Electron bypasses the picker silently
+      autoConnectSystemAudio();
+      updateBadge(true, 'Connected');
+      el('sb-connect').style.display       = 'none';
+      el('sb-playlists-btn').style.display = '';
+      el('sb-disconnect').style.display    = '';
+      el('sb-change-client').style.display = '';
+
+      // Free vs Premium — show/hide playback controls
+      const isPremium = state.product === 'premium';
+      _isPremium = isPremium;
+      setSpotifyControls(isPremium);
+
+      // First-run tour
+      setTimeout(window.tkStart, 1200);
+    } else if (state.loggedOut) {
+      fadeLoading();
+      updateBadge(false, 'Disconnected');
+      el('sb-connect').style.display    = '';
+      el('sb-disconnect').style.display = 'none';
+      el('sb-playlists-btn').style.display = 'none';
+      el('sp-info').textContent = 'Not connected.';
+      setSpotifyControls(false);
+      _plLoaded = false; _playlists = [];
+      el('plp-count').textContent = '';
+      el('sb-playlists-btn').style.display = 'none';
+    } else if (state.error) {
+      toast('Auth failed: ' + state.error);
+    } else {
+      // No token — show login screen
+      fadeLoading();
+      el('login').style.display = 'flex';
+    }
+  });
+
+  window.ikandy.onSpotifyState(state => {
+    if (state.type === 'local') {
+      el('hud').style.display      = 'none';
+      el('controls').style.display = 'none';
+      updateBadge(true, 'Local');
+      return;
+    }
+    if (state.type === 'volume') {
+      const sl = el('vol-sl');
+      if (sl && Math.abs(+sl.value - state.volume) > 1) {
+        sl.value = state.volume;
+        _lastVolumeSent = state.volume;
+      }
+      return;
+    }
+    if (state.type === 'track') {
+      // VLC always shows HUD; Spotify checks premium
+      if (currentSource === 'vlc') {
+        el('hud').style.display      = '';
+        el('controls').style.display = '';
+      } else if (el('free-note')?.style.display !== 'block') {
+        el('hud').style.display      = '';
+        el('controls').style.display = '';
+      }
+      trackPlaying = state.playing;
+      setPlayIcon(state.playing);
+      if (!state.title) return; // partial update (e.g. play state sync only)
+      trackDuration    = state.duration;
+      _pollAnchorProgress = state.progress;
+      _pollAnchorTime     = performance.now();
+      trackProgress       = state.progress;
+      updateHUD(state.title, state.artist, state.album, state.art, trackProgress, state.duration);
+      // Sync volume slider if volume changed externally
+      if (state.volume != null) {
+        const sl = el('vol-sl');
+        if (sl && Math.abs(+sl.value - state.volume) > 1) {
+          sl.value = state.volume;
+          // Update visual without sending back to Spotify
+          _lastVolumeSent = state.volume;
+        }
+      }
+      const info = el('sp-info');
+      if (info) info.textContent = (state.playing ? '▶ ' : '⏸ ') + state.title + ' — ' + state.artist;
+      if (state.id !== trackId) {
+        trackId = state.id;
+        lyrics = []; lyricsSync = false; lastLyricIdx = -1;
+        el('lyric-line').classList.add('blank');
+        console.log('[iKandy] Track change:', state.title);
+        advancePreset();
+        // Restart cycle timer on track change so it reliably fires
+        if (autoCycle) { clearTimeout(cycleTimer); startCycle(); }
+      }
+    }
+  });
+
+  window.ikandy.onLyrics(({ type, raw }) => {
+    lyrics = []; lyricsSync = false; lastLyricIdx = -1;
+    if (type === 'synced') {
+      lyrics = parseLRC(raw); lyricsSync = true;
+      buildLyricsUI();
+      el('lyric-status').textContent = `✓ Synced · ${lyrics.length} lines`;
+    } else if (type === 'plain') {
+      lyrics = raw.split('\n').filter(l => l.trim());
+      buildLyricsUI();
+      el('lyric-status').textContent = `✓ ${lyrics.length} lines`;
+    } else {
+      // No lyrics — clear everything so previous song's lyrics don't linger
+      lyrics = []; lyricsSync = false; lastLyricIdx = -1;
+      el('lyric-line').textContent = '';
+      el('lyric-line').classList.add('blank');
+      el('lyric-status').textContent = 'No lyrics found';
+    }
+    setTimeout(() => { el('lyric-status').textContent = ''; }, 4000);
+  });
+
+  window.ikandy.rendererReady();
+  console.log('[iKandy] IPC listeners registered, rendererReady sent');
+}
+
+/* ── HUD ── */
+function setControlsLocked(locked) {
+  ['cb-prev','cb-pp','cb-next'].forEach(id => {
+    const btn = el(id);
+    if (btn) { btn.disabled = locked; btn.style.opacity = locked ? '0.3' : '1'; }
+  });
+  const vol = el('vol-sl');
+  if (vol) { vol.disabled = locked; vol.style.opacity = locked ? '0.3' : '1'; }
+}
+
+function updateHUD(title, artist, album, art, progress, duration) {
+  const hTitle = el('hud-title'), hArtist = el('hud-artist');
+  const hArt = el('hud-art');
+  if (hTitle)  hTitle.textContent  = title  || '';
+  if (hArtist) hArtist.textContent = artist || '';
+  if (hArt) {
+    if (art === 'local') {
+      // Draw a simple waveform icon as local art
+      hArt.src = '';
+      hArt.classList.remove('show');
+      el('hud-local-art') && (el('hud-local-art').style.display = '');
+    } else if (art) {
+      el('hud-local-art') && (el('hud-local-art').style.display = 'none');
+      hArt.src = art;
+      hArt.classList.add('show');
+      hArt.onerror = () => { hArt.classList.remove('show'); hArt.src = ''; };
+    } else {
+      el('hud-local-art') && (el('hud-local-art').style.display = 'none');
+      hArt.classList.remove('show'); hArt.src = '';
+    }
+  }
+  updateProgressBar(progress, duration);
+}
+function updateProgressBar(progress, duration) {
+  const bar = el('hud-bar');
+  if (bar && duration > 0) bar.style.width = (progress / duration * 100) + '%';
+  // hud-time doesn't exist in HTML, skip silently
+}
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000), m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
+}
+function updateBadge(connected, label) {
+  const dot = el('status-dot');
+  if (dot) dot.classList.toggle('live', connected);
+  const lbl = el('status-label');
+  if (lbl) lbl.textContent = label || '';
+}
+
+/* ── PLAY ICON ── */
+function setPlayIcon(playing) {
+  const icon = el('pp-icon');
+  if (!icon) return;
+  icon.innerHTML = playing
+    ? '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>'
+    : '<path d="M8 5v14l11-7z"/>';
+}
+
+/* ── CONTROLS ── */
+async function spAction(cmd) {
+  const type = typeof cmd === 'string' ? cmd : cmd.type;
+  if (currentSource === 'vlc') {
+    await window.ikandy.vlcAction(typeof cmd === 'string' ? { type: cmd } : cmd);
+    return;
+  }
+  if (type === 'playpause') {
+    const wasPlaying = trackPlaying;
+    setPlayIcon(!wasPlaying);
+    try {
+      const result = await window.ikandy.action(cmd);
+      if (result && !result.ok) setPlayIcon(wasPlaying);
+      else trackPlaying = !wasPlaying;
+    } catch(e) { setPlayIcon(wasPlaying); }
+    return;
+  }
+  await window.ikandy.action(cmd);
+}
+
+let _volDebounce = null;
+let _lastVolumeSent = -1;
+function setVolume(val) {
+  _lastVolumeSent = val;
+  clearTimeout(_volDebounce);
+  _volDebounce = setTimeout(() => {
+    if (currentSource === 'vlc') {
+      window.ikandy.vlcAction({ type: 'volume', value: val });
+    } else {
+      window.ikandy.action({ type: 'volume', value: val });
+    }
+  }, 300);
+}
+
+function openExternal(url) {
+  const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.click();
+}
+async function saveSetup() {
+  const input = el('client-id-input');
+  const id = (input?.value || '').trim();
+  if (!id || id.length < 10) { el('setup-error').style.display = 'block'; return; }
+  const result = await window.ikandy.saveClientId(id);
+  if (result.ok) {
+    el('setup').style.display = 'none';
+    el('login').style.display = 'flex';
+    toast('Client ID saved ✓ — now connect your Spotify account');
+  } else {
+    el('setup-error').textContent = result.error || 'Invalid Client ID';
+    el('setup-error').style.display = 'block';
+  }
+}
+async function changeClientId() {
+  if (!confirm('This will disconnect Spotify and return to setup. Continue?')) return;
+  await window.ikandy.clearClientId();
+  // Close sidebar and show setup screen
+  if (sidebarOpen) toggleSidebar();
+  el('setup').style.display = 'flex';
+  el('login').style.display = 'none';
+  el('client-id-input').value = '';
+  el('setup-error').style.display = 'none';
+}
+async function startLogin() {
+  const id = await window.ikandy.getClientId();
+  if (!id) {
+    // No Client ID — bring back the full centered setup screen
+    el('setup').style.display  = 'flex';
+    el('login').style.display  = 'none';
+    // Close sidebar so setup screen is fully visible
+    if (sidebarOpen) toggleSidebar();
+    return;
+  }
+  window.ikandy.startAuth();
+}
+/* ── PLAYLIST PANEL ── */
+let _playlists = [], _plLoaded = false, _activePlUri = '', _plSearchStr = '';
+
+async function openPlaylistPanel() {
+  el('playlist-panel').classList.add('open');
+  if (!_plLoaded) await loadPlaylists();
+}
+function closePlaylistPanel() {
+  el('playlist-panel').classList.remove('open');
+}
+async function loadPlaylists() {
+  el('plp-grid').innerHTML = '<div style="padding:48px;text-align:center;color:var(--dim);font-size:13px;">Loading…</div>';
+  const result = await window.ikandy.getPlaylists();
+  if (!result.ok) {
+    el('plp-grid').innerHTML = `<div style="padding:48px;text-align:center;color:var(--red);">${esc(result.error || 'Failed')}</div>`;
+    return;
+  }
+  _playlists = result.playlists;
+  _plLoaded = true;
+  el('plp-count').textContent = _playlists.length + ' playlists';
+  buildPlpGrid(_playlists);
+}
+function buildPlpGrid(list) {
+  const grid = el('plp-grid');
+  grid.innerHTML = '';
+  const filtered = _plSearchStr ? list.filter(p => p.name.toLowerCase().includes(_plSearchStr)) : list;
+  el('plp-empty').style.display = filtered.length === 0 ? 'block' : 'none';
+  filtered.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'plcard' + (p.uri === _activePlUri ? ' active' : '');
+    card.onclick = () => playPlaylist(p.uri, p.id);
+    card.innerHTML = `
+      ${p.image ? `<img class="plcard-art" src="${esc(p.image)}" loading="lazy" alt="">` : `<div class="plcard-noart">♪</div>`}
+      <div class="plcard-info"><div class="plcard-name">${esc(p.name)}</div></div>`;
+    grid.appendChild(card);
+  });
+}
+function plpFilter(q) {
+  _plSearchStr = q.toLowerCase();
+  buildPlpGrid(_playlists);
+}
+
+/* ── PLAY PLAYLIST ── */
+async function playPlaylist(uri, id) {
+  if (currentSource === 'vlc') {
+    await window.ikandy.setSource('spotify');
+    currentSource = 'spotify';
+    applySourceUI('spotify');
+    updateBadge(true, 'Connected');
+    toast('Switched to Spotify');
+    await new Promise(r => setTimeout(r, 800));
+  }
+  _activePlUri = uri;
+  buildPlpGrid(_playlists);
+  closePlaylistPanel();
+  const result = await window.ikandy.playPlaylist(uri);
+  if (result && result.ok === false) toast('Could not start playlist — open Spotify first');
+}
+
+/* ── FREE vs PREMIUM ── */
+function setSpotifyControls(isPremium) {
+  const allBtns = document.querySelectorAll('#controls .cb, #vol-row');
+  allBtns.forEach(b => {
+    b.style.opacity       = isPremium ? '1' : '0.3';
+    b.style.pointerEvents = isPremium ? '' : 'none';
+  });
+  // Hide HUD and controls entirely for free users
+  el('hud').style.display      = isPremium ? '' : 'none';
+  el('controls').style.display = isPremium ? '' : 'none';
+  el('free-note').style.display    = isPremium ? 'none' : 'block';
+  el('sb-playlists-btn').style.display = isPremium ? '' : 'none';
+}
+
+function setControlsLocked(locked) {
+  // Hide everything when locked (local mode)
+  el('hud').style.display      = locked ? 'none' : '';
+  el('controls').style.display = locked ? 'none' : '';
+  if (!locked) {
+    // Restore based on premium state when unlocking
+    const wasFree = el('free-note')?.style.display === 'block';
+    if (!wasFree) {
+      el('hud').style.display      = '';
+      el('controls').style.display = '';
+    }
+  }
+}
+
+function seekTrack(e) {
+  if (!trackDuration) return;
+  const bar   = el('hud-prog');
+  const rect  = bar.getBoundingClientRect();
+  const pct   = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const posMs = Math.round(pct * trackDuration);
+  // Update bar immediately for responsiveness
+  el('hud-bar').style.width = (pct * 100).toFixed(1) + '%';
+  trackProgress = posMs;
+  _pollAnchorProgress = posMs;
+  _pollAnchorTime = performance.now();
+  if (currentSource === 'vlc') {
+    window.ikandy.vlcAction({ type: 'seek', position: Math.round(posMs / 1000) });
+  } else {
+    window.ikandy.action({ type: 'seek', position_ms: posMs });
+  }
+}
+
+function skipToLocal() {
+  el('login').style.display  = 'none';
+  el('setup').style.display  = 'none';
+  fadeLoading();
+  ensureAudioRunning();
+  applySourceUI('vlc');
+  currentSource = 'vlc';
+  updateBadge(false, 'No Spotify — use VLC or Local');
+}
+
+function logout() { window.ikandy.logout(); }
+
+/* ── SOURCE MODE ── */
+let currentSource = 'spotify';
+async function initSource() {
+  const s = await window.ikandy.getSource();
+  currentSource = s.mode || 'spotify';
+  if (s.vlcPort)     el('vlc-port-input').value = s.vlcPort;
+  if (s.vlcPassword) el('vlc-pass-input').value  = s.vlcPassword;
+  applySourceUI(currentSource);
+}
+function applySourceUI(mode) {
+  const isVlc    = mode === 'vlc';
+  const isLocal  = mode === 'local';
+  const isSpotify= mode === 'spotify';
+  el('src-spotify-panel').style.display = (isVlc || isLocal) ? 'none' : '';
+  el('src-vlc-panel').style.display     = isVlc   ? '' : 'none';
+  el('src-local-info') && (el('src-local-info').style.display = isLocal ? '' : 'none');
+  el('src-spotify-btn').className = isSpotify ? 'btn primary' : 'btn';
+  el('src-vlc-btn').className     = isVlc     ? 'btn primary' : 'btn';
+  el('src-local-btn').className   = isLocal   ? 'btn primary' : 'btn';
+}
+let _isPremium = false; // track premium state across source switches
+
+async function setSourceMode(mode) {
+  // If switching to Spotify with no Client ID, go straight to setup
+  if (mode === 'spotify') {
+    const id = await window.ikandy.getClientId();
+    if (!id) {
+      if (sidebarOpen) toggleSidebar();
+      el('setup').style.display = 'flex';
+      el('login').style.display = 'none';
+      el('client-id-input').value = '';
+      el('setup-error').style.display = 'none';
+      return;
+    }
+  }
+  currentSource = mode;
+  applySourceUI(mode);
+  window.ikandy.action({ type: 'telemetry', source_mode: mode });
+  if (mode === 'local') {
+    await window.ikandy.setSource('local');
+    updateBadge(false, 'Local — click 🎤');
+    return;
+  }
+  await window.ikandy.setSource(mode);
+  if (mode === 'vlc') {
+    // VLC always shows full HUD and controls — unlocked
+    el('hud').style.display      = '';
+    el('controls').style.display = '';
+    el('free-note').style.display = 'none';
+    // Unlock all control buttons for VLC
+    document.querySelectorAll('#controls .cb, #vol-row').forEach(b => {
+      b.disabled = false; b.style.opacity = '1'; b.style.pointerEvents = '';
+    });
+    const volSl = el('vol-sl');
+    if (volSl) { volSl.disabled = false; volSl.style.opacity = '1'; }
+    updateBadge(_vlcConnected, _vlcConnected ? 'VLC' : 'VLC — click Connect');
+    el('vlc-status').textContent = _vlcConnected ? '✓ Connected to VLC' : 'Switched to VLC — click Connect VLC';
+    el('vlc-status').style.color = _vlcConnected ? 'var(--sp)' : 'var(--dim)';
+  } else if (mode === 'spotify') {
+    // Re-apply premium state and update badge
+    setSpotifyControls(_isPremium);
+    updateBadge(_isPremium, _isPremium ? 'Spotify Premium' : 'Spotify Free');
+  }
+}
+let _vlcConnected = false;
+async function vlcConnect() {
+  const port = parseInt(el('vlc-port-input').value) || 8080;
+  const pass = el('vlc-pass-input').value || '';
+  await window.ikandy.setVlcConfig({ port, password: pass });
+  el('vlc-status').textContent = 'Testing connection…';
+  el('vlc-status').style.color = 'var(--dim)';
+  const result = await window.ikandy.vlcTest();
+  if (result.ok) {
+    el('vlc-status').textContent = '✓ Connected to VLC';
+    el('vlc-status').style.color = 'var(--sp)';
+    _vlcConnected = true;
+    await window.ikandy.setSource('vlc');
+    currentSource = 'vlc';
+    el('hud').style.display      = '';
+    el('controls').style.display = '';
+    el('free-note').style.display = 'none';
+    updateBadge(true, 'VLC');
+  } else {
+    el('vlc-status').textContent = '✗ ' + (result.error || 'Failed');
+    el('vlc-status').style.color = 'var(--red)';
+    _vlcConnected = false;
+  }
+}
+
+/* ── VISUALS CONTROLS ── */
+let _speedCounter = 0, _useFrameskip = true, _frameskipRate = 0;
+function setSpeed(v) {
+  el('speed-v').textContent = v;
+  const skipMap = { 1: 4, 2: 3, 3: 1, 4: 1, 5: 0 };
+  _speedSkip = skipMap[v] ?? 1;
+  localStorage.setItem('viz-speed', v);
+}
+function setSensitivity(v) {
+  el('sens-v').textContent = v.toFixed(2);
+  if (window._boostGainNode) window._boostGainNode.gain.value = v * 3;
+  localStorage.setItem('viz-sensitivity', v);
+}
+function setSmoothing(v) {
+  el('sm-v').textContent = v.toFixed(2);
+  if (analyserNode) analyserNode.smoothingTimeConstant = v;
+  localStorage.setItem('viz-smoothing', v);
+}
+
+/* ── LYRICS ── */
+function parseLRC(src) {
+  return src.split('\n').map(l => {
+    const m = l.match(/^\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+    if (!m) return null;
+    const time = (parseInt(m[1]) * 60 + parseFloat(m[2])) * 1000;
+    const text = m[3].replace(/<\d+:\d+\.\d+>/g, '').trim();
+    return { time, text };
+  }).filter(Boolean).sort((a, b) => a.time - b.time);
+}
+
+function buildLyricsUI() {
+  const box = el('lyrics-box');
+  if (!box) return;
+  box.innerHTML = '';
+  const lines = lyricsSync ? lyrics.map(l => l.text) : lyrics;
+  lines.forEach((text, i) => {
+    const d = document.createElement('div');
+    d.className = 'll'; d.id = 'll' + i; d.textContent = text;
+    box.appendChild(d);
+  });
+  if (lines.length) box.style.display = 'block';
+}
+
+function getCurrentLyric() {
+  if (!lyrics.length) return null;
+  if (lyricsSync) {
+    const t = trackProgress + LYRIC_LOOKAHEAD;
+    let lo = 0, hi = lyrics.length - 1, idx = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (lyrics[mid].time <= t) { idx = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    if (idx < 0) return null;
+    const text = lyrics[idx].text;
+    if (idx !== lastLyricIdx) {
+      lastLyricIdx = idx;
+      if (!text) el('lyric-line').classList.add('blank');
+      highlightLyricsLine(idx);
+    }
+    return text || null;
+  } else {
+    if (!trackDuration) return null;
+    const idx = Math.min(Math.floor(trackProgress / trackDuration * lyrics.length), lyrics.length - 1);
+    if (idx !== lastLyricIdx) { lastLyricIdx = idx; highlightLyricsLine(idx); }
+    return lyrics[idx];
+  }
+}
+
+function highlightLyricsLine(idx) {
+  document.querySelectorAll('.ll').forEach((e, i) => e.classList.toggle('active', i === idx));
+  const a = el('ll' + idx);
+  if (a) a.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+function toggleOverlay() {
+  lyricsOn = !lyricsOn;
+  el('overlay-btn').textContent = lyricsOn ? 'Overlay ON' : 'Overlay OFF';
+  el('overlay-btn').style.color = lyricsOn ? 'var(--sp)' : '';
+  if (!lyricsOn) el('lyric-line').classList.add('blank');
+}
+
+/* ── PRESETS ── */
+function getAuthor(name) {
+  const d = name.indexOf(' - ');
+  if (d === -1) return 'other';
+  const raw = name.slice(0, d).trim();
+  return raw.replace(/\b\w/g, c => c.toUpperCase());
+}
+function getCatKey(a) {
+  const l = a.toLowerCase();
+  if (l.includes('flexi'))    return 'flexi';
+  if (l.includes('martin'))   return 'martin';
+  if (l.includes('geiss'))    return 'geiss';
+  if (l.includes('bmelton') || l.includes('b. melton') || l.includes('b.melton')) return 'bmelton';
+  if (l.includes('unchained') || l.includes('unconed')) return 'unchained';
+  return 'other';
+}
+function getLabel(name) {
+  const d = name.indexOf(' - ');
+  let label = d > -1 ? name.slice(d + 3).trim() : name.trim();
+  const dashIdx = label.search(/ [-\/] /);
+  if (dashIdx > 2) label = label.slice(0, dashIdx).trim();
+  label = label.replace(/_/g, ' ');
+  label = label.replace(/[\[\(].*?[\]\)]/g, '');
+  label = label.replace(/^[._\-\s]+/, '');
+  label = label.replace(/\b\w/g, c => c.toUpperCase());
+  label = label.replace(/\s+/g, ' ').trim();
+  return label || name;
+}
+
+function loadPresets() {
+  const packs = butterchurnPresets.default || butterchurnPresets;
+  const rawMap = typeof packs.getPresets === 'function' ? packs.getPresets() : packs;
+  allNames = Object.keys(rawMap).sort((a, b) => {
+    const la = getLabel(a).toLowerCase();
+    const lb = getLabel(b).toLowerCase();
+    return la < lb ? -1 : la > lb ? 1 : 0;
+  });
+  allPresets = allNames.map(n => rawMap[n]);
+  el('pp-count').textContent = allNames.length + ' presets';
+  el('pc-count').textContent = allNames.length;
+  loadPreset(Math.floor(Math.random() * allPresets.length), 0);
+}
+
+function loadPreset(idx, blend, manual = false) {
+  if (!allPresets.length || !visualizer) return;
+  currentIdx = ((idx % allPresets.length) + allPresets.length) % allPresets.length;
+  visualizer.loadPreset(allPresets[currentIdx], +(blend ?? getBlend()));
+  const name = getLabel(allNames[currentIdx]);
+  const pname = el('pname-sb');
+  if (pname) pname.textContent = name;
+  const pnameNav = el('pname');
+  if (pnameNav) pnameNav.textContent = name;
+  const prev = el('ppcard-' + (currentIdx === 0 ? allPresets.length - 1 : currentIdx - 1));
+  document.querySelectorAll('.pcard.active').forEach(e => e.classList.remove('active'));
+  const cur = el('ppcard-' + currentIdx);
+  if (cur) cur.classList.add('active');
+  if (manual) {
+    autoCycle = false;
+    clearTimeout(cycleTimer);
+    syncAutoState();  // dims AUTO buttons (doesn't touch PRESETS since autoCycle=false)
+    // Add PRESETS highlight AFTER syncAutoState so it can't be overwritten
+    setTimeout(() => {
+      const pb = el('presets-btn');
+      if (pb) pb.classList.add('on');
+    }, 0);
+  }
+}
+
+function getBlend() { return +(el('blend-s')?.value || 2.5); }
+
+function advancePreset() {
+  if (autoCycle) {
+    clearTimeout(cycleTimer);
+    nextPreset(false);  // not manual — don't kill auto
+  }
+}
+
+function nextPreset(manual=true)  { loadPreset(currentIdx + 1, getBlend(), manual); }
+function prevPreset(manual=true)  { loadPreset(currentIdx - 1, getBlend(), manual); }
+function randPreset(manual=true)  { loadPreset(Math.floor(Math.random() * allPresets.length), getBlend(), manual); }
+
+function syncAutoState() {
+  // Top-right AUTO button
+  const autoBtn = el('auto-btn');
+  if (autoBtn) autoBtn.classList.toggle('on', autoCycle);
+  // Sidebar AUTO-CYCLE button
+  const autoSb = el('auto-sb');
+  if (autoSb) {
+    autoSb.style.color       = autoCycle ? 'var(--sp)' : '';
+    autoSb.style.borderColor = autoCycle ? 'var(--sp)' : '';
+  }
+  // PRESETS: remove .on when switching back to auto
+  if (autoCycle) {
+    const presetsBtn = el('presets-btn');
+    if (presetsBtn) presetsBtn.classList.remove('on');
+  }
+}
+
+function toggleAuto() {
+  autoCycle = !autoCycle;
+  syncAutoState();
+  if (autoCycle) startCycle(); else clearTimeout(cycleTimer);
+  window.ikandy.action({ type: 'telemetry', auto_cycle: autoCycle });
+}
+function startCycle() {
+  clearTimeout(cycleTimer);
+  const secs = +(el('cycle-s')?.value) || 20;
+  cycleTimer = setTimeout(() => {
+    randPreset(false);
+    startCycle();
+  }, secs * 1000);
+}
+
+/* ── PRESET PANEL ── */
+const VIEW_MODES = { list: 140, grid: 185, large: 280 };
+function setViewMode(mode) {
+  const px = VIEW_MODES[mode] || 185;
+  document.documentElement.style.setProperty('--card-min', px + 'px');
+  localStorage.setItem('pp-view-mode', mode);
+  const grid = el('pp-grid');
+  if (grid) {
+    grid.classList.toggle('list-mode',  mode === 'list');
+    grid.classList.toggle('large-mode', mode === 'large');
+  }
+  ['list','grid','large'].forEach(m => {
+    const btn = el('vm-' + m);
+    if (!btn) return;
+    const active = m === mode;
+    btn.style.color       = active ? 'var(--acc)' : 'var(--dim)';
+    btn.style.borderColor = active ? 'var(--acc)' : 'var(--bdr)';
+  });
+}
+
+function openPresetPanel() {
+  const saved = localStorage.getItem('pp-view-mode') || 'grid';
+  setViewMode(saved);
+  el('preset-panel').classList.add('open');
+  const pb = el('presets-btn'); if (pb) pb.classList.add('on');
+  buildGrid();
+  setTimeout(() => { const a = el('ppcard-' + currentIdx); if (a) a.scrollIntoView({ block: 'center' }); }, 60);
+}
+function closePresetPanel() {
+  el('preset-panel').classList.remove('open');
+  const pb = el('presets-btn'); if (pb) pb.classList.remove('on');
+}
+
+function buildGrid() {
+  const grid = el('pp-grid');
+  grid.innerHTML = '';
+  let count = 0;
+  allNames.forEach((name, i) => {
+    const author  = getAuthor(name);
+    const catKey  = getCatKey(author);
+    const label   = getLabel(name);
+    if (ppCatFilter !== 'all' && catKey !== ppCatFilter) return;
+    if (ppSearchStr && !label.toLowerCase().includes(ppSearchStr) && !author.toLowerCase().includes(ppSearchStr)) return;
+    const card = document.createElement('div');
+    card.className = 'pcard' + (i === currentIdx ? ' active' : '');
+    card.id = 'ppcard-' + i;
+    card.dataset.presetName = name;
+    card.onclick = () => { loadPreset(i, getBlend(), true); closePresetPanel(); };
+    card.addEventListener('mouseenter', () => showPreview(name, i, card));
+    card.addEventListener('mouseleave', hidePreview);
+    card.innerHTML = `
+      <img class="pcard-thumb" id="pthumb-${i}" alt="">
+      <div class="pcard-pending" id="ppending-${i}">···</div>
+      <div class="pcard-info">
+        <div class="pcard-name">${esc(label)}</div>
+        <div class="pcard-author">${esc(author)}</div>
+        <div class="pcard-now"><div class="pbar" style="height:8px"></div><div class="pbar" style="height:12px"></div><div class="pbar" style="height:6px"></div><span>Now Playing</span></div>
+      </div>`;
+    grid.appendChild(card);
+    count++;
+  });
+  el('pp-empty').style.display = count === 0 ? 'block' : 'none';
+  el('pp-count').textContent = count + ' presets';
+  // Start thumbnail generation for visible cards
+  setTimeout(queueVisibleThumbs, 50);
+}
+
+/* ── PRESET INLINE THUMBNAILS ── */
+const _previewCache = {};
+let _previewViz = null, _thumbQueue = [], _thumbRunning = false;
+let _previewEl = null, _previewRaf = null, _previewTimer = null; // kept for compat
+
+const _thumbCanvas = document.createElement('canvas');
+_thumbCanvas.width  = 240;
+_thumbCanvas.height = 150;
+
+async function initPreviewViz() {
+  if (_previewViz) return;
+  await waitForButterchurn();
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  _previewViz = butterchurn.default.createVisualizer(ctx, _thumbCanvas,
+    { width: 240, height: 150, pixelRatio: 1 });
+  await _previewViz.loadPresets(window.butterchurnPresets.getPresets(), 0);
+}
+
+async function runThumbQueue() {
+  if (_thumbRunning) return;
+  _thumbRunning = true;
+  await initPreviewViz();
+  const presets = window.butterchurnPresets.getPresets();
+  while (_thumbQueue.length) {
+    const { name, idx } = _thumbQueue.shift();
+    if (_previewCache[name]) { applyThumb(name, idx); continue; }
+    _previewViz.loadPreset(presets[name], 0);
+    // Render ~2s worth of frames (60 frames @ ~30ms each)
+    await new Promise(resolve => {
+      let f = 0;
+      function frame() {
+        _previewViz.render();
+        if (++f < 60) requestAnimationFrame(frame);
+        else resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+    _previewCache[name] = _thumbCanvas.toDataURL('image/jpeg', 0.75);
+    applyThumb(name, idx);
+    // Yield between presets so UI stays responsive
+    await new Promise(r => setTimeout(r, 16));
+  }
+  _thumbRunning = false;
+}
+
+function applyThumb(name, idx) {
+  const img     = document.getElementById('pthumb-' + idx);
+  const pending = document.getElementById('ppending-' + idx);
+  if (!img) return;
+  img.src = _previewCache[name];
+  img.onload = () => { img.classList.add('loaded'); if (pending) pending.style.display = 'none'; };
+}
+
+function queueVisibleThumbs() {
+  const grid = el('pp-grid');
+  if (!grid) return;
+  const cards = grid.querySelectorAll('.pcard');
+  cards.forEach(card => {
+    const idx  = parseInt(card.id.replace('ppcard-', ''));
+    const name = card.dataset.presetName;
+    if (!name || _previewCache[name]) return;
+    // Queue if not already queued
+    if (!_thumbQueue.find(q => q.name === name)) {
+      _thumbQueue.push({ name, idx });
+    }
+  });
+  runThumbQueue();
+}
+
+// Kept stubs for compat with card hover events (now no-ops)
+let _liveViz = null, _liveRaf = null, _liveTimer = null;
+const _liveEl     = document.getElementById('pp-live-preview');
+const _liveCanvas = document.getElementById('pp-live-canvas');
+const _liveLabel  = document.getElementById('pp-live-label');
+
+async function initLiveViz() {
+  if (_liveViz) return;
+  await waitForButterchurn();
+  _liveViz = butterchurn.default.createVisualizer(
+    new (window.AudioContext || window.webkitAudioContext)(),
+    _liveCanvas, { width: 200, height: 125, pixelRatio: 1 }
+  );
+  await _liveViz.loadPresets(window.butterchurnPresets.getPresets(), 0);
+}
+
+function positionLive(cardEl) {
+  const rect = cardEl.getBoundingClientRect();
+  const pw = 200, ph = 125, margin = 10;
+  let left = rect.left - pw - margin;
+  let top  = rect.top + (rect.height - ph) / 2;
+  if (left < 8) left = rect.right + margin;
+  top = Math.max(8, Math.min(top, window.innerHeight - ph - 8));
+  _liveEl.style.left = left + 'px';
+  _liveEl.style.top  = top  + 'px';
+}
+
+let _flyoutViz = null, _flyoutRaf = null, _inlineTimer = null;
+const _flyoutEl     = document.getElementById('pp-list-flyout');
+const _flyoutCanvas = document.getElementById('pp-flyout-canvas');
+const _flyoutName   = document.getElementById('pp-list-flyout-name');
+const FW = 480, FH = 300; // flyout dimensions
+
+async function initFlyoutViz() {
+  if (_flyoutViz) return;
+  await waitForButterchurn();
+  _flyoutViz = butterchurn.default.createVisualizer(
+    new (window.AudioContext || window.webkitAudioContext)(),
+    _flyoutCanvas, { width: FW, height: FH, pixelRatio: 1 }
+  );
+  await _flyoutViz.loadPresets(window.butterchurnPresets.getPresets(), 0);
+}
+
+async function showPreview(name, idx, cardEl) {
+  clearTimeout(_liveTimer);
+  clearTimeout(_inlineTimer);
+
+  const isListMode = el('pp-grid')?.classList.contains('list-mode');
+
+  if (isListMode) {
+    _inlineTimer = setTimeout(async () => {
+      await initFlyoutViz();
+
+      // Center flyout in the viewport
+      const left = Math.round((window.innerWidth  - FW) / 2);
+      const top  = Math.round((window.innerHeight - FH) / 2);
+      _flyoutEl.style.left = left + 'px';
+      _flyoutEl.style.top  = top  + 'px';
+      _flyoutEl.style.width  = FW + 'px';
+      _flyoutEl.style.height = FH + 'px';
+      if (_flyoutName) _flyoutName.textContent = getLabel(name);
+      _flyoutEl.classList.add('show');
+
+      _flyoutViz.setRendererSize(FW, FH);
+      _flyoutViz.loadPreset(window.butterchurnPresets.getPresets()[name], 0.5);
+      if (_flyoutRaf) cancelAnimationFrame(_flyoutRaf);
+      const startTime = Date.now();
+      function loop() {
+        if (Date.now() - startTime > 5000) { _flyoutRaf = null; return; }
+        _flyoutViz.render(); _flyoutRaf = requestAnimationFrame(loop);
+      }
+      loop();
+    }, 250);
+    return;
+  }
+
+  // Grid/Large: overlay on card
+  _liveTimer = setTimeout(async () => {
+    await initLiveViz();
+    const rect = cardEl.getBoundingClientRect();
+    const w = Math.round(rect.width), h = Math.round(rect.height);
+    // Resize the canvas element itself — CSS 100%/100% will scale it
+    _liveCanvas.width  = w;
+    _liveCanvas.height = h;
+    _liveEl.style.cssText = `
+      position:fixed; left:${rect.left}px; top:${rect.top}px;
+      width:${w}px; height:${h}px;
+      border-radius:7px; overflow:hidden;
+      z-index:299; pointer-events:none;
+      border:1px solid var(--acc);
+      display:block; opacity:1;
+    `;
+    _liveViz.setRendererSize(w, h);
+    _liveViz.loadPreset(window.butterchurnPresets.getPresets()[name], 0.5);
+    if (_liveRaf) cancelAnimationFrame(_liveRaf);
+    const startTime = Date.now();
+    function loop() {
+      if (Date.now() - startTime > 5000) { _liveRaf = null; return; }
+      _liveViz.render(); _liveRaf = requestAnimationFrame(loop);
+    }
+    loop();
+  }, 300);
+}
+
+function hidePreview() {
+  clearTimeout(_liveTimer);
+  clearTimeout(_inlineTimer);
+  if (_liveRaf)   { cancelAnimationFrame(_liveRaf);   _liveRaf = null; }
+  if (_flyoutRaf) { cancelAnimationFrame(_flyoutRaf); _flyoutRaf = null; }
+  // Park overlay offscreen
+  _liveEl.style.cssText = 'position:fixed;left:-9999px;top:-9999px;display:block;opacity:0;';
+  if (_flyoutEl) _flyoutEl.classList.remove('show');
+}
+
+function ppCat(cat) {
+  ppCatFilter = cat;
+  document.querySelectorAll('.pp-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
+  buildGrid();
+}
+function ppFilter(q) { ppSearchStr = q.toLowerCase(); buildGrid(); }
+
+/* ── SIDEBAR / TOAST / ACCORDION ── */
+let sidebarOpen = false;
+function toggleSidebar() {
+  ensureAudioRunning();
+  sidebarOpen = !sidebarOpen;
+  window.sidebarOpen = sidebarOpen; // keep window in sync for tour
+  el('sb').classList.toggle('open', sidebarOpen);
+  el('ptab').classList.toggle('open', sidebarOpen);
+  el('ptab').classList.toggle('shifted', sidebarOpen);
+}
+window.sidebarOpen = false;
+window.toggleSidebar = toggleSidebar;
+function accToggle(hd) {
+  hd.classList.toggle('open');
+  const bd = hd.nextElementSibling;
+  if (bd) bd.classList.toggle('open');
+}
+function accOpen(id)  { const h = document.getElementById(id); if (h && !h.classList.contains('open')) accToggle(h); }
+function accClose(id) { const h = document.getElementById(id); if (h &&  h.classList.contains('open')) accToggle(h); }
+window.accToggle = accToggle;
+window.accOpen  = accOpen;
+window.accClose = accClose;
+function accToggleAll() {
+  const headers = document.querySelectorAll('#sbi .acc-hd');
+  // Decide based on majority — if more are open, collapse all, else expand all
+  const openCount = [...headers].filter(h => h.classList.contains('open')).length;
+  const shouldOpen = openCount < headers.length / 2;
+  headers.forEach(h => {
+    const isOpen = h.classList.contains('open');
+    if (shouldOpen && !isOpen) accToggle(h);
+    else if (!shouldOpen && isOpen) accToggle(h);
+  });
+  const btn = el('acc-all-btn');
+  if (btn) btn.textContent = shouldOpen ? '⊟ All' : '⊞ All';
+}
+let _toastTimer = null;
+function toast(msg, dur = 3500) {
+  const t = el('toast'); if (!t) return;
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+/* ── FULLSCREEN ── */
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+    el('fs-btn').textContent = '✕';
+    el('fs-btn').title = 'Exit Fullscreen (Esc)';
+  } else {
+    document.exitFullscreen();
+    el('fs-btn').textContent = '⛶';
+    el('fs-btn').title = 'Fullscreen (F)';
+  }
+}
+document.addEventListener('fullscreenchange', () => {
+  const fs = !!document.fullscreenElement;
+  const btn = el('fs-btn');
+  if (btn) { btn.textContent = fs ? '✕' : '⛶'; }
+  // DOM mode — words are in regular DOM divs, resize happens automatically
+  setTimeout(() => {
+    if (_lyricMode === 'physics' && _lastLyricText) {
+      _physicsWords = [];
+      const wrap = el('physics-wrap');
+      if (wrap) wrap.innerHTML = '';
+      spawnPhysicsWords(_lastLyricText);
+    }
+  }, 200);
+});
+
+
+
+/* ── UI HIDE MODE ── */
+// _uiHidden = the MODE (toggled by button/H key)
+// body.ui-hidden = the VISUAL STATE (can be temporarily lifted by mouse)
+let _uiHidden = false;
+let _mouseTimer = null;
+
+function toggleUI() {
+  _uiHidden = !_uiHidden;
+  if (_uiHidden) {
+    // Enter hide mode — start listening for mouse to temporarily show
+    document.addEventListener('mousemove', onMouseMoveInHideMode);
+    // Hide immediately
+    document.body.classList.add('ui-hidden');
+    // Update button to show active state
+    const btn = el('hide-btn');
+    if (btn) { btn.classList.add('on'); btn.title = 'Show UI (H)'; }
+  } else {
+    // Exit hide mode entirely
+    document.removeEventListener('mousemove', onMouseMoveInHideMode);
+    clearTimeout(_mouseTimer);
+    document.body.classList.remove('ui-hidden');
+    const btn = el('hide-btn');
+    if (btn) { btn.classList.remove('on'); btn.title = 'Hide UI (H)'; }
+  }
+}
+
+function onMouseMoveInHideMode() {
+  // Temporarily show UI while mouse is moving
+  document.body.classList.remove('ui-hidden');
+  clearTimeout(_mouseTimer);
+  // After 3s of no movement, hide again (only if still in hide mode)
+  _mouseTimer = setTimeout(() => {
+    if (_uiHidden) document.body.classList.add('ui-hidden');
+  }, 3000);
+}
+
+/* ── KEYBOARD SHORTCUTS ── */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  switch(e.key) {
+    case 'ArrowRight': case 'n': nextPreset(); break;
+    case 'ArrowLeft':  case 'p': prevPreset(); break;
+    case 'r': randPreset(); break;
+    case 'b': openPresetPanel(); break;
+    case 'Escape':
+      if (document.fullscreenElement) document.exitFullscreen();
+      else closePresetPanel();
+      break;
+    case 'f': case 'F': toggleFullscreen(); break;
+    case 'h': case 'H': toggleUI(); break;
+    case ' ': e.preventDefault(); spAction('playpause'); break;
+  }
+});
+
+/* ── BOOT ── */
+async function waitForButterchurn() {
+  for (let i = 0; i < 200; i++) {
+    if (typeof butterchurn !== 'undefined' && typeof butterchurnPresets !== 'undefined') return;
+    await sleep(80);
+  }
+  throw new Error('Butterchurn CDN timed out');
+}
+
+function lp(pct) { const f = el('ld-fill'); if (f) f.style.width = pct + '%'; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   VIBE SYSTEM — grain, scanlines, bg image, ripple, color tint
+   ═══════════════════════════════════════════════════════════════════ */
+
+// ── Grain ──────────────────────────────────────────────────────────
+let _grainOpacity = 0, _grainTimer = null;
+// ── Vignette heartbeat ──────────────────────────────────────────────
+const vigCanvas = document.getElementById('vignette-canvas');
+const vigCtx    = vigCanvas.getContext('2d');
+let   _vigBass  = 0;  // smoothed bass amplitude
+function resizeVig() {
+  vigCanvas.width  = window.innerWidth;
+  vigCanvas.height = window.innerHeight;
+}
+resizeVig();
+function drawVignette(bassAmp) {
+  const w = vigCanvas.width, h = vigCanvas.height;
+  vigCtx.clearRect(0, 0, w, h);
+  // Use diagonal so gradient reaches all corners on ultrawide
+  const diag = Math.sqrt(w*w + h*h) / 2;
+  const cx = w / 2, cy = h / 2;
+  // Inner radius — keep 85% of screen totally clear, only darken outer edge
+  const innerR = diag * (0.85 - bassAmp * 0.06);
+  const outerR = diag * 1.02; // slightly beyond corners
+  const grad = vigCtx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, `rgba(0,0,0,${0.6 + bassAmp * 0.35})`);
+  vigCtx.fillStyle = grad;
+  vigCtx.fillRect(0, 0, w, h);
+}
+
+const grainCanvas = document.getElementById('grain-canvas');
+const grainCtx    = grainCanvas.getContext('2d');
+function resizeGrain() {
+  // Keep grain canvas small and let CSS scale it — much faster
+  grainCanvas.width = 256; grainCanvas.height = 256;
+  grainCanvas.style.width  = window.innerWidth  + 'px';
+  grainCanvas.style.height = window.innerHeight + 'px';
+}
+resizeGrain();
+function drawGrain() {
+  if (_grainOpacity === 0) return;
+  const w = 256, h = 256;
+  const img = grainCtx.createImageData(w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const v = Math.random() * 255 | 0;
+    d[i] = d[i+1] = d[i+2] = v; d[i+3] = 40;
+  }
+  grainCtx.putImageData(img, 0, 0);
+}
+function setGrain(v) {
+  _grainOpacity = v;
+  el('grain-v').textContent = v.toFixed(2);
+  grainCanvas.style.opacity = v;
+  localStorage.setItem('ikandy-grain', v);
+  if (v > 0 && !_grainTimer) _grainTimer = setInterval(drawGrain, 80);
+  if (v === 0 && _grainTimer) { clearInterval(_grainTimer); _grainTimer = null; grainCtx.clearRect(0,0,256,256); }
+}
+
+// ── Scanlines ──────────────────────────────────────────────────────
+const scanCanvas = document.getElementById('scanline-canvas');
+const scanCtx    = scanCanvas.getContext('2d');
+function resizeScan() {
+  scanCanvas.width = window.innerWidth; scanCanvas.height = window.innerHeight;
+  drawScanlines();
+}
+resizeScan();
+function drawScanlines() {
+  const w = scanCanvas.width, h = scanCanvas.height;
+  scanCtx.clearRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 3) {
+    scanCtx.fillStyle = 'rgba(0,0,0,0.5)';
+    scanCtx.fillRect(0, y, w, 1);
+  }
+}
+function setScanlines(v) {
+  el('scan-v').textContent = v.toFixed(2);
+  scanCanvas.style.opacity = v;
+  localStorage.setItem('ikandy-scan', v);
+}
+
+// ── Viz opacity ────────────────────────────────────────────────────
+function setVizOpacity(v) {
+  el('viz-opacity-v').textContent = v.toFixed(2);
+  el('viz').style.opacity = v;
+}
+
+// ── Color tint via CSS filter ──────────────────────────────────────
+/* ── FX MODE ── */
+let _currentFxMode = 'viz'; // 'viz' or any shader key
+const _allFxKeys = ['raindrops','inkbleed','vhswarp','fog','watercolor','dustfilm',
+                    'liquidmetal','shatter','datacorrupt','plasmaarc','hologram','heatwave'];
+
+function setFxMode(mode) {
+  // Returning to visualizer — restore opacity to 1
+  _currentFxMode = 'viz';
+  _allFxKeys.forEach(k => el('ifx-'+k)?.classList.remove('active'));
+  hideRainVideo();
+  const hasImg = !!_bgTexture;
+  el('viz').style.display = 'block';
+  if (hasImg) stopRippleLoop();
+  // Restore viz opacity
+  el('viz-opacity-sl').value = 1; setVizOpacity(1);
+  localStorage.setItem('ikandy-fxmode', 'viz');
+}
+
+/* ── COLOR PALETTE ── */
+const PALETTES = {
+  none:      'none',
+  amber:     'sepia(0.6) saturate(1.2) hue-rotate(10deg) brightness(0.9)',
+  rust:      'sepia(0.8) hue-rotate(340deg) saturate(1.4) brightness(0.85)',
+  sage:      'sepia(0.3) hue-rotate(80deg) saturate(0.8) brightness(0.88)',
+  olive:     'sepia(0.4) hue-rotate(55deg) saturate(1.1) brightness(0.85)',
+  sand:      'sepia(0.5) saturate(0.7) brightness(0.92)',
+  slate:     'saturate(0.5) hue-rotate(200deg) brightness(0.85)',
+  mauve:     'sepia(0.3) hue-rotate(310deg) saturate(0.9) brightness(0.88)',
+  forest:    'sepia(0.2) hue-rotate(100deg) saturate(0.8) brightness(0.82)',
+  neonpink:  'hue-rotate(300deg) saturate(2.5) brightness(1.05) contrast(1.1)',
+  neoncyan:  'hue-rotate(175deg) saturate(2.2) brightness(1.05) contrast(1.05)',
+  neongreen: 'hue-rotate(120deg) saturate(2.4) brightness(1.0) contrast(1.1)',
+  purple:    'hue-rotate(260deg) saturate(2.0) brightness(0.95) contrast(1.1)',
+  orange:    'hue-rotate(20deg) saturate(2.2) brightness(1.0) contrast(1.05)',
+  gold:      'sepia(0.3) saturate(1.8) hue-rotate(15deg) brightness(0.95)',
+  ice:       'hue-rotate(190deg) saturate(1.4) brightness(1.05)',
+};
+const BG_COLORS = {
+  none:      'transparent',
+  amber:     '#1a0e00',
+  rust:      '#1a0400',
+  sage:      '#061209',
+  olive:     '#0c0f00',
+  sand:      '#141008',
+  slate:     '#060810',
+  mauve:     '#100610',
+  forest:    '#020a04',
+  neonpink:  '#1a0010',
+  neoncyan:  '#001a1a',
+  neongreen: '#001a08',
+  purple:    '#0a0018',
+  orange:    '#1a0500',
+  gold:      '#120e00',
+  ice:       '#00101a',
+};
+
+function setPalette(name) {
+  const filter = PALETTES[name] || 'none';
+  el('viz').style.filter = filter;
+  // Set background color — deep dark tint of the palette color
+  const bgCol = BG_COLORS[name] || 'transparent';
+  el('color-bg').style.background = bgCol;
+  document.querySelectorAll('.pal-sw').forEach(s =>
+    s.classList.toggle('active', s.dataset.color === name));
+  localStorage.setItem('ikandy-palette', name);
+}
+
+// ── Background image — multi-shader FX engine ─────────────────────
+const bgCanvas = document.getElementById('bg-canvas');
+const bgGl     = bgCanvas.getContext('webgl');
+let _bgTexture = null, _bgImage = null, _fxTime = 0;
+let _rippleRAF = null, _rippleAmp = 0, _currentFx = 'raindrops', _fxStrength = 1.0;
+
+function showRainVideo() { /* rain is a shader — no video */ }
+function hideRainVideo() {}
+
+function setFxStrength(v) {
+  _fxStrength = v;
+  el('fx-strength-v').textContent = v.toFixed(2);
+}
+
+const VERT = `
+  attribute vec2 a_pos; varying vec2 v_uv;
+  void main() { v_uv = a_pos*.5+.5; gl_Position = vec4(a_pos,0,1); }
+`;
+
+const FRAG = {
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  LO-FI 1 — RAIN ON GLASS
+  //  Drops fall TOP→BOTTOM. Normal-map refraction on each drop.
+  //  Three layers: static condensation beads, small sliding drops,
+  //  large hero streaks. Heartfelt pause-then-release timing.
+  // ═══════════════════════════════════════════════════════════════════
+  raindrops: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float h11(float n){ return fract(sin(n*127.1)*43758.5453); }
+    float h21(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    vec2  h22(vec2 p) {
+      p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));
+      return fract(sin(p)*43758.5453);
+    }
+    float vnoise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),
+                 mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);
+    }
+
+    /* Heartfelt: slow charge then sudden release downward */
+    float heartfelt(float phase){
+      if(phase < 0.6) return 0.0;           /* sitting still */
+      float p = (phase - 0.6) / 0.4;        /* 0→1 during slide */
+      return pow(p, 0.4);                    /* fast start, eases */
+    }
+
+    /* ── Refracted color through a spherical drop ──
+       pos = drop center in UV, r = radius in UV       */
+    vec3 refractDrop(vec2 uv, vec2 pos, float r){
+      vec2  d    = (uv - pos) * vec2(u_res.x/u_res.y, 1.0);
+      float dist = length(d);
+      float norm = dist / (r * u_res.x/u_res.y);
+      if(norm >= 1.0) return vec3(-1.0);    /* outside drop */
+      float h    = sqrt(max(0., 1.0 - norm*norm));
+      /* lens bends UV inward and magnifies */
+      vec2  bend = normalize(d+0.0001) * (1.0 - h) * 0.12;
+      vec2  suv  = clamp(pos - bend, 0.005, 0.995);
+      return texture2D(u_tex, suv).rgb;
+    }
+
+    /* ── Draw one drop at pos with radius r ── */
+    vec3 drawDrop(vec2 uv, vec2 pos, float r, vec3 bg){
+      float AR   = u_res.x/u_res.y;
+      vec2  d    = (uv - pos) * vec2(AR, 1.0);
+      float dist = length(d);
+      float rAR  = r * AR;
+      if(dist > rAR * 1.15) return bg;
+
+      /* clamp refraction sample safely away from edges */
+      vec2  d2   = (uv - pos) * vec2(u_res.x/u_res.y, 1.0);
+      float norm = length(d2) / (r * u_res.x/u_res.y);
+      if(norm >= 1.0) return mix(bg, bg, 0.0);
+      float h    = sqrt(max(0., 1.0 - norm*norm));
+      vec2  bend = normalize(d2+0.0001) * (1.0 - h) * 0.12;
+      vec2  suv  = clamp(pos - bend, 0.01, 0.99);
+      vec3  lc   = texture2D(u_tex, suv).rgb;
+
+      float mask = smoothstep(rAR, rAR*0.82, dist);
+
+      /* specular highlight — top-left */
+      vec2  hlD  = d - vec2(-rAR*0.3, -rAR*0.35);
+      float hl   = smoothstep(rAR*0.22, 0., length(hlD)) * 0.9;
+
+      /* dark rim — surface tension edge */
+      float rim  = smoothstep(rAR*0.9, rAR, dist) *
+                   smoothstep(rAR*1.05, rAR*0.92, dist) * 0.5;
+      lc = lc * (0.8 + rim*0.2) + hl;
+
+      return mix(bg, lc, mask * 0.92);
+    }
+
+    /* ── Draw a vertical trail above a sliding drop ── */
+    vec3 drawTrail(vec2 uv, vec2 dropPos, float r, float trailLen, vec3 bg){
+      if(trailLen < 0.002) return bg;
+      float AR  = u_res.x/u_res.y;
+      float dx  = abs(uv.x - dropPos.x) * AR;
+      float tw  = r * AR * 0.55;
+      if(dx > tw) return bg;
+      /* trail goes UPWARD from drop head (drop falls down, trail is above) */
+      float trailTop = dropPos.y + trailLen;  /* higher Y = higher on screen */
+      if(uv.y < dropPos.y || uv.y > trailTop) return bg;
+      float fy  = (uv.y - dropPos.y) / trailLen;  /* 0=at drop, 1=trail top */
+      float fx  = dx / (tw * (0.2 + 0.8*(1.-fy)));
+      float wet = smoothstep(1., 0.1, fx) * (1.-fy*0.7) * 0.22;
+      /* wet trail darkens + blurs slightly */
+      vec2  wuv = clamp(uv + vec2(0., 0.002*(1.-fy)), 0., 1.);
+      vec3  wc  = texture2D(u_tex, wuv).rgb * 0.78;
+      return mix(bg, wc, wet);
+    }
+
+    void main(){
+      vec2  uv  = v_uv;
+      float s   = u_strength;
+      float t   = u_time;
+      float AR  = u_res.x / u_res.y;
+      vec3  col = texture2D(u_tex, uv).rgb;
+
+      /* ── Condensation fog base ── */
+      float fog = vnoise(uv*5.+t*0.02)*vnoise(uv*10.-t*0.015);
+      fog *= 0.06 * s * (0.5 + 0.5*(1.-uv.y));
+      vec2  fUV = clamp(uv + vec2(fog*0.004, fog*0.002), 0., 1.);
+      col = mix(col, texture2D(u_tex, fUV).rgb * 0.93, fog);
+
+      /* ── Static condensation beads ── */
+      /* Grid: each cell may have a tiny bead that never slides */
+      vec2 gA = uv * vec2(28., 20.);
+      vec2 cell = floor(gA);
+      vec2 frac = fract(gA);
+      for(int dy=0;dy<=1;dy++) for(int dx=0;dx<=1;dx++){
+        vec2  nb  = cell + vec2(dx,dy);
+        vec2  rnd = h22(nb);
+        if(rnd.x > 0.5) continue;
+        float r   = (0.003 + rnd.y*0.007) * s;
+        float br  = 0.85 + 0.15*sin(t*(0.15+rnd.y*0.25)+rnd.x*6.28);
+        vec2  pos = (nb + 0.15 + rnd*0.7) / vec2(28.,20.);
+        col = drawDrop(uv, pos, r*br, col);
+      }
+
+      /* ── Small sliding drops (falls from top to bottom) ── */
+      for(int i=0;i<16;i++){
+        float fi   = float(i);
+        float per  = 4.0 + h11(fi*3.1)*7.0;
+        float off  = h11(fi*7.3);
+        float phase= fract(t/per + off);
+        float hf   = heartfelt(phase);       /* 0 while waiting, then slides */
+
+        float xCol = 0.06 + h11(fi*2.1)*0.88;
+        /* spawn Y: near TOP of screen = high Y value */
+        float spawnY = 0.88 + h11(fi*5.3)*0.10;
+        float speed  = 0.25 + h11(fi*4.4)*0.35;
+        float r      = (0.004 + h11(fi*9.)*0.004) * s;
+
+        /* drop falls DOWN = Y decreases */
+        float dropY  = spawnY - hf * speed;
+        vec2  pos    = vec2(xCol, dropY);
+
+        /* trail goes upward from current drop position */
+        float trailLen = hf * speed * 0.7;
+        col = drawTrail(uv, pos, r, trailLen, col);
+
+        float life = smoothstep(0., 0.02, phase) * smoothstep(1., 0.9, phase);
+        if(life > 0.01) col = drawDrop(uv, pos, r, col);
+      }
+
+      /* ── Hero drops (larger, faster, longer trail) ── */
+      for(int i=0;i<5;i++){
+        float fi   = float(i) + 40.;
+        float per  = 2.5 + h11(fi*2.7)*3.5;
+        float off  = h11(fi*6.1);
+        float phase= fract(t/per + off);
+        float hf   = heartfelt(phase);
+
+        float xCol   = 0.08 + h11(fi*3.3)*0.84;
+        float spawnY = 0.90 + h11(fi*1.7)*0.08;
+        float speed  = 0.45 + h11(fi*2.)*0.40;
+        float r      = (0.008 + h11(fi*4.)*0.006) * s;
+
+        float dropY  = spawnY - hf * speed;
+        vec2  pos    = vec2(xCol, dropY);
+
+        float trailLen = hf * speed * 0.85;
+        col = drawTrail(uv, pos, r, trailLen, col);
+
+        float life = smoothstep(0.,0.015,phase)*smoothstep(1.,0.88,phase);
+        if(life > 0.01) col = drawDrop(uv, pos, r, col);
+      }
+
+      /* vignette */
+      float vig = length((uv-0.5)*vec2(1.,0.75));
+      col *= 1.0 - vig*vig*0.3*s;
+
+      gl_FragColor = vec4(clamp(col, 0., 1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  LO-FI 2 — INK BLEED  (Gray-Scott reaction-diffusion aesthetic)
+  //
+  //  Pipeline:
+  //    1. Build a reaction-diffusion height field via domain-warped fbm
+  //       (true R-D would need multi-pass, so we simulate the look)
+  //    2. Derive normals from the height field
+  //    3. Refract the background through the ink surface
+  //    4. Darken where ink pools (shadow absorption)
+  //    5. Add wet-ink sheen along normals
+  // ═══════════════════════════════════════════════════════════════════
+  inkbleed: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+    float vnoise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),
+                 mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);
+    }
+    float fbm(vec2 p, int oct){
+      float v=0.,a=0.5;
+      for(int i=0;i<8;i++){
+        if(i>=oct) break;
+        v+=a*vnoise(p); p=p*2.1+vec2(1.7,9.2); a*=0.5;
+      }
+      return v;
+    }
+
+    /* ── Reaction-diffusion height field ──
+       Real Gray-Scott needs multi-pass framebuffers. We simulate the
+       characteristic "blob with sharp edges" look using nested fbm
+       domain warping — the same technique used in shadertoy R-D demos. */
+    float rdHeight(vec2 uv, float t){
+      float s = u_strength;
+      float speed = t * 0.05;
+
+      /* primary warp — slow large-scale flow */
+      vec2 q = vec2(fbm(uv*1.8 + vec2(speed, speed*0.7), 5),
+                    fbm(uv*1.8 + vec2(3.2, 1.7), 5));
+
+      /* secondary warp — medium turbulence */
+      vec2 r = vec2(fbm(uv*3.5 + 4.*q + vec2(1.7, 9.2) + speed*0.4, 5),
+                    fbm(uv*3.5 + 4.*q + vec2(8.3, 2.8) + speed*0.3, 5));
+
+      /* tertiary — fine detail, fast-moving */
+      float f = fbm(uv*6. + 4.*r + speed*0.8, 6);
+
+      /* threshold to get sharp ink blob edges (R-D characteristic) */
+      float blob = smoothstep(0.42, 0.52, f);
+
+      /* beat pulse — ink floods outward */
+      float pulse = u_amp * 0.08 * s;
+      blob = smoothstep(0.42 - pulse, 0.52 + pulse, f);
+
+      return blob * s;
+    }
+
+    /* ── Normal from height field ── */
+    vec3 rdNormal(vec2 uv, float t){
+      float eps = 1.5 / min(u_res.x, u_res.y);
+      float hC = rdHeight(uv, t);
+      float hR = rdHeight(uv + vec2(eps, 0.), t);
+      float hU = rdHeight(uv + vec2(0., eps), t);
+      return normalize(vec3(-(hR-hC)/eps, -(hU-hC)/eps, 1.) * vec3(4.,4.,1.));
+    }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time;
+
+      float h  = rdHeight(uv, t);
+      vec3  N  = rdNormal(uv, t);
+
+      /* ── Refraction — ink surface bends light ── */
+      float refStr = 0.04 * min(s, 1.2);
+      vec2  rUV    = clamp(uv + N.xy * h * refStr, 0.005, 0.995);
+      vec4  refCol = texture2D(u_tex, rUV);
+      vec4  bgCol  = texture2D(u_tex, uv);
+
+      /* ── Ink absorption — where blobs are thick, image darkens ──
+         Real ink absorbs light. Simulate with deep desaturated darken. */
+      float lum    = dot(bgCol.rgb, vec3(0.299, 0.587, 0.114));
+      vec3  inkCol = vec3(lum * 0.08, lum * 0.06, lum * 0.12); /* deep indigo-black */
+      vec4  col    = mix(bgCol, vec4(inkCol, 1.), h * 0.75);
+
+      /* ── Blend refracted view at blob edges ── */
+      float edge   = abs(N.z - 1.) * 3.;  /* strong at blob boundaries */
+      col = mix(col, refCol, clamp(edge * h * 0.6, 0., 0.7));
+
+      /* ── Wet ink sheen — specular along normals ── */
+      vec3  L    = normalize(vec3(-0.3, 0.6, 0.8));
+      float spec = pow(max(0., dot(N, L)), 24.) * h * 1.2 * min(s, 1.3);
+      /* ink sheen is blue-black, not white */
+      col.rgb   += spec * vec3(0.15, 0.12, 0.25);
+
+      /* ── Feathered wet edge ── where blobs meet dry paper ── */
+      float wetEdge = smoothstep(0.3, 0.7, h) * (1. - smoothstep(0.7, 1., h));
+      vec2  featherUV = clamp(uv + N.xy * 0.008, 0., 1.);
+      vec4  feather   = texture2D(u_tex, featherUV);
+      col = mix(col, feather * 0.72, wetEdge * 0.4 * s);
+
+      /* ── Vignette ── */
+      float vig = length((uv-0.5)*vec2(1.,0.75));
+      col.rgb  *= 1. - vig*vig*0.3*s;
+
+      gl_FragColor = vec4(clamp(col.rgb, 0., 1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  LO-FI 3 — VHS WARP  (analog tape + color bleed + head-switching)
+  // ═══════════════════════════════════════════════════════════════════
+  vhswarp: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float hash1(float n){ return fract(sin(n)*43758.5); }
+    float hash2(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time;
+
+      /* tape wobble — multi-frequency horizontal wave */
+      float w1 = sin(uv.y*120.+t*4.3)*0.0015*s;
+      float w2 = sin(uv.y*37. -t*2.7)*0.003*s;
+      float w3 = sin(uv.y*8.  +t*1.1)*0.001*s;
+      uv.x    += w1+w2+w3;
+
+      /* head-switching glitch band — bottom 8% of frame */
+      float hs = step(0.92, uv.y) * hash1(floor(t*60.)) * 0.04 * s;
+      uv.x    += hs;
+
+      /* tracking error stripes */
+      float sl     = floor(uv.y*240.);
+      float slRand = hash1(sl + floor(t*12.)*7.3);
+      float err    = step(0.96 - u_amp*0.04*s, slRand);
+      uv.x        += err * (slRand-0.96) * 0.4 * s;
+
+      /* chroma smear — R trails behind, B ahead */
+      float smear  = (0.004+u_amp*0.005)*s;
+      float r = texture2D(u_tex, clamp(uv+vec2(-smear,0.),0.,1.)).r;
+      float g = texture2D(u_tex, clamp(uv,0.,1.)).g;
+      float b = texture2D(u_tex, clamp(uv+vec2( smear*.6, 0.0008),0.,1.)).b;
+      vec3 col = vec3(r,g,b);
+
+      /* luma noise / static */
+      float noise = hash2(floor(uv*vec2(320.,240.))+t*67.) * 0.08 * s;
+      col += (noise-0.04*s) * (0.5+u_amp);
+
+      /* scan lines — alternating brightness */
+      float scan = 0.88 + 0.12*sin(uv.y*u_res.y*1.3 + t*0.5);
+      col *= scan;
+
+      /* vignette + slight warm tint */
+      float vig = length(uv-.5)*1.5;
+      col      *= 1.0 - vig*vig*0.55*s;
+      col.r    += 0.015*s;
+
+      gl_FragColor = vec4(clamp(col,0.,1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  LO-FI 4 — FOG  (explicit fog banks drawn as soft ellipses)
+  //
+  //  Same philosophy as rain: draw each fog element directly.
+  //  Each fog bank is a soft elliptical blob that drifts slowly.
+  //  Image is always visible — fog overlays on top like real mist.
+  // ═══════════════════════════════════════════════════════════════════
+  fog: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float h11(float n){ return fract(sin(n*127.1)*43758.5453); }
+    float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    vec2  h22(vec2 p){
+      p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));
+      return fract(sin(p)*43758.5453);
+    }
+    float vnoise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),
+                 mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);
+    }
+
+    /* ── One fog bank: soft ellipse that drifts ──
+       Returns density [0,1] at uv for a fog blob
+       centered at pos, with given width/height     */
+    float fogBank(vec2 uv, vec2 pos, float w, float h2){
+      float AR = u_res.x / u_res.y;
+      vec2  d  = (uv - pos) * vec2(AR, 1.0);
+      /* ellipse SDF */
+      float e  = length(d / vec2(w*AR, h2));
+      return smoothstep(1.0, 0.0, e);
+    }
+
+    /* ── Wisp: thin elongated tendril ── */
+    float wisp(vec2 uv, vec2 pos, float len, float width, float angle){
+      float AR   = u_res.x / u_res.y;
+      float ca   = cos(angle), sa = sin(angle);
+      vec2  d    = uv - pos;
+      d.x       *= AR;
+      /* rotate into wisp local space */
+      vec2  ld   = vec2(d.x*ca + d.y*sa, -d.x*sa + d.y*ca);
+      /* capsule shape */
+      float lc   = clamp(ld.x, -len, len);
+      float dist = length(vec2(ld.x - lc, ld.y));
+      return smoothstep(width, 0., dist);
+    }
+
+    void main(){
+      vec2  uv  = v_uv;
+      float s   = u_strength;
+      float t   = u_time;
+      float AR  = u_res.x / u_res.y;
+
+      /* Always show the image */
+      vec4 col = texture2D(u_tex, uv);
+      float fogDensity = 0.0;
+      vec3  fogColor   = vec3(0.0);
+
+      /* ── GROUND FOG BANKS (large, slow, hug bottom) ──
+         6 large elliptical banks drift slowly left/right */
+      for(int i = 0; i < 6; i++){
+        float fi    = float(i);
+        vec2  rnd   = h22(vec2(fi*3.1, fi*7.3));
+        float speed = (rnd.x - 0.5) * 0.012; /* left or right drift */
+        float bobS  = 0.003 + rnd.y * 0.004;  /* gentle vertical bob */
+
+        vec2  pos;
+        pos.x = fract(rnd.x + t * speed);     /* wraps 0→1 */
+        pos.y = 0.05 + rnd.y * 0.35;          /* bottom 35% of screen */
+        pos.y += sin(t * bobS + rnd.x * 6.28) * 0.02;
+
+        float w  = 0.18 + rnd.x * 0.22;       /* wide fog bank */
+        float h2 = 0.06 + rnd.y * 0.08;       /* short vertical extent */
+
+        float d  = fogBank(uv, pos, w, h2) * (0.5 + rnd.x * 0.3) * s;
+        /* ground fog: cool blue-grey */
+        vec3  gc = mix(vec3(0.75, 0.78, 0.86), vec3(0.82, 0.80, 0.75), rnd.y);
+        fogDensity += d * (1. - fogDensity); /* max blend */
+        fogColor    = mix(fogColor, gc, d * (1. - fogDensity + d));
+      }
+
+      /* ── MID WISPS (thin tendrils at medium height) ── */
+      for(int i = 0; i < 8; i++){
+        float fi    = float(i);
+        vec2  rnd   = h22(vec2(fi*5.7+1., fi*2.3+4.));
+        float speed = (rnd.x - 0.5) * 0.018;
+        float angle = (rnd.y - 0.5) * 0.4;   /* slight diagonal */
+
+        vec2  pos;
+        pos.x = fract(rnd.x*1.3 + t * speed + 0.5);
+        pos.y = 0.20 + rnd.y * 0.45;
+
+        float len   = 0.10 + rnd.x * 0.18;
+        float width = 0.015 + rnd.y * 0.025;
+
+        float d = wisp(uv, pos, len/AR, width, angle) * 0.45 * s;
+        /* wisps: warm light grey */
+        vec3  wc = vec3(0.88, 0.86, 0.84);
+        fogDensity += d * (1. - fogDensity);
+        fogColor    = mix(fogColor, wc, d);
+      }
+
+      /* ── HIGH WISPS (thin, fast, near top) ── */
+      for(int i = 0; i < 5; i++){
+        float fi    = float(i);
+        vec2  rnd   = h22(vec2(fi*9.1+2., fi*4.7+8.));
+        float speed = (rnd.x - 0.5) * 0.025;
+
+        vec2  pos;
+        pos.x = fract(rnd.x*0.8 + t * speed + 0.2);
+        pos.y = 0.55 + rnd.y * 0.35;          /* upper portion */
+
+        float len   = 0.06 + rnd.x * 0.12;
+        float width = 0.008 + rnd.y * 0.012;
+        float angle = (rnd.y - 0.5) * 0.6;
+
+        float d = wisp(uv, pos, len/AR, width, angle) * 0.30 * s;
+        /* high wisps: near white, ethereal */
+        vec3  hc = vec3(0.93, 0.92, 0.95);
+        fogDensity += d * (1. - fogDensity);
+        fogColor    = mix(fogColor, hc, d);
+      }
+
+      /* ── Blend fog over image ──
+         Fog is semi-transparent — image always shows through */
+      fogDensity = clamp(fogDensity, 0., 0.82);
+      col.rgb    = mix(col.rgb, fogColor, fogDensity);
+
+      /* ── Add subtle image glow where fog is thin ──
+         Bright parts of image bleed a bit of color into nearby fog */
+      float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+      float glow= (1. - fogDensity) * lum * 0.1 * s;
+      col.rgb  += glow * vec3(1., 0.95, 0.88);
+
+      gl_FragColor = vec4(clamp(col.rgb, 0., 1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  LO-FI 5 — WATERCOLOR
+  //  Continuous flow field — no grid seams.
+  //  Uses smooth noise derivatives for stroke direction.
+  //  Full image coverage, visible movement, stays colorful.
+  // ═══════════════════════════════════════════════════════════════════
+  watercolor: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    float vnoise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),
+                 mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);
+    }
+    /* Smooth fbm — continuous, no seams */
+    float fbm(vec2 p){
+      float v=0.,a=0.55;
+      for(int i=0;i<4;i++){
+        v+=a*vnoise(p); p=p*2.1+vec2(1.3,2.9); a*=0.5;
+      }
+      return v;
+    }
+
+    /* ── Continuous flow field ──
+       Curl-style: use fbm gradient to get a smooth
+       direction field that covers the whole image
+       with NO seams or grid artifacts.              */
+    vec2 flowField(vec2 uv, float t){
+      float eps = 0.005;
+      /* Sample fbm at offset points to get gradient */
+      float n  = fbm(uv*3.    + t*0.2);
+      float nx = fbm(uv*3.    + t*0.2 + vec2(eps,0.));
+      float ny = fbm(uv*3.    + t*0.2 + vec2(0.,eps));
+      /* Gradient = direction of steepest ascent */
+      vec2 grad = vec2(nx-n, ny-n) / eps;
+      /* Rotate 90° for curl — gives smooth swirling flow */
+      return vec2(-grad.y, grad.x);
+    }
+
+    /* ── Paper grain — smooth, no grid ── */
+    float paperGrain(vec2 uv){
+      float AR = u_res.x / u_res.y;
+      return fbm(uv * vec2(14.*AR, 14.)) * 0.6
+           + vnoise(uv * vec2(28.*AR, 28.)) * 0.4;
+    }
+
+    /* ── Wet edge — softer, based on flow divergence ── */
+    float wetEdge(vec2 uv, float t){
+      float eps = 0.008;
+      vec2  f0  = flowField(uv, t);
+      vec2  fr  = flowField(uv + vec2(eps, 0.), t);
+      vec2  fu  = flowField(uv + vec2(0., eps), t);
+      /* Divergence — where flow spreads apart = wet edge */
+      float div = (fr.x - f0.x + fu.y - f0.y) / eps;
+      return clamp(abs(div) * 0.015, 0., 1.);
+    }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time * 0.4;
+
+      /* ── 1. Flow warp — continuous, covers full image ── */
+      vec2  flow   = flowField(uv, t);
+      /* Multi-scale: large slow movement + fine detail */
+      vec2  flow2  = flowField(uv*2.3 + 0.5, t*1.4) * 0.4;
+      vec2  warp   = (flow + flow2) * 0.022 * s;
+      vec2  warpUV = clamp(uv + warp, 0.005, 0.995);
+      vec4  col    = texture2D(u_tex, warpUV);
+
+      /* ── 2. Paper grain — darkens valleys ── */
+      float grain = paperGrain(uv);
+      col.rgb    *= 0.87 + grain * 0.22 * s;
+
+      /* ── 3. Wet edge darkening — soft, no seams ── */
+      float edge  = wetEdge(uv, t);
+      col.rgb    *= 1. - edge * 2.5 * s;
+
+      /* ── 4. Slight warm tint — keep color ── */
+      col.rgb *= vec3(1.02, 0.995, 0.94);
+
+      gl_FragColor = vec4(clamp(col.rgb, 0., 1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  LO-FI 6 — DUST & FILM  (hand-cranked 16mm projector)
+  // ═══════════════════════════════════════════════════════════════════
+  dustfilm: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float hash1(float n){ return fract(sin(n)*43758.5); }
+    float hash2(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+
+    void main(){
+      vec2  uv    = v_uv;
+      float s     = u_strength;
+      float fps   = 18.0;                 /* old projector frame rate */
+      float frame = floor(u_time*fps);
+
+      vec4 col = texture2D(u_tex, uv);
+
+      /* frame gate shake — tiny random offset each frame */
+      float shakeX = (hash1(frame*1.3)-.5)*0.003*s;
+      float shakeY = (hash1(frame*2.7)-.5)*0.002*s;
+      col = texture2D(u_tex, clamp(uv+vec2(shakeX,shakeY),0.,1.));
+
+      /* vertical scratch lines — 1-2 per frame */
+      for(int i=0;i<2;i++){
+        float fi   = float(i);
+        float scrX = hash1(frame*3.+fi*7.1);
+        float scrA = hash1(frame*1.7+fi*3.3);
+        if(scrA > (0.92-u_amp*0.05*s)){
+          float d = abs(uv.x - scrX);
+          col.rgb += smoothstep(0.002,0.,d) * hash1(frame+uv.y*80.+fi) * 1.8 * s;
+        }
+      }
+
+      /* dust motes */
+      vec2 dustUV = floor(uv * vec2(u_res.x,u_res.y) / 4.0);
+      float dust  = hash2(dustUV + frame*5.3);
+      if(dust > 0.993) col.rgb += (dust-0.993)*180.*s*vec3(1.,0.93,0.8);
+
+      /* light leak — top-left corner, pulsing */
+      float leak  = exp(-length(uv)*3.5) * (0.2+hash1(frame*0.09)*0.5) * s;
+      col.rgb    += leak * vec3(1.,0.75,0.3);
+
+      /* per-frame grain — changes every frame */
+      float grain = (hash2(uv*vec2(u_res)+frame*73.)-0.5)*0.11*s;
+      col.rgb    += grain;
+
+      /* flicker — brightness randomly dips */
+      float flicker = 0.92 + hash1(frame*1.9)*0.1*s;
+      col.rgb *= flicker;
+
+      /* sepia + vignette */
+      float lum = dot(col.rgb,vec3(0.299,0.587,0.114));
+      col.rgb   = mix(col.rgb, vec3(lum*1.1,lum*0.95,lum*0.75), 0.35*s);
+      float vig = length(uv-.5)*1.6;
+      col.rgb  *= 1.0-vig*vig*0.65*s;
+
+      gl_FragColor = vec4(clamp(col.rgb,0.,1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CYBER 1 — LIQUID METAL  (curl-noise fluid + Fresnel sheen)
+  //
+  //  Pipeline:
+  //    1. Divergence-free curl noise velocity field (real fluid math)
+  //    2. Multi-step advection for turbulent flow
+  //    3. Normal derivation from velocity field
+  //    4. Refraction through the fluid surface
+  //    5. Fresnel reflectance — edge highlights like real metal
+  //    6. Beat shockwave — radial pressure wave through the fluid
+  // ═══════════════════════════════════════════════════════════════════
+  liquidmetal: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+    float vnoise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),
+                 mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);
+    }
+
+    /* ── True curl noise ──
+       Curl of a scalar potential field is divergence-free,
+       meaning the fluid neither creates nor destroys volume.
+       This gives it the incompressible look of real liquid.          */
+    vec2 curlNoise(vec2 p, float t){
+      float eps = 0.001;
+      float n   = vnoise(p + t*0.3);
+      float nx  = vnoise(p + vec2(eps,0.) + t*0.3);
+      float ny  = vnoise(p + vec2(0.,eps) + t*0.3);
+      /* curl = (dF/dy, -dF/dx) */
+      return vec2((ny-n)/eps, -(nx-n)/eps) * 0.5;
+    }
+
+    /* ── Fluid height field ──
+       Advect a point through the curl field, multi-step.
+       More steps = more turbulent, more realistic.                   */
+    float fluidHeight(vec2 uv, float t){
+      float s = u_strength;
+      vec2  p = uv * 2.5;
+
+      /* step 1 — primary flow */
+      vec2  c1 = curlNoise(p, t*0.35);
+      p += c1 * 0.018 * s;
+
+      /* step 2 — secondary turbulence at higher frequency */
+      vec2  c2 = curlNoise(p*2. + vec2(3.1,7.4), t*0.55);
+      p += c2 * 0.010 * s;
+
+      /* step 3 — fine detail */
+      vec2  c3 = curlNoise(p*4. + vec2(1.7,2.8), t*0.8);
+      p += c3 * 0.005 * s;
+
+      /* height from noise at advected position */
+      return vnoise(p) * 0.5 + vnoise(p*2.+1.3)*0.3 + vnoise(p*4.+2.7)*0.2;
+    }
+
+    /* ── Normal from fluid height ── */
+    vec3 fluidNormal(vec2 uv, float t){
+      float eps = 1.5/min(u_res.x,u_res.y);
+      float hC  = fluidHeight(uv,t);
+      float hR  = fluidHeight(uv+vec2(eps,0.),t);
+      float hU  = fluidHeight(uv+vec2(0.,eps),t);
+      return normalize(vec3(-(hR-hC)/eps, -(hU-hC)/eps, 1.) * vec3(6.,6.,1.));
+    }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time;
+
+      float h  = fluidHeight(uv, t);
+      vec3  N  = fluidNormal(uv, t);
+
+      /* ── Beat shockwave — pressure wave through fluid ── */
+      float dist  = length(uv - 0.5);
+      float shock = sin(dist*30. - t*9.) * exp(-dist*4.) * u_amp*0.035*s;
+      vec2  sDir  = normalize(uv-0.5+0.001);
+
+      /* ── Refraction through fluid surface ── */
+      float refStr = 0.06 * min(s,1.2);
+      vec2  rUV   = clamp(uv + N.xy*h*refStr + sDir*shock, 0.005, 0.995);
+      vec4  refCol= texture2D(u_tex, rUV);
+      vec4  bgCol = texture2D(u_tex, uv);
+
+      /* ── Desaturate to metal ── metal has low chroma */
+      float lum   = dot(refCol.rgb, vec3(0.299,0.587,0.114));
+      vec3  metal = mix(refCol.rgb, vec3(lum*1.15), 0.6*s);
+      /* cool-tint the midtones — steel/silver look */
+      metal = mix(metal, metal*vec3(0.88,0.92,1.0), 0.3*s);
+      vec4  col   = vec4(metal, 1.);
+
+      /* ── Fresnel reflectance ──
+         Real metals are much brighter at glancing angles.
+         Simulate with N.z — low N.z = glancing = bright.           */
+      float fresnel = pow(1.-abs(N.z), 3.) * h * 1.5 * min(s,1.3);
+      col.rgb      += fresnel * vec3(0.85,0.90,1.0);
+
+      /* ── Primary specular — sharp highlight ── */
+      vec3  L1   = normalize(vec3(-0.5, 0.7, 0.5));
+      float s1   = pow(max(0.,dot(N,L1)),64.) * h * 2.0 * min(s,1.3);
+      col.rgb   += s1 * vec3(1.0, 0.97, 0.93);
+
+      /* ── Secondary specular — fill light ── */
+      vec3  L2   = normalize(vec3(0.4,-0.3,0.7));
+      float s2   = pow(max(0.,dot(N,L2)),24.) * h * 0.5 * min(s,1.2);
+      col.rgb   += s2 * vec3(0.6,0.7,0.9);
+
+      /* ── Edge chromatic — blue fringe at fluid boundaries ── */
+      float edge  = (1.-abs(N.z)) * h * 0.015 * s;
+      float bEdge = texture2D(u_tex, clamp(rUV+vec2(edge,0.),0.,1.)).b;
+      col.b       = mix(col.b, bEdge, h*0.3*s);
+
+      /* ── Vignette ── */
+      float vig = length((uv-0.5)*vec2(1.,0.75));
+      col.rgb  *= 1.-vig*vig*0.25*s;
+
+      gl_FragColor = vec4(clamp(col.rgb,0.,1.),1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CYBER 2 — SHATTER  (Voronoi fracture + normal-map glass shards)
+  //
+  //  Pipeline:
+  //    1. Voronoi cell decomposition — finds nearest + 2nd nearest
+  //    2. Per-shard normal — each fragment tilts independently
+  //    3. Refraction through tilted glass shard
+  //    4. Beat = fracture impact — shards explode outward
+  //    5. Neon edge glow — cracked glass glows at breaks
+  //    6. Specular highlight per shard (glass catching light)
+  // ═══════════════════════════════════════════════════════════════════
+  shatter: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float h11(float n){ return fract(sin(n)*43758.5); }
+    vec2  h22(vec2 p){
+      return vec2(h11(dot(p,vec2(127.1,311.7))), h11(dot(p,vec2(269.5,183.3))));
+    }
+    float h21(vec2 p){ return h22(p).x; }
+
+    /* ── Voronoi with distance to 1st and 2nd nearest ──
+       Returns: x=dist to nearest, y=dist to 2nd nearest,
+                z=cell hash, w=dist to border (y-x)               */
+    vec4 voronoi(vec2 uv){
+      vec2  cell = floor(uv);
+      vec2  frac = fract(uv);
+      float d1=9.,d2=9.;
+      vec2  nearest=vec2(0.);
+      float nearHash=0.;
+
+      for(int y=-2;y<=2;y++) for(int x=-2;x<=2;x++){
+        vec2  n  = vec2(x,y);
+        vec2  pt = h22(cell+n) + n;
+        float d  = length(pt - frac);
+        if(d<d1){ d2=d1; d1=d; nearest=cell+n; nearHash=h21(cell+n+7.3); }
+        else if(d<d2){ d2=d; }
+      }
+      return vec4(d1, d2, nearHash, d2-d1);
+    }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time;
+      float AR = u_res.x/u_res.y;
+
+      /* ── Fracture pattern — two scales for complexity ── */
+      float cells  = 8.0 + sin(t*0.1)*0.5;
+      vec2  uvC    = uv * vec2(cells * AR, cells);
+      vec4  vor    = voronoi(uvC);
+      float border = vor.w;      /* distance to nearest cell edge */
+      float cellH  = vor.z;      /* per-cell random value */
+
+      /* ── Beat impact ──
+         On beat, shards explode outward from center.
+         Heartfelt timing — builds up then snaps.                    */
+      float beatPhase = fract(t * 0.4);
+      float snap = smoothstep(0.6, 0.65, beatPhase) * smoothstep(1., 0.7, beatPhase);
+      float burst = u_amp * snap * 0.06 * s;
+
+      /* each shard moves in its own direction from its centroid */
+      vec2  shardDir = normalize(h22(vec2(cellH*100., cellH*73.)) - 0.5);
+      vec2  explode  = shardDir * burst;
+
+      /* ── Per-shard tilt ──
+         Each glass shard has a slightly different surface normal,
+         like a broken mirror tilting at different angles.           */
+      vec2  tiltDir = (h22(vec2(cellH*37., cellH*53.)) - 0.5) * 0.3;
+      /* shard tilt increases with beat */
+      float tiltStr = (0.02 + burst * 0.8) * s;
+      vec2  tilt    = tiltDir * tiltStr;
+
+      /* ── Refraction through tilted shard ── */
+      vec2  rUV = clamp(uv + tilt + explode, 0.005, 0.995);
+      vec4  refCol = texture2D(u_tex, rUV);
+      vec4  bgCol  = texture2D(u_tex, uv);
+      vec4  col    = mix(bgCol, refCol, clamp(s*0.7,0.,0.85));
+
+      /* ── Glass shard specular ──
+         Each shard catches light differently based on its tilt.    */
+      vec3  shardN = normalize(vec3(tiltDir*3., 1.));
+      vec3  L      = normalize(vec3(-0.4, 0.6, 0.7));
+      float spec   = pow(max(0.,dot(shardN,L)), 48.) * 0.9 * min(s,1.3);
+      col.rgb     += spec * vec3(0.9,0.95,1.0);
+
+      /* ── Neon crack glow ──
+         The border between shards glows with neon light.
+         Alternate cyan/magenta per cell pair for complexity.        */
+      float crack = smoothstep(0.08*s, 0., border-0.01) * s;
+      /* color alternates based on neighboring cell hashes */
+      float parity= step(0.5, h21(vec2(cellH*17.,cellH*43.)));
+      vec3  neon  = mix(vec3(0.,1.,0.9), vec3(1.,0.,0.85), parity);
+      col.rgb    += crack * neon * 1.4;
+
+      /* ── Impact flash — white flash on big beat ── */
+      float flash = smoothstep(0.7,1.,u_amp) * snap * 0.15 * s;
+      col.rgb    += flash;
+
+      /* ── Vignette ── */
+      float vig = length((uv-0.5)*vec2(1.,0.75));
+      col.rgb  *= 1.-vig*vig*0.3*s;
+
+      gl_FragColor = vec4(clamp(col.rgb,0.,1.),1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CYBER 3 — DATA CORRUPT  (pixel-sort + block glitch + RGB split)
+  // ═══════════════════════════════════════════════════════════════════
+  datacorrupt: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float hash1(float n){ return fract(sin(n)*43758.5); }
+    float hash2(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t12= floor(u_time*16.0);
+
+      /* ---- pixel sort horizontal bands ---- */
+      float bandH   = floor(uv.y*50.);
+      float bandRnd = hash1(bandH*3.7+t12*0.4);
+      float sortAmt = (bandRnd>(0.78-u_amp*0.25*s)) ? (bandRnd-0.78)*0.2*s : 0.;
+      uv.x = fract(uv.x + sortAmt);
+
+      /* ---- chromatic aberration ---- */
+      float chrom= (0.007+u_amp*0.014)*s;
+      float r = texture2D(u_tex, clamp(uv+vec2( chrom,0.),0.,1.)).r;
+      float g = texture2D(u_tex, clamp(uv,0.,1.)).g;
+      float b = texture2D(u_tex, clamp(uv+vec2(-chrom*.7,0.001),0.,1.)).b;
+      vec3 col = vec3(r,g,b);
+
+      /* ---- block replacement glitch ---- */
+      vec2 blk    = floor(uv*vec2(48.,32.));
+      float bRnd  = hash2(blk+t12*9.1);
+      if(bRnd > (0.93-u_amp*0.12*s)){
+        float repY  = hash1(bRnd*127.+t12);
+        vec2  srcUV = vec2(uv.x, repY);
+        col = mix(col, texture2D(u_tex,clamp(srcUV,0.,1.)).rgb, (bRnd-.93)*10.*s);
+      }
+
+      /* ---- scanline flicker ---- */
+      float scan = (mod(uv.y*u_res.y,2.)<1.) ? 0.86 : 1.0;
+      col *= scan;
+
+      /* ---- neon data drizzle ---- */
+      float data = hash2(floor(uv*vec2(80.,60.))+t12*4.)*u_amp*0.15*s;
+      col += data*vec3(0.,0.85,0.25);
+
+      /* ---- brief total invert flash on big beat ---- */
+      float inv = step(0.88, u_amp)*hash1(t12*3.7)*0.12*s;
+      col = mix(col, 1.-col, inv);
+
+      gl_FragColor = vec4(clamp(col,0.,1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CYBER 4 — PLASMA ARC  (branching lightning + glow + beat strike)
+  // ═══════════════════════════════════════════════════════════════════
+  plasmaarc: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float hash1(float n){ return fract(sin(n)*43758.5); }
+    float hash2(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+    float noise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(hash2(i),hash2(i+vec2(1,0)),f.x),
+                 mix(hash2(i+vec2(0,1)),hash2(i+vec2(1,1)),f.x),f.y);
+    }
+
+    /* signed distance to a jittered line segment */
+    float boltDist(vec2 uv, vec2 a, vec2 b, float t, float s){
+      vec2  ab=b-a; float len=length(ab);
+      vec2  dir=ab/len;
+      float proj=clamp(dot(uv-a,dir),0.,len);
+      /* fractal jitter along the bolt */
+      float jit = noise(vec2(proj*12.+t*7., t*3.))*0.045*s;
+      float jit2= noise(vec2(proj*25.-t*5., t*5.))*0.018*s;
+      vec2  closest=a+dir*proj+vec2(jit+jit2,jit-jit2)*0.5;
+      return length(uv-closest);
+    }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time;
+      vec4  col= texture2D(u_tex, uv);
+      float glow=0.;
+
+      /* 5 arc bolts — each fires independently */
+      for(int i=0;i<5;i++){
+        float fi   = float(i);
+        float rate = 0.3+hash1(fi*7.1)*0.5;
+        float phase= fract(t*rate + hash1(fi*3.3));
+        /* on/off envelope — crisp rise, slow decay */
+        float env  = smoothstep(0.,0.08,phase)*smoothstep(1.,0.55,phase);
+        env *= (0.4 + u_amp*0.6*s);
+
+        /* random endpoints per firing cycle */
+        float cyc  = floor(t*rate+hash1(fi*3.3));
+        vec2  a    = vec2(hash1(fi*2.+cyc*13.7), hash1(fi*5.+cyc*7.3));
+        vec2  b    = vec2(hash1(fi*8.+cyc*11.1), hash1(fi*11.+cyc*17.9));
+        /* secondary branch */
+        vec2  mid  = mix(a,b,0.4)+vec2(hash1(fi+cyc*3.)-.5,hash1(fi*3.+cyc*5.)-.5)*0.2;
+
+        float d1   = boltDist(uv,a,b,t,s);
+        float d2   = boltDist(uv,a,mid,t*1.3,s)*1.3;
+        float arc  = (smoothstep(0.014*s,0.,d1)+smoothstep(0.008*s,0.,d2)*0.5
+                     +smoothstep(0.05*s,0.,d1)*0.3);
+        glow += arc*env;
+      }
+
+      /* neon purple → white core */
+      vec3 arcC = mix(vec3(0.55,0.,1.), vec3(1.,0.92,1.), clamp(glow,0.,1.));
+      col.rgb  += arcC*glow*s;
+      /* bloom darkens surroundings subtly */
+      col.rgb  *= 1.-glow*0.12*s;
+
+      gl_FragColor = vec4(clamp(col.rgb,0.,1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CYBER 5 — HOLOGRAM  (volumetric scan + RGB ghost + wipe glitch)
+  // ═══════════════════════════════════════════════════════════════════
+  hologram: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float hash1(float n){ return fract(sin(n)*43758.5); }
+    float hash2(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+    float noise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(hash2(i),hash2(i+vec2(1,0)),f.x),
+                 mix(hash2(i+vec2(0,1)),hash2(i+vec2(1,1)),f.x),f.y);
+    }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time;
+
+      /* ---- RGB ghost desync ---- */
+      float desynk  = (0.006+u_amp*0.009)*s;
+      float ghostOff= 0.012*s;
+      float r = texture2D(u_tex, clamp(uv+vec2( desynk,0.),0.,1.)).r;
+      float g = texture2D(u_tex, uv).g;
+      float b = texture2D(u_tex, clamp(uv-vec2( desynk,0.),0.,1.)).b;
+      /* ghost copy slightly offset */
+      vec4  ghost = texture2D(u_tex, clamp(uv+vec2(ghostOff,ghostOff*.3),0.,1.));
+      vec3  col   = mix(vec3(r,g,b), ghost.rgb, 0.15*s);
+
+      /* ---- volumetric scan lines ---- */
+      float scanLine = sin(uv.y*u_res.y*0.4 + t*2.5)*0.5+0.5;
+      col *= 0.75 + scanLine*0.35*s;
+
+      /* ---- holographic transparency bands ---- */
+      float band = sin(uv.y*18.-t*2.)*0.5+0.5;
+      col *= 0.8 + band*0.25*s;
+
+      /* ---- vertical interference shimmer ---- */
+      float intf = smoothstep(0.0015,0.,mod(uv.x, 1./80.)-0.00025)*0.35*s;
+      col += intf*vec3(0.1,1.,0.85);
+
+      /* ---- horizontal glitch wipe on beat ---- */
+      float wipeT  = hash1(floor(t*10.)*3.7);
+      float wipeY  = hash1(floor(t*10.)*7.1);
+      float wipeW  = 0.04+hash1(floor(t*10.)*5.)*0.1;
+      float inWipe = step(0.9-u_amp*0.15*s, wipeT)*
+                     smoothstep(wipeW,0.,abs(uv.y-wipeY));
+      col  = mix(col, col*vec3(0.,1.8,0.9)+vec3(0.,0.1,0.05), inWipe*s);
+
+      /* ---- edge distortion ---- */
+      float edgeDist = noise(vec2(uv.y*8.+t*3., t))*0.008*s;
+      col = mix(col, texture2D(u_tex,clamp(uv+vec2(edgeDist,0.),0.,1.)).rgb, 0.25*s);
+
+      /* flicker */
+      col *= 0.9+hash1(floor(t*30.))*0.14*s;
+
+      gl_FragColor = vec4(clamp(col,0.,1.), 1.);
+    }
+  `,
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CYBER 6 — HEAT DISTORTION  (normal-map thermal refraction)
+  //
+  //  Pipeline:
+  //    1. Thermal height field — hot air density from bottom up
+  //    2. Normal derivation — heat shimmer bends light like water
+  //    3. Refraction through thermal gradient
+  //    4. Neon bloom at high-temperature zones
+  //    5. Beat shockwave — explosive heat burst from center
+  // ═══════════════════════════════════════════════════════════════════
+  heatwave: `
+    precision highp float;
+    uniform sampler2D u_tex;
+    uniform float u_time, u_amp, u_strength;
+    uniform vec2  u_res;
+    varying vec2  v_uv;
+
+    float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
+    float vnoise(vec2 p){
+      vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+      return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),
+                 mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);
+    }
+    float fbm(vec2 p, int oct){
+      float v=0.,a=0.5;
+      for(int i=0;i<8;i++){
+        if(i>=oct)break;
+        v+=a*vnoise(p);p=p*2.1+vec2(1.3,2.7);a*=0.5;
+      }
+      return v;
+    }
+
+    /* ── Thermal density field ──
+       Hot air rises — density peaks near heat sources at bottom.
+       Uses two fbm layers at different speeds to simulate turbulent
+       convection currents.                                            */
+    float thermalDensity(vec2 uv, float t){
+      float s = u_strength;
+
+      /* rising heat — exponentially stronger near bottom of screen
+         uv.y=0 is bottom, so 1.-uv.y is max at bottom             */
+      float heatY = pow(max(0., 1.-uv.y), 1.8) * 2.0;
+
+      /* convection current layer 1 — large slow rolls, rising upward */
+      vec2  c1  = vec2(uv.x + t*0.08, uv.y*0.6 + t*0.12);
+      float n1  = fbm(c1 * 3.0, 5) * heatY;
+
+      /* convection layer 2 — fast turbulent shimmer, also rising */
+      vec2  c2  = vec2(uv.x*2. - t*0.15, uv.y*1.5 - t*0.2);
+      float n2  = fbm(c2 * 5.0, 4) * heatY * 0.6;
+
+      /* horizontal heat bands — street heat mirage */
+      float band = sin(uv.y*30. - t*4.) * 0.5 + 0.5;
+      float mirage= band * heatY * 0.3;
+
+      return clamp((n1 + n2 + mirage) * s, 0., 1.);
+    }
+
+    /* ── Normal from thermal field ── */
+    vec3 thermalNormal(vec2 uv, float t){
+      float eps = 1.5 / min(u_res.x, u_res.y);
+      float hC  = thermalDensity(uv, t);
+      float hR  = thermalDensity(uv+vec2(eps,0.), t);
+      float hU  = thermalDensity(uv+vec2(0.,eps), t);
+      /* heat rises so vertical normal is stronger */
+      return normalize(vec3(-(hR-hC)/eps*3., -(hU-hC)/eps*5., 1.));
+    }
+
+    void main(){
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time;
+
+      float h  = thermalDensity(uv, t);
+      vec3  N  = thermalNormal(uv, t);
+
+      /* ── Thermal refraction ──
+         Hot air has lower refractive index — light bends upward
+         through the thermal gradient (mirage effect)               */
+      float refStr = 0.05 * min(s, 1.2);
+      /* heat shimmer is primarily vertical (rising air) */
+      vec2  heatOffset = vec2(N.x * 0.4, N.y) * h * refStr;
+      vec2  rUV    = clamp(uv + heatOffset, 0.005, 0.995);
+      vec4  refCol = texture2D(u_tex, rUV);
+      vec4  bgCol  = texture2D(u_tex, uv);
+
+      /* ── Beat shockwave — explosive heat burst from bottom-center ── */
+      float dist  = length(uv - vec2(0.5, 0.1));
+      float shock = sin(dist*25. - t*10.) * exp(-dist*3.) * u_amp * 0.04 * s;
+      vec2  sDir  = normalize(uv - vec2(0.5,0.1) + 0.001);
+      vec2  sUV   = clamp(rUV + sDir*shock, 0.005, 0.995);
+      refCol      = mix(refCol, texture2D(u_tex, sUV), u_amp*0.6);
+
+      /* ── Composite ── */
+      vec4 col = mix(bgCol, refCol, clamp(h*2.0, 0., 0.88));
+
+      /* ── Chromatic aberration from heat ──
+         Real heat shimmer splits colors (dispersion)               */
+      float disp  = h * 0.008 * s;
+      float rC    = texture2D(u_tex, clamp(rUV+vec2(disp,0.),0.,1.)).r;
+      float bC    = texture2D(u_tex, clamp(rUV-vec2(disp,0.),0.,1.)).b;
+      col.r       = mix(col.r, rC, h*0.5);
+      col.b       = mix(col.b, bC, h*0.5);
+
+      /* ── Neon heat glow — hottest at bottom (uv.y=0 = bottom) ── */
+      float heatYb = pow(max(0., 1.-uv.y), 2.) * h;
+      col.rgb    += heatYb * mix(vec3(1.0,0.2,0.0), vec3(0.8,0.4,1.0), fbm(uv*4.+t*0.3,3)) * 0.4*s;
+
+      /* ── Horizon shimmer line — near bottom ── */
+      float horizon = exp(-abs(uv.y-0.25)*20.) * u_amp * 0.5 * s;
+      col.rgb      += horizon * vec3(1.,0.5,0.1);
+
+      /* ── Specular along thermal normals ── */
+      vec3  L    = normalize(vec3(0.2,0.8,0.5));
+      float spec = pow(max(0.,dot(N,L)),16.) * h * 0.8 * min(s,1.2);
+      col.rgb   += spec * vec3(1.,0.7,0.3);
+
+      /* ── Vignette ── */
+      float vig = length((uv-0.5)*vec2(1.,0.75));
+      col.rgb  *= 1.-vig*vig*0.3*s;
+
+      gl_FragColor = vec4(clamp(col.rgb,0.,1.),1.);
+    }
+  `,
+};
+
+// Build all shader programs up front
+const _fxPrograms = {};
+function buildShader(type, src) {
+  const gl = bgGl; if (!gl) return null;
+  const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s;
+}
+function buildProgram(fragSrc) {
+  const gl = bgGl; if (!gl) return null;
+  const prog = gl.createProgram();
+  gl.attachShader(prog, buildShader(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, buildShader(gl.FRAGMENT_SHADER, fragSrc));
+  gl.linkProgram(prog);
+  // Setup quad buffer
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'a_pos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  return prog;
+}
+function initAllShaders() {
+  if (!bgGl) return;
+  Object.keys(FRAG).forEach(k => { _fxPrograms[k] = buildProgram(FRAG[k]); });
+}
+initAllShaders();
+
+function uploadBgTexture(img) {
+  const gl = bgGl; if (!gl) return;
+  if (_bgTexture) gl.deleteTexture(_bgTexture);
+  _bgTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, _bgTexture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+}
+
+function renderFx() {
+  const gl = bgGl; if (!gl || !_bgTexture) return;
+  const prog = _fxPrograms[_currentFx]; if (!prog) return;
+  bgCanvas.width  = window.innerWidth;
+  bgCanvas.height = window.innerHeight;
+  gl.viewport(0, 0, bgCanvas.width, bgCanvas.height);
+  gl.useProgram(prog);
+  // Re-bind buffer for this program
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'a_pos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.uniform1f(gl.getUniformLocation(prog, 'u_time'),     _fxTime);
+  gl.uniform1f(gl.getUniformLocation(prog, 'u_amp'),      _rippleAmp * _fxStrength);
+  gl.uniform1f(gl.getUniformLocation(prog, 'u_strength'), _fxStrength);
+  gl.uniform2f(gl.getUniformLocation(prog, 'u_res'),      bgCanvas.width, bgCanvas.height);
+  gl.bindTexture(gl.TEXTURE_2D, _bgTexture);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  _fxTime += 0.016;
+}
+
+function startRippleLoop() {
+  if (_rippleRAF) return;
+  function loop() { renderFx(); _rippleRAF = requestAnimationFrame(loop); }
+  loop();
+}
+function stopRippleLoop() {
+  if (_rippleRAF) { cancelAnimationFrame(_rippleRAF); _rippleRAF = null; }
+}
+function updateRippleAmp(amp) { _rippleAmp = amp; }
+
+function setImgFx(fx) {
+  const wasActive = (_currentFx === fx && _currentFxMode !== 'viz');
+  if (wasActive) { setFxMode('viz'); return; }
+
+  _currentFx     = fx;
+  _currentFxMode = fx;
+
+  // Single-select: activate this fx
+  el('fxmode-viz')?.classList.remove('active');
+  _allFxKeys.forEach(k => el('ifx-'+k)?.classList.toggle('active', k === fx));
+
+  // Set viz opacity to 0 — image FX takes over
+  el('viz-opacity-sl').value = 0; setVizOpacity(0);
+
+  // Rain video overlay — show/hide
+  if (fx === 'raindrops') { showRainVideo(); }
+  else { hideRainVideo(); }
+
+  // Show bg canvas if image loaded, else just note the selection
+  const hasImg = !!_bgTexture;
+  if (hasImg) {
+    bgCanvas.style.display = 'block';
+    el('viz').style.display = 'none';
+    startRippleLoop();
+  }
+
+  localStorage.setItem('ikandy-imgfx',  fx);
+  localStorage.setItem('ikandy-fxmode', fx);
+}
+
+function onBgFileChange(input) {
+  const file = input.files[0]; if (!file) return;
+  // Validate MIME type — don't rely on accept attribute alone
+  const allowed = new Set(['image/jpeg','image/png','image/webp','image/gif','image/bmp','image/avif']);
+  if (!allowed.has(file.type)) {
+    toast('Invalid file type — please use JPG, PNG, WebP, GIF or BMP');
+    input.value = '';
+    return;
+  }
+  // Also validate by extension as second check
+  const ext = file.name.split('.').pop().toLowerCase();
+  const allowedExt = new Set(['jpg','jpeg','png','webp','gif','bmp','avif']);
+  if (!allowedExt.has(ext)) {
+    toast('Invalid file extension');
+    input.value = '';
+    return;
+  }
+  // Size limit — 50MB max (WebGL texture limit)
+  if (file.size > 50 * 1024 * 1024) {
+    toast('Image too large — max 50MB');
+    input.value = '';
+    return;
+  }
+  // Stop any folder cycle
+  if (_bgCycleTimer) { clearInterval(_bgCycleTimer); _bgCycleTimer = null; }
+  _bgFiles = [];
+  el('bg-cycle-row').style.display = 'none';
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    _bgImage = img;
+    uploadBgTexture(img);
+    bgCanvas.style.display = 'block';
+    el('bg-filename').textContent = file.name;
+    el('bg-filename').style.display = 'block';
+    el('bg-clear-btn').style.display = '';
+    // Auto-select Rain when image is loaded
+    setImgFx('raindrops');
+    };
+  img.src = url;
+}
+
+// ── Background folder cycling ──────────────────────────────────────
+let _bgFiles = [], _bgCycleIdx = 0, _bgCycleTimer = null, _bgCycleSeconds = 15;
+
+async function pickBgFolder() {
+  const result = await window.ikandy.pickImageFolder();
+  if (!result.ok || !result.files.length) { toast('No images found in folder'); return; }
+  _bgFiles = result.files;
+  _bgCycleIdx = 0;
+  el('bg-filename').textContent = `📁 ${result.files.length} images`;
+  el('bg-filename').style.display = 'block';
+  el('bg-cycle-row').style.display = 'flex';
+  el('bg-clear-btn').style.display = '';
+  // Auto-select Rain when folder is loaded
+  setImgFx('raindrops');
+  loadBgFile(_bgFiles[0]);
+  startBgCycle();
+}
+
+function loadBgFile(url) {
+  const img = new Image();
+  img.onload = () => { _bgImage = img; uploadBgTexture(img); bgCanvas.style.display = 'block'; startRippleLoop(); };
+  img.src = url;
+}
+
+function startBgCycle() {
+  if (_bgCycleTimer) clearInterval(_bgCycleTimer);
+  _bgCycleTimer = setInterval(() => {
+    _bgCycleIdx = (_bgCycleIdx + 1) % _bgFiles.length;
+    loadBgFile(_bgFiles[_bgCycleIdx]);
+  }, _bgCycleSeconds * 1000);
+}
+
+function setBgCycleTime(s) {
+  _bgCycleSeconds = s || 15;
+  if (_bgFiles.length) startBgCycle();
+}
+
+function clearBgImage() {
+  _bgImage = null; _bgTexture = null; _bgFiles = [];
+  if (_bgCycleTimer) { clearInterval(_bgCycleTimer); _bgCycleTimer = null; }
+  bgCanvas.style.display = 'none';
+  el('bg-filename').style.display = 'none';
+  el('bg-filename').textContent = '';
+  el('bg-cycle-row').style.display = 'none';
+  el('bg-clear-btn').style.display = 'none';
+  stopRippleLoop();
+  // Return to visualizer
+  setFxMode('viz');
+}
+
+function initVibeSettings() {
+  // Always boot to Visualizer
+  _currentFxMode = 'viz';
+  el('fxmode-viz')?.classList.add('active');
+  el('viz').style.display = 'block';
+  _allFxKeys.forEach(k => el('ifx-'+k)?.classList.remove('active'));
+
+  const savedPalette = localStorage.getItem('ikandy-palette') || 'none';
+  setPalette(savedPalette);
+  const savedGrain = parseFloat(localStorage.getItem('ikandy-grain') || '0');
+  const savedScan  = parseFloat(localStorage.getItem('ikandy-scan')  || '0');
+  el('grain-sl').value = savedGrain; setGrain(savedGrain);
+  el('scan-sl').value  = savedScan;  setScanlines(savedScan);
+}
+
+/* ── THEMES ── */
+const THEMES = {
+  gold:    { acc: '#d4a843', accDim: 'rgba(212,168,67,.15)',  accTxt: '#f5d080', sbBg: 'rgba(6,6,10,.98)',   bdr: 'rgba(255,255,255,.12)', dim: '#7a7a94' },
+  neon:    { acc: '#ff2d8a', accDim: 'rgba(255,45,138,.12)',  accTxt: '#ff80b8', sbBg: 'rgba(8,4,14,.98)',   bdr: 'rgba(255,45,138,.18)',  dim: '#7a6a82' },
+  forest:  { acc: '#4caf7d', accDim: 'rgba(76,175,125,.12)',  accTxt: '#88d4a8', sbBg: 'rgba(4,10,6,.98)',   bdr: 'rgba(76,175,125,.18)',  dim: '#607a6a' },
+  dusk:    { acc: '#9b72cf', accDim: 'rgba(155,114,207,.12)', accTxt: '#c4a0f0', sbBg: 'rgba(8,4,14,.98)',   bdr: 'rgba(155,114,207,.18)', dim: '#706a82' },
+  ice:     { acc: '#5bc8f5', accDim: 'rgba(91,200,245,.12)',  accTxt: '#a0e0ff', sbBg: 'rgba(4,8,14,.98)',   bdr: 'rgba(91,200,245,.18)',  dim: '#607a8a' },
+  white:   { acc: '#e8e8e8', accDim: 'rgba(232,232,232,.12)', accTxt: '#ffffff', sbBg: 'rgba(6,6,10,.98)',   bdr: 'rgba(255,255,255,.25)', dim: '#909090' },
+};
+function setTheme(name) {
+  const t = THEMES[name] || THEMES.gold;
+  const r = document.documentElement.style;
+  r.setProperty('--acc',     t.acc);
+  r.setProperty('--acc-dim', t.accDim);
+  r.setProperty('--acc-txt', t.accTxt);
+  r.setProperty('--sb-bg',   t.sbBg);
+  r.setProperty('--bdr',     t.bdr);
+  r.setProperty('--dim',     t.dim);
+  document.querySelectorAll('.theme-sw').forEach(s =>
+    s.classList.toggle('active', s.dataset.theme === name));
+  localStorage.setItem('ikandy-theme', name);
+}
+function initTheme() {
+  setTheme(localStorage.getItem('ikandy-theme') || 'gold');
+}
+
+async function boot() {
+  lp(10);
+  await waitForButterchurn();
+  lp(55);
+  initAudio();
+  lp(65);
+  initButterchurn();
+  lp(80);
+  loadPresets(); lp(85);
+
+  // Restore saved visual settings
+  const savedSpeed  = localStorage.getItem('viz-speed');
+  const savedSmooth = localStorage.getItem('viz-smoothing');
+  if (savedSpeed)  { const sl = el('speed-sl'); if (sl) { sl.value = savedSpeed;  setSpeed(+savedSpeed); } }
+  if (savedSmooth) { const sl = el('sm-sl');    if (sl) { sl.value = savedSmooth; setSmoothing(+savedSmooth); } }
+
+  resize();
+  renderLoop();
+  lp(100);
+  setupAudioResumeOnGesture();
+  // Don't fade loading yet — wait for auth-result to avoid flash of login screen
+
+  // Defer sync until after first render paint — 100ms ensures DOM is fully ready
+  setTimeout(() => {
+    syncAutoState();
+    if (autoCycle) startCycle();
+  }, 100);
+
+  // Sync overlay button to initial lyricsOn=true state
+  const overlayBtn = el('overlay-btn');
+  if (overlayBtn) overlayBtn.style.color = 'var(--sp)';
+
+  // Set up IPC listeners — will receive auth-result from main.js
+  setupSpotifyIPC();
+  await initSource();
+  initVibeSettings();
+  initTheme();
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOOLTIP TOUR — starts after Spotify connected (tkStart called on success)
+   ═══════════════════════════════════════════════════════════════════ */
+(function() {
+  const DONE_KEY = 'ikandy-tour3-done';
+  const g = id => document.getElementById(id);
+
+  const STEPS = [
+    { sel:'#pnav',            place:'below', title:'Preset Navigator',   body:'Use ‹ › to cycle 500+ MilkDrop presets. AUTO switches them per track automatically.' },
+    { sel:'#presets-btn',     place:'below', title:'Preset Browser',     body:'Browse all presets with live previews in Grid, List, or Large view.' },
+    { sel:'#status-badge',    place:'below', title:'Connection Status',  body:'Shows your active source. Click Disconnect to switch accounts or sources.' },
+    { sel:'#hud',             place:'right', title:'Now Playing',        body:'Track info, album art, and a progress bar. Click the bar to seek. Works with Spotify Premium and VLC.' },
+    { sel:'#controls',        place:'above', title:'Playback Controls',  body:'Play, pause, skip, adjust volume. Works with Spotify Premium and VLC only.' },
+    { sel:'#hide-btn',        place:'below', title:'Hide UI',            body:'Click ◎ (or press H) to hide all controls for a clean full-screen view. Press F for fullscreen. Click ◎ again to restore.' },
+    // Sidebar steps — sidebar opened once on entry, closed on leave
+    { sel:'#ptab',            place:'left',  title:'Settings Sidebar',   body:'Click this tab to open the sidebar at any time. It holds all app settings.', sbOpen: true },
+    { sel:'#app-brand',       place:'left',  title:'Theme',              body:'Pick an accent colour from the swatches to change the whole app\'s colour scheme.', sbOpen: true },
+    { sel:'#acc-all-btn',     place:'left',  title:'Expand / Collapse',  body:'Instantly expand or collapse all sidebar sections at once.', sbOpen: true },
+    { sel:'#src-spotify-btn', place:'left',  title:'Audio Source',       body:'Switch between Spotify, VLC, and Local audio. Spotify and VLC show track info and lyrics. Local reacts to system audio.', sbOpen: true },
+    { sel:'#recapture-btn',   place:'left',  title:'System Audio',       body:'If visuals stop reacting to music, click this to reconnect the audio capture.', sbOpen: true },
+    { sel:'#acc-presets',     place:'left',  title:'Presets (Sidebar)',  body:'Set auto-cycle interval and blend time. Browse all presets from here too.', sbOpen: true },
+    { sel:'#acc-visuals', place:'left', title:'Visuals',   body:'Speed, Reactivity, and Smoothness control how the visualizer moves and responds to your music.', sbOpen: true,
+      onEnter: () => window.accOpen('acc-visuals'), onLeave: () => window.accClose('acc-visuals') },
+    { sel:'#acc-vibe',    place:'left', title:'FX & Vibe', body:'Apply real-time GLSL shaders over a background image. Add grain or scanlines for a lo-fi feel.', sbOpen: true,
+      onEnter: () => window.accOpen('acc-vibe'),    onLeave: () => window.accClose('acc-vibe') },
+    { sel:'#acc-lyrics',  place:'left', title:'Lyrics',    body:'Lyrics auto-fetch from LRCLIB. Classic mode shows one line; Physics mode lets words float around the screen.', sbOpen: true, last: true,
+      onEnter: () => window.accOpen('acc-lyrics'),  onLeave: () => window.accClose('acc-lyrics') },
+  ];
+
+  let cur = 0;
+  let _sidebarWasOpen = false; // track sidebar state before tour opened it
+
+  function isDone() { return localStorage.getItem(DONE_KEY) === '1'; }
+
+  function hide() {
+    g('tk-mask').classList.remove('visible');
+    g('tk-box').classList.remove('visible');
+  }
+
+  function ensureSidebar(open) {
+    if (open && !window.sidebarOpen) window.toggleSidebar();
+    else if (!open && window.sidebarOpen) window.toggleSidebar();
+  }
+
+  function skip() {
+    const leaving = STEPS[cur];
+    if (leaving && leaving.onLeave) leaving.onLeave();
+    localStorage.setItem(DONE_KEY, '1');
+    if (!_sidebarWasOpen && window.sidebarOpen) window.toggleSidebar();
+    hide();
+  }
+
+  function next() {
+    const leaving = STEPS[cur];
+    if (leaving && leaving.onLeave) leaving.onLeave();
+    cur++;
+    if (cur >= STEPS.length) { skip(); return; }
+    const entering = STEPS[cur];
+    const needsOpen = !!entering.sbOpen;
+    if (needsOpen && !window.sidebarOpen) {
+      window.toggleSidebar();
+      setTimeout(() => { if (entering.onEnter) entering.onEnter(); draw(cur); }, 380);
+    } else if (!needsOpen && window.sidebarOpen) {
+      window.toggleSidebar();
+      setTimeout(() => { if (entering.onEnter) entering.onEnter(); draw(cur); }, 380);
+    } else {
+      if (entering.onEnter) entering.onEnter();
+      draw(cur);
+    }
+  }
+
+  function draw(i) {
+    const s = STEPS[i];
+    const el = document.querySelector(s.sel);
+    if (!el) { cur++; if (cur < STEPS.length) draw(cur); else skip(); return; }
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) { cur++; if (cur < STEPS.length) draw(cur); else skip(); return; }
+
+    const W=268, H=150, PAD=10, GAP=14;
+    const vw=window.innerWidth, vh=window.innerHeight;
+    let L, T;
+
+    if (s.place==='below') {
+      L = r.left + r.width/2 - W/2;
+      T = r.bottom + GAP;
+    } else if (s.place==='above') {
+      L = r.left + r.width/2 - W/2;
+      T = r.top - GAP - H;
+    } else if (s.place==='right') {
+      L = r.right + GAP;
+      T = r.top + r.height/2 - H/2;
+    } else { // left
+      L = r.left - GAP - W;
+      T = r.top + r.height/2 - H/2;
+    }
+    L = Math.max(PAD, Math.min(L, vw-W-PAD));
+    T = Math.max(PAD, Math.min(T, vh-H-PAD));
+
+    const hp=6, hole=g('tk-hole');
+    hole.style.left   = (r.left-hp)+'px';
+    hole.style.top    = (r.top-hp)+'px';
+    hole.style.width  = (r.width+hp*2)+'px';
+    hole.style.height = (r.height+hp*2)+'px';
+
+    const box = g('tk-box');
+    box.style.left = L+'px';
+    box.style.top  = T+'px';
+
+    g('tk-label').textContent = 'Step '+(i+1)+' of '+STEPS.length;
+    g('tk-title').textContent = s.title;
+    g('tk-body').textContent  = s.body;
+    g('tk-next').textContent  = s.last ? 'Done ✓' : 'Next →';
+    g('tk-dots').innerHTML    = STEPS.map((_,j)=>'<div class="tk-dot'+(j===i?' on':'')+'"></div>').join('');
+
+    g('tk-mask').classList.add('visible');
+    box.classList.add('visible');
+  }
+
+  function startFrom(i, delay) {
+    _sidebarWasOpen = !!window.sidebarOpen;
+    cur = i;
+    // Collapse all accordions so tour's open/close is predictable
+    document.querySelectorAll('#sbi .acc-hd.open').forEach(h => window.accToggle(h));
+    // Always start with sidebar closed
+    if (window.sidebarOpen) {
+      window.toggleSidebar();
+      setTimeout(() => draw(i), delay + 380);
+    } else {
+      setTimeout(() => draw(i), delay);
+    }
+  }
+
+  window.tkNext  = next;
+  window.tkSkip  = skip;
+  window.tkStart = function() { if (isDone()) return; startFrom(0, 900); };
+  window.tkRestart = function() { localStorage.removeItem(DONE_KEY); startFrom(0, 100); };
+})();
+
+boot().catch(e => { console.error('[iKandy] Boot failed:', e); toast('Boot error: ' + e.message); });
+</script>
+<!-- TOOLTIP TOUR -->
+<div id="tk-mask"><div id="tk-hole"></div></div>
+<div id="tk-box">
+  <div id="tk-label"></div>
+  <div id="tk-title"></div>
+  <div id="tk-body"></div>
+  <div id="tk-footer">
+    <button id="tk-skip" onclick="tkSkip()">Skip</button>
+    <div id="tk-dots"></div>
+    <button id="tk-next" onclick="tkNext()">Next →</button>
+  </div>
+</div>
+
+</body>
+</html>
