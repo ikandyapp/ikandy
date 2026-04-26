@@ -39,11 +39,11 @@ contextBridge.exposeInMainWorld('IKANDY', {
     return ipcRenderer.invoke('playback-action', payload);
   },
 
-  // Push listeners from main
-  onAuthResult:   (cb) => ipcRenderer.on('auth-result',   (_e, d) => cb(d)),
-  onSpotifyState: (cb) => ipcRenderer.on('spotify-state', (_e, d) => cb(d)),
-  onLyrics:       (cb) => ipcRenderer.on('lyrics',        (_e, d) => cb(d)),
-  onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_e, d) => cb(d)),
+  // Push listeners from main — removeAllListeners prevents accumulation on re-register
+  onAuthResult:   (cb) => { ipcRenderer.removeAllListeners('auth-result');   ipcRenderer.on('auth-result',   (_e, d) => cb(d)); },
+  onSpotifyState: (cb) => { ipcRenderer.removeAllListeners('spotify-state'); ipcRenderer.on('spotify-state', (_e, d) => cb(d)); },
+  onLyrics:       (cb) => { ipcRenderer.removeAllListeners('lyrics');        ipcRenderer.on('lyrics',        (_e, d) => cb(d)); },
+  onUpdateStatus: (cb) => { ipcRenderer.removeAllListeners('update-status'); ipcRenderer.on('update-status', (_e, d) => cb(d)); },
   installUpdate:  ()   => ipcRenderer.send('update-install'),
 
   platform:      process.platform,

@@ -703,7 +703,15 @@ ipcMain.handle('get-playlists', async () => {
       items.push(...(data.items || []));
       url = data.next || null;
     }
-    return { ok: true, items };
+    // Map to shape renderer expects
+    const playlists = items.map(p => ({
+      id:    p.id,
+      name:  p.name,
+      uri:   p.uri,
+      image: p.images?.[0]?.url || null,
+      total: p.tracks?.total || 0,
+    }));
+    return { ok: true, playlists };
   } catch(e) { return { ok: false, error: e.message }; }
 });
 
@@ -885,6 +893,16 @@ function setupSession() {
         );
       }
     }
+    // Content Security Policy — restrict to known safe origins
+    headers['Content-Security-Policy'] = [
+      "default-src 'self';" +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net;" +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;" +
+      "font-src 'self' data: https://fonts.gstatic.com;" +
+      "img-src 'self' blob: data: https://i.scdn.co https://*.spotifycdn.com https://*.scdn.co;" +
+      "connect-src 'self' https://api.spotify.com https://lrclib.net https://*.supabase.co;" +
+      "media-src 'self' blob:;"
+    ];
     callback({ responseHeaders: headers });
   });
 }
