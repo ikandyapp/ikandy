@@ -15,7 +15,12 @@ contextBridge.exposeInMainWorld('ikandy', {
   clearClientId: ()    => ipcRenderer.invoke('clear-client-id'),
 
   // Background folder
-  pickImageFolder: () => ipcRenderer.invoke('pick-image-folder'),
+  pickImageFolder:  () => ipcRenderer.invoke('pick-image-folder'),
+
+  // Custom preset folder
+  pickPresetFolder: () => ipcRenderer.invoke('pick-preset-folder'),
+  getPresetFolder:  () => ipcRenderer.invoke('get-preset-folder'),
+  clearPresetFolder:() => ipcRenderer.invoke('clear-preset-folder'),
 
   // Playlists
   getPlaylists: ()     => ipcRenderer.invoke('get-playlists'),
@@ -38,6 +43,8 @@ contextBridge.exposeInMainWorld('ikandy', {
   onAuthResult:   (cb) => ipcRenderer.on('auth-result',   (_e, d) => cb(d)),
   onSpotifyState: (cb) => ipcRenderer.on('spotify-state', (_e, d) => cb(d)),
   onLyrics:       (cb) => ipcRenderer.on('lyrics',        (_e, d) => cb(d)),
+  onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_e, d) => cb(d)),
+  installUpdate:  ()   => ipcRenderer.send('update-install'),
 
   platform:      process.platform,
   rendererReady: ()    => ipcRenderer.send('renderer-ready'),

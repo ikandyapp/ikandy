@@ -13,6 +13,7 @@
  */
 
 const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const http  = require('http');
 const https = require('https');
 const path  = require('path');
@@ -777,6 +778,56 @@ ipcMain.handle('playback-action', async (_e, action) => {
   } catch(e) { return { ok: false, error: e.message }; }
 });
 
+// ── Custom preset folder ──────────────────────────────────────────────────────
+const PRESET_FOLDER_FILE = () => path.join(app.getPath('userData'), 'ikandy-preset-folder.txt');
+
+function getSavedPresetFolder() {
+  try { return fs.readFileSync(PRESET_FOLDER_FILE(), 'utf8').trim(); } catch(e) { return null; }
+}
+
+function loadPresetsFromFolder(dir) {
+  try {
+    const files = fs.readdirSync(dir).filter(f => {
+      if (path.extname(f).toLowerCase() !== '.json') return false;
+      const full = path.resolve(dir, f);
+      if (!full.startsWith(path.resolve(dir))) return false;
+      try { return fs.statSync(full).isFile(); } catch(e) { return false; }
+    });
+    const presets = {};
+    for (const f of files) {
+      try {
+        const name = path.basename(f, '.json');
+        const data = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
+        presets[name] = data;
+      } catch(e) {}
+    }
+    return { ok: true, presets, count: Object.keys(presets).length, dir };
+  } catch(e) { return { ok: false, error: e.message }; }
+}
+
+ipcMain.handle('pick-preset-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select Preset Folder (.json files)',
+  });
+  if (result.canceled || !result.filePaths.length) return { ok: false };
+  const dir = result.filePaths[0];
+  if (!path.isAbsolute(dir)) return { ok: false, error: 'Invalid path' };
+  fs.writeFileSync(PRESET_FOLDER_FILE(), dir, 'utf8');
+  return loadPresetsFromFolder(dir);
+});
+
+ipcMain.handle('get-preset-folder', () => {
+  const dir = getSavedPresetFolder();
+  if (!dir) return { ok: false };
+  return loadPresetsFromFolder(dir);
+});
+
+ipcMain.handle('clear-preset-folder', () => {
+  try { fs.unlinkSync(PRESET_FOLDER_FILE()); } catch(e) {}
+  return { ok: true };
+});
+
 ipcMain.handle('pick-image-folder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
@@ -862,7 +913,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox:         false,
       webSecurity:     true,
-      devTools:        true,
+      devTools:        !app.isPackaged,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -876,20 +927,39 @@ function createWindow() {
   // mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   // Register Ctrl+Shift+I to toggle DevTools
-  globalShortcut.register('CommandOrControl+Shift+I', () => {
-    if (mainWindow) {
-      if (mainWindow.webContents.isDevToolsOpened()) {
-        mainWindow.webContents.closeDevTools();
-      } else {
-        mainWindow.webContents.openDevTools({ mode: 'detach' });
+  if (!app.isPackaged) {
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+      if (mainWindow) {
+        if (mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools();
+        } else {
+          mainWindow.webContents.openDevTools({ mode: 'detach' });
+        }
       }
-    }
-  });
+    });
+  }
 
   mainWindow.on('closed', () => {
     globalShortcut.unregisterAll();
     mainWindow = null;
   });
+
+  // ── Auto-updater ──────────────────────────────────────────────────────────────
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify();
+
+    autoUpdater.on('update-available', () => {
+      mainWindow?.webContents.send('update-status', { status: 'available' });
+    });
+
+    autoUpdater.on('update-downloaded', () => {
+      mainWindow?.webContents.send('update-status', { status: 'ready' });
+    });
+
+    autoUpdater.on('error', (e) => {
+      console.log('[iKandy] Auto-update error:', e.message);
+    });
+  }
 }
 
 
@@ -1051,6 +1121,10 @@ process.on('uncaughtException',      (e) => pingError(e.message, e.stack));
 process.on('unhandledRejection',     (e) => pingError(e?.message || e, e?.stack || ''));
 
 // IPC — renderer reports source mode and auto-cycle state
+ipcMain.on('update-install', () => {
+  autoUpdater.quitAndInstall();
+});
+
 ipcMain.on('telemetry', (_e, data) => {
   if (data.source_mode !== undefined) _telemetry.source_mode = data.source_mode;
   if (data.auto_cycle  !== undefined) _telemetry.auto_cycle  = data.auto_cycle;

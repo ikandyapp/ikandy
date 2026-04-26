@@ -1160,6 +1160,18 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
         border-radius:var(--r);outline:none;">
       <span style="font-size:11px;color:var(--dim);">s</span>
     </div>
+
+    <!-- Custom preset folder -->
+    <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--bdr2);">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5;">
+        <span style="color:var(--acc);">📂 Custom Presets</span> — load community .json preset files from a folder.
+      </div>
+      <div id="preset-folder-row" style="display:none;margin-bottom:8px;">
+        <div id="preset-folder-name" style="font-size:11px;color:var(--sp);margin-bottom:6px;word-break:break-all;"></div>
+        <button class="btn" onclick="clearPresetFolder()" style="width:100%;font-size:11px;padding:6px;">✕ Remove Folder</button>
+      </div>
+      <button class="btn" id="preset-folder-btn" onclick="pickPresetFolder()" style="width:100%;font-size:11px;padding:7px;">📂 Load Preset Folder</button>
+    </div>
   </div>
 
   <!-- VISUALS -->
@@ -1863,6 +1875,22 @@ function setupSpotifyIPC() {
 
   window.ikandy.rendererReady();
   console.log('[iKandy] IPC listeners registered, rendererReady sent');
+
+  // Auto-updater notifications
+  if (window.ikandy.onUpdateStatus) {
+    window.ikandy.onUpdateStatus(({ status }) => {
+      if (status === 'available') {
+        toast('⬆ Update found — downloading in background…', 4000);
+      } else if (status === 'ready') {
+        // Show persistent update banner
+        const banner = document.createElement('div');
+        banner.id = 'update-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--sp);color:#000;padding:10px 20px;display:flex;align-items:center;justify-content:center;gap:16px;font-family:var(--ui);font-size:13px;font-weight:600;';
+        banner.innerHTML = '⬆ iKandy update ready — <button onclick="window.ikandy.installUpdate()" style="background:#000;color:#fff;border:none;padding:6px 16px;font-family:var(--ui);font-size:12px;cursor:pointer;font-weight:600;">Restart & Install</button> <button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:#000;cursor:pointer;font-size:16px;padding:0 4px;">✕</button>';
+        document.body.prepend(banner);
+      }
+    });
+  }
 }
 
 /* ── HUD ── */
@@ -2360,6 +2388,40 @@ function loadPreset(idx, blend, manual = false) {
 }
 
 function getBlend() { return +(el('blend-s')?.value || 2.5); }
+
+/* ── CUSTOM PRESET FOLDER ── */
+async function pickPresetFolder() {
+  const result = await window.ikandy.pickPresetFolder();
+  if (!result?.ok) return;
+  applyCustomPresets(result);
+  toast(`✓ Loaded ${result.count} presets from folder`);
+}
+
+async function clearPresetFolder() {
+  await window.ikandy.clearPresetFolder();
+  // Reload built-in presets
+  loadPresets();
+  el('preset-folder-row').style.display = 'none';
+  el('preset-folder-btn').style.display = '';
+  toast('Custom presets removed — built-ins restored');
+}
+
+function applyCustomPresets(result) {
+  if (!result?.ok || !result.count) return;
+  const names = Object.keys(result.presets).sort();
+  allNames   = names;
+  allPresets = names.map(n => result.presets[n]);
+  el('pp-count').textContent = allNames.length + ' presets';
+  el('pc-count').textContent = allNames.length;
+  loadPreset(0, 0);
+  // Update UI
+  const folderRow  = el('preset-folder-row');
+  const folderName = el('preset-folder-name');
+  const folderBtn  = el('preset-folder-btn');
+  if (folderRow)  folderRow.style.display  = 'block';
+  if (folderName) folderName.textContent   = `📂 ${result.dir} (${result.count} presets)`;
+  if (folderBtn)  folderBtn.style.display  = 'none';
+}
 
 function advancePreset() {
   if (autoCycle) {
@@ -4421,6 +4483,13 @@ async function boot() {
   lp(80);
   loadPresets(); lp(85);
 
+  // Restore saved custom preset folder if any
+  if (window.ikandy.getPresetFolder) {
+    window.ikandy.getPresetFolder().then(result => {
+      if (result?.ok && result.count) applyCustomPresets(result);
+    }).catch(() => {});
+  }
+
   // Restore saved visual settings
   const savedSpeed  = localStorage.getItem('viz-speed');
   const savedSmooth = localStorage.getItem('viz-smoothing');
@@ -4462,7 +4531,7 @@ async function boot() {
     { sel:'#pnav',            place:'below', title:'Preset Navigator',   body:'Use ‹ › to cycle 500+ MilkDrop presets. AUTO switches them per track automatically.' },
     { sel:'#presets-btn',     place:'below', title:'Preset Browser',     body:'Browse all presets with live previews in Grid, List, or Large view.' },
     { sel:'#status-badge',    place:'below', title:'Connection Status',  body:'Shows your active source. Click Disconnect to switch accounts or sources.' },
-    { sel:'#hud',             place:'right', title:'Now Playing',        body:'Track info, album art, and a progress bar. Click the bar to seek. Works with Spotify Premium and VLC.' },
+    { sel:'#hud-info',        place:'above',  title:'Now Playing',        body:'Track info, album art, and a progress bar. Click the bar to seek. Works with Spotify Premium and VLC.' },
     { sel:'#controls',        place:'above', title:'Playback Controls',  body:'Play, pause, skip, adjust volume. Works with Spotify Premium and VLC only.' },
     { sel:'#hide-btn',        place:'below', title:'Hide UI',            body:'Click ◎ (or press H) to hide all controls for a clean full-screen view. Press F for fullscreen. Click ◎ again to restore.' },
     // Sidebar steps — sidebar opened once on entry, closed on leave
@@ -4538,6 +4607,10 @@ async function boot() {
       T = r.bottom + GAP;
     } else if (s.place==='above') {
       L = r.left + r.width/2 - W/2;
+      T = r.top - GAP - H;
+    } else if (s.place==='above-right') {
+      // Above the element, anchored toward the right side (avoids bottom-left brand)
+      L = r.right - W - PAD;
       T = r.top - GAP - H;
     } else if (s.place==='right') {
       L = r.right + GAP;
