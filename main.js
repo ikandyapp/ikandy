@@ -1,5 +1,5 @@
 /**
- * iKandy — Electron Main Process v13
+ * IKANDY — Electron Main Process v13
  *
  * Architecture: ALL Spotify communication happens in main process (Node.js).
  * The renderer (HTML) only receives track data via IPC — zero auth code there.
@@ -20,12 +20,12 @@ const path  = require('path');
 const fs    = require('fs');
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const CLIENT_ID_FILE = () => path.join(app.getPath("userData"), "ikandy-client-id.txt");
+const CLIENT_ID_FILE = () => path.join(app.getPath("userData"), "IKANDY-client-id.txt");
 function getClientId() { try { return fs.readFileSync(CLIENT_ID_FILE(), "utf8").trim(); } catch(e) { return ""; } }
 const CALLBACK_PORT = 8888;
 const REDIRECT_URI  = `http://127.0.0.1:${CALLBACK_PORT}/callback`;
 const SCOPES        = 'user-read-currently-playing user-read-playback-state user-modify-playback-state user-read-private streaming playlist-read-private playlist-read-collaborative';
-const TOKEN_FILE    = () => path.join(app.getPath('userData'), 'ikandy-tokens.json');
+const TOKEN_FILE    = () => path.join(app.getPath('userData'), 'IKANDY-tokens.json');
 const POLL_INTERVAL = 5000;  // 5 seconds — snappy track detection, 12 calls/min (6.7% of rate limit)
 const VOL_INTERVAL  = 8000;  // 8 seconds — catches external volume changes quickly
 let   volPollTimer  = null;
@@ -44,7 +44,7 @@ let isRateLimited   = false;
 let sourceMode   = 'spotify';
 let vlcPort      = 8080;
 let vlcPassword  = '';
-const SOURCE_FILE = () => path.join(app.getPath('userData'), 'ikandy-source.json');
+const SOURCE_FILE = () => path.join(app.getPath('userData'), 'IKANDY-source.json');
 function loadSource() {
   try {
     const s = JSON.parse(fs.readFileSync(SOURCE_FILE(), 'utf8'));
@@ -64,7 +64,7 @@ function loadTokens() {
       try {
         const decrypted = safeStorage.decryptString(raw);
         tokens = JSON.parse(decrypted);
-        console.log('[iKandy] Loaded encrypted tokens, expires:', tokens.expires_at ? new Date(tokens.expires_at).toISOString() : 'unknown');
+        console.log('[IKANDY] Loaded encrypted tokens, expires:', tokens.expires_at ? new Date(tokens.expires_at).toISOString() : 'unknown');
         return tokens;
       } catch(e) {
         // Might be legacy plaintext — try that
@@ -72,14 +72,14 @@ function loadTokens() {
           tokens = JSON.parse(raw.toString('utf8'));
           // Re-save as encrypted
           saveTokens(tokens);
-          console.log('[iKandy] Migrated plaintext tokens to encrypted storage');
+          console.log('[IKANDY] Migrated plaintext tokens to encrypted storage');
           return tokens;
         } catch(e2) { tokens = {}; }
       }
     } else {
       // Encryption unavailable — fall back to plaintext
       tokens = JSON.parse(raw.toString('utf8'));
-      console.log('[iKandy] Loaded tokens (encryption unavailable), expires:', tokens.expires_at ? new Date(tokens.expires_at).toISOString() : 'unknown');
+      console.log('[IKANDY] Loaded tokens (encryption unavailable), expires:', tokens.expires_at ? new Date(tokens.expires_at).toISOString() : 'unknown');
     }
   }
   catch(e) { tokens = {}; }
@@ -95,7 +95,7 @@ function saveTokens(t) {
       fs.writeFileSync(TOKEN_FILE(), data);
     }
   }
-  catch(e) { console.error('[iKandy] Could not save tokens:', e.message); }
+  catch(e) { console.error('[IKANDY] Could not save tokens:', e.message); }
 }
 function clearTokens() {
   tokens = {};
@@ -193,10 +193,10 @@ async function refreshAccessToken() {
       refresh_token: data.refresh_token || tokens.refresh_token,
       expires_at:    Date.now() + data.expires_in * 1000,
     });
-    console.log('[iKandy] Token refreshed, expires in', data.expires_in, 's');
+    console.log('[IKANDY] Token refreshed, expires in', data.expires_in, 's');
     return true;
   } catch(e) {
-    console.error('[iKandy] Token refresh failed:', e.message);
+    console.error('[IKANDY] Token refresh failed:', e.message);
     return false;
   }
 }
@@ -232,31 +232,31 @@ async function pollCurrentTrack() {
       return;
     }
     if (res.status === 403) {
-      console.error('[iKandy] 403 on currently-playing — check User Management in Spotify Dashboard');
+      console.error('[IKANDY] 403 on currently-playing — check User Management in Spotify Dashboard');
       mainWindow?.webContents.send('spotify-state', { type: 'error', message: '403 — check Spotify Dashboard User Management' });
       return;
     }
     if (res.status === 429) {
       const wait = parseInt(res.headers['retry-after'] || '120') * 1000;
       const resumeAt = Date.now() + wait;
-      console.warn('[iKandy] 429 rate limited — pausing', Math.round(wait/1000), 's until', new Date(resumeAt).toLocaleTimeString());
+      console.warn('[IKANDY] 429 rate limited — pausing', Math.round(wait/1000), 's until', new Date(resumeAt).toLocaleTimeString());
       isRateLimited = true;
       clearInterval(pollTimer); pollTimer = null;
       // Save resume time so restarts don't immediately re-hit the limit
-      try { fs.writeFileSync(path.join(app.getPath('userData'), 'ikandy-ratelimit.json'), JSON.stringify({ resumeAt })); } catch(e) {}
+      try { fs.writeFileSync(path.join(app.getPath('userData'), 'IKANDY-ratelimit.json'), JSON.stringify({ resumeAt })); } catch(e) {}
       mainWindow?.webContents.send('spotify-state', { type: 'error', message: `Rate limited — resuming at ${new Date(resumeAt).toLocaleTimeString()}` });
       setTimeout(() => {
         isRateLimited = false;
-        try { fs.unlinkSync(path.join(app.getPath('userData'), 'ikandy-ratelimit.json')); } catch(e) {}
+        try { fs.unlinkSync(path.join(app.getPath('userData'), 'IKANDY-ratelimit.json')); } catch(e) {}
         pollTimer = setInterval(pollCurrentTrack, POLL_INTERVAL);
         pollCurrentTrack();
-        console.log('[iKandy] Rate limit cleared — polling resumed');
+        console.log('[IKANDY] Rate limit cleared — polling resumed');
       }, wait);
       return;
     }
 
     const data = JSON.parse(res.body);
-    if (!data?.item) { console.warn('[iKandy] Poll: 200 but no item in response'); return; }
+    if (!data?.item) { console.warn('[IKANDY] Poll: 200 but no item in response'); return; }
 
     // Compensate for network latency — progress_ms is from when Spotify
     // captured it, not when we receive it. Add ~200ms for typical latency.
@@ -283,13 +283,13 @@ async function pollCurrentTrack() {
       fetchLyrics(track.title, track.artist);
     }
   } catch(e) {
-    console.warn('[iKandy] Poll error:', e.message);
+    console.warn('[IKANDY] Poll error:', e.message);
   }
 }
 
 // ── Lyrics fetch (LRCLIB → lyrics.ovh fallback) ───────────────────────────────
 async function fetchLyrics(title, artist) {
-  console.log('[iKandy] Fetching lyrics for:', title, '—', artist);
+  console.log('[IKANDY] Fetching lyrics for:', title, '—', artist);
   const cleanArtist = artist.split(/[,&]/)[0].trim();
   const cleanTitle  = title.replace(/\s*[\(\[].*[\)\]]/g, '').trim();
 
@@ -331,7 +331,7 @@ async function fetchLyrics(title, artist) {
   const winner  = synced || plain;
 
   if (winner) {
-    console.log('[iKandy] Lyrics:', winner.type, 'from LRCLIB', winner.name || '');
+    console.log('[IKANDY] Lyrics:', winner.type, 'from LRCLIB', winner.name || '');
     mainWindow?.webContents.send('lyrics', winner);
     return;
   }
@@ -342,14 +342,14 @@ async function fetchLyrics(title, artist) {
     if (res.status === 200) {
       const data = JSON.parse(res.body);
       if (data.lyrics) {
-        console.log('[iKandy] Lyrics: plain from lyrics.ovh');
+        console.log('[IKANDY] Lyrics: plain from lyrics.ovh');
         mainWindow?.webContents.send('lyrics', { type: 'plain', raw: data.lyrics });
         return;
       }
     }
   } catch(e) {}
 
-  console.log('[iKandy] Lyrics: not found for', title);
+  console.log('[IKANDY] Lyrics: not found for', title);
   mainWindow?.webContents.send('lyrics', { type: 'none' });
 }
 
@@ -367,18 +367,18 @@ function startAuthServer(pkceVerifier) {
 
     // Send nice response to browser
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(`<!DOCTYPE html><html><head><title>iKandy</title><style>
+    res.end(`<!DOCTYPE html><html><head><title>IKANDY</title><style>
       body{background:#060608;color:#b89a5a;font-family:sans-serif;display:flex;
       align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px;}
       h1{font-size:40px;letter-spacing:.22em;}p{color:#444;font-size:13px;}
-    </style></head><body><h1>iKandy ✓</h1>
+    </style></head><body><h1>IKANDY ✓</h1>
     <p>Connected! You can close this tab.</p>
     <script>setTimeout(()=>window.close(),1500);</script></body></html>`);
 
     authServer.close(); authServer = null;
 
     if (error || !code) {
-      console.error('[iKandy] Auth error:', error);
+      console.error('[IKANDY] Auth error:', error);
       mainWindow?.webContents.send('auth-result', { success: false, error });
       return;
     }
@@ -397,7 +397,7 @@ function startAuthServer(pkceVerifier) {
       const r    = await httpsPost('https://accounts.spotify.com/api/token', body);
       const data = JSON.parse(r.body);
 
-      console.log('[iKandy] Token exchange status:', r.status);
+      console.log('[IKANDY] Token exchange status:', r.status);
 
       if (data.error) {
         mainWindow?.webContents.send('auth-result', { success: false, error: data.error_description || data.error });
@@ -410,7 +410,7 @@ function startAuthServer(pkceVerifier) {
         expires_at:    Date.now() + data.expires_in * 1000,
       });
 
-      console.log('[iKandy] Auth success — token saved to', TOKEN_FILE());
+      console.log('[IKANDY] Auth success — token saved to', TOKEN_FILE());
 
       // Fetch user profile to get product (free/premium)
       let product = 'free';
@@ -419,7 +419,7 @@ function startAuthServer(pkceVerifier) {
           { Authorization: 'Bearer ' + data.access_token });
         if (me.status === 200) product = JSON.parse(me.body).product || 'free';
       } catch(e) {}
-      console.log('[iKandy] Spotify product:', product);
+      console.log('[IKANDY] Spotify product:', product);
       mainWindow?.webContents.send('auth-result', { success: true, product });
 
       // Start polling immediately
@@ -427,7 +427,7 @@ function startAuthServer(pkceVerifier) {
 
       if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
     } catch(e) {
-      console.error('[iKandy] Token exchange error:', e.message);
+      console.error('[IKANDY] Token exchange error:', e.message);
       mainWindow?.webContents.send('auth-result', { success: false, error: e.message });
     }
   });
@@ -436,20 +436,20 @@ function startAuthServer(pkceVerifier) {
   function tryListen(port) {
     authServer.listen(port, '127.0.0.1', () => {
       const actualPort = authServer.address().port;
-      console.log('[iKandy] Auth server ready on port', actualPort);
+      console.log('[IKANDY] Auth server ready on port', actualPort);
       // If we got a different port, update the redirect URI used in auth flow
       if (actualPort !== CALLBACK_PORT) {
-        console.log('[iKandy] Port', CALLBACK_PORT, 'was busy — using', actualPort);
+        console.log('[IKANDY] Port', CALLBACK_PORT, 'was busy — using', actualPort);
         authServer._actualPort = actualPort;
       }
     });
   }
   authServer.on('error', e => {
     if (e.code === 'EADDRINUSE') {
-      console.warn('[iKandy] Port', CALLBACK_PORT, 'in use — trying random port');
+      console.warn('[IKANDY] Port', CALLBACK_PORT, 'in use — trying random port');
       tryListen(0);  // 0 = let OS assign a free port
     } else {
-      console.error('[iKandy] Auth server error:', e.message);
+      console.error('[IKANDY] Auth server error:', e.message);
       mainWindow?.webContents.send('auth-result', {
         success: false, error: 'Auth server failed: ' + e.message
       });
@@ -462,23 +462,23 @@ function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
   if (volPollTimer) { clearInterval(volPollTimer); volPollTimer = null; }
   if (sourceMode === 'local') {
-    console.log('[iKandy] Local audio mode — no polling');
+    console.log('[IKANDY] Local audio mode — no polling');
     return;
   }
   if (sourceMode === 'vlc') {
     pollVLC();
     pollTimer = setInterval(pollVLC, POLL_INTERVAL);
-    console.log('[iKandy] VLC polling started');
+    console.log('[IKANDY] VLC polling started');
     return;
   }
 
   // Check if we're still within a rate-limit window from a previous session
-  const rlFile = path.join(app.getPath('userData'), 'ikandy-ratelimit.json');
+  const rlFile = path.join(app.getPath('userData'), 'IKANDY-ratelimit.json');
   try {
     const rl = JSON.parse(fs.readFileSync(rlFile, 'utf8'));
     if (rl.resumeAt && rl.resumeAt > Date.now()) {
       const waitMs = rl.resumeAt - Date.now();
-      console.warn('[iKandy] Rate limit still active — waiting', Math.round(waitMs/1000), 's before first poll');
+      console.warn('[IKANDY] Rate limit still active — waiting', Math.round(waitMs/1000), 's before first poll');
       isRateLimited = true;
       mainWindow?.webContents.send('spotify-state', { type: 'error', message: `Rate limited — resuming at ${new Date(rl.resumeAt).toLocaleTimeString()}` });
       setTimeout(() => {
@@ -486,7 +486,7 @@ function startPolling() {
         try { fs.unlinkSync(rlFile); } catch(e) {}
         pollCurrentTrack();
         pollTimer = setInterval(pollCurrentTrack, POLL_INTERVAL);
-        console.log('[iKandy] Rate limit expired — polling started');
+        console.log('[IKANDY] Rate limit expired — polling started');
       }, waitMs);
       return;
     }
@@ -497,7 +497,7 @@ function startPolling() {
   // Volume poll — separate timer, hits /me/player for device volume
   volPollTimer = setInterval(pollVolume, 8000);
   pollVolume(); // immediate check
-  console.log('[iKandy] Polling started (' + POLL_INTERVAL/1000 + 's interval)');
+  console.log('[IKANDY] Polling started (' + POLL_INTERVAL/1000 + 's interval)');
 }
 
 async function pollVolume() {
@@ -513,7 +513,7 @@ async function pollVolume() {
     if (vol !== null && vol !== lastVolume) {
       lastVolume = vol;
       mainWindow?.webContents.send('spotify-state', { type: 'volume', volume: vol });
-      console.log('[iKandy] Volume sync:', vol + '%');
+      console.log('[IKANDY] Volume sync:', vol + '%');
     }
   } catch(e) { /* silent — volume sync is best-effort */ }
 }
@@ -545,7 +545,7 @@ ipcMain.handle('start-auth', async () => {
     show_dialog:           'true',
   });
   const authUrl = 'https://accounts.spotify.com/authorize?' + params;
-  console.log('[iKandy] Opening auth URL in system browser');
+  console.log('[IKANDY] Opening auth URL in system browser');
   await shell.openExternal(authUrl);
   return { ok: true };
 });
@@ -568,7 +568,7 @@ ipcMain.handle('save-client-id', (_e, id) => {
   if (!id || typeof id !== 'string' || !id.trim().match(/^[a-f0-9]{10,64}$/i)) return { ok: false, error: 'Invalid Client ID — must be hex' };
   try {
     fs.writeFileSync(CLIENT_ID_FILE(), id.trim());
-    console.log('[iKandy] Client ID saved');
+    console.log('[IKANDY] Client ID saved');
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
 });
@@ -779,7 +779,7 @@ ipcMain.handle('playback-action', async (_e, action) => {
 });
 
 // ── Custom preset folder ──────────────────────────────────────────────────────
-const PRESET_FOLDER_FILE = () => path.join(app.getPath('userData'), 'ikandy-preset-folder.txt');
+const PRESET_FOLDER_FILE = () => path.join(app.getPath('userData'), 'IKANDY-preset-folder.txt');
 
 function getSavedPresetFolder() {
   try { return fs.readFileSync(PRESET_FOLDER_FILE(), 'utf8').trim(); } catch(e) { return null; }
@@ -869,7 +869,7 @@ function setupDesktopCapturer() {
       }
     }).catch(() => callback({}));
   });
-  console.log('[iKandy] desktopCapturer / getDisplayMedia enabled');
+  console.log('[IKANDY] desktopCapturer / getDisplayMedia enabled');
 }
 
 // ── Cookie rewriting for SDK session ─────────────────────────────────────────
@@ -903,7 +903,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280, height: 800, minWidth: 800, minHeight: 500,
     show: false,  // don't show until maximized
-    title: 'iKandy',
+    title: 'IKANDY',
     backgroundColor: '#060608',
     autoHideMenuBar: true,  // hides the File/Edit/View menu bar
     frame: true,
@@ -923,7 +923,7 @@ function createWindow() {
 
   mainWindow.maximize();
   mainWindow.show();
-  mainWindow.loadFile('ikandy.html');
+  mainWindow.loadFile('IKANDY.html');
   // mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   // Register Ctrl+Shift+I to toggle DevTools
@@ -957,7 +957,7 @@ function createWindow() {
     });
 
     autoUpdater.on('error', (e) => {
-      console.log('[iKandy] Auto-update error:', e.message);
+      console.log('[IKANDY] Auto-update error:', e.message);
     });
   }
 }
@@ -1028,7 +1028,7 @@ const SUPABASE_URL = 'https://grimznincoiujnurhmlx.supabase.co/rest/v1';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyaW16bmluY29pdWpudXJobWx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNDQ5NzAsImV4cCI6MjA5MjcyMDk3MH0.X-eXBp4gF3RthSt10As83Ft4z5rOc929IMdis5BSuxk';
 
 // UUID stored in userData — persists across launches
-const UUID_FILE = () => path.join(app.getPath('userData'), 'ikandy-uuid.txt');
+const UUID_FILE = () => path.join(app.getPath('userData'), 'IKANDY-uuid.txt');
 function getOrCreateUUID() {
   try {
     const existing = fs.readFileSync(UUID_FILE(), 'utf8').trim();
@@ -1142,20 +1142,20 @@ app.whenReady().then(() => {
   // Wait for renderer to signal it has registered IPC listeners (after boot())
   // This prevents auth-result arriving before setupSpotifyIPC() runs
   ipcMain.once('renderer-ready', async () => {
-    console.log('[iKandy] Renderer ready — checking token');
+    console.log('[IKANDY] Renderer ready — checking token');
 
     if (sourceMode === 'vlc' || sourceMode === 'local') {
       sourceMode = 'spotify';
-      console.log('[iKandy] Non-spotify mode saved but starting in Spotify mode');
+      console.log('[IKANDY] Non-spotify mode saved but starting in Spotify mode');
     }
     if (!getClientId()) {
-      console.log('[iKandy] No Client ID — showing setup screen');
+      console.log('[IKANDY] No Client ID — showing setup screen');
       mainWindow?.webContents.send('auth-result', { success: false, needsSetup: true });
       return;
     }
     const valid = await ensureValidToken();
     if (valid) {
-      console.log('[iKandy] Valid token found — restoring session');
+      console.log('[IKANDY] Valid token found — restoring session');
       // Send auth-result immediately so loading screen fades fast
       // Fetch product in background and send update if needed
       mainWindow?.webContents.send('auth-result', { success: true, restored: true, product: 'free' });
@@ -1170,7 +1170,7 @@ app.whenReady().then(() => {
         }
       } catch(e) {}
     } else {
-      console.log('[iKandy] No valid token — showing login');
+      console.log('[IKANDY] No valid token — showing login');
       mainWindow?.webContents.send('auth-result', { success: false });
     }
   });

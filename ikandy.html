@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>iKandy</title>
+<title>IKANDY</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <style>
   /* Load Bebas Neue locally — eliminates font-swap flicker on startup */
@@ -844,14 +844,14 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 
 <!-- LOADING -->
 <div id="loading">
-  <div class="ld-logo">iKandy</div>
+  <div class="ld-logo">IKANDY</div>
   <div class="ld-sub">MilkDrop Engine</div>
   <div id="ld-bar"><div id="ld-fill"></div></div>
 </div>
 
 <!-- LOGIN -->
 <div id="setup">
-  <div class="setup-logo">iKandy</div>
+  <div class="setup-logo">IKANDY</div>
   <div class="setup-sub">First-time setup</div>
   <p class="setup-note">
     Enter your Spotify Client ID.<br>
@@ -872,7 +872,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 </div>
 
 <div id="login">
-  <div class="login-logo">iKandy</div>
+  <div class="login-logo">IKANDY</div>
   <div class="login-sub">Music Visualizer</div>
   <button id="sp-login-btn" onclick="startLogin()">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -949,7 +949,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     </svg>
   </div>
   <div id="hud-info">
-    <div id="hud-title">iKandy</div>
+    <div id="hud-title">IKANDY</div>
     <div id="hud-artist">Connect Spotify to begin</div>
     <div id="hud-album"></div>
     <div id="hud-prog" onclick="seekTrack(event)"><div id="hud-bar"></div></div>
@@ -1048,7 +1048,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <!-- APP BRANDING -->
   <div id="app-brand">
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div id="app-name">iKandy</div>
+      <div id="app-name">IKANDY</div>
       <button id="acc-all-btn" onclick="accToggleAll()" title="Expand / Collapse all"
         style="background:none;border:1px solid var(--bdr);border-radius:4px;color:var(--dim);
         font-family:var(--ui);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
@@ -1105,7 +1105,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       </div>
       <button class="btn green" id="sb-connect" onclick="startLogin()">Connect Spotify</button>
       <div style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6;">
-        Open Spotify and start playing something before using iKandy's controls.
+        Open Spotify and start playing something before using IKANDY's controls.
       </div>
       <button class="btn" id="sb-playlists-btn" onclick="openPlaylistPanel()" style="display:none;border-color:var(--sp);color:var(--sp);margin-top:4px;">Playlists</button>
       <button class="btn danger" id="sb-disconnect" onclick="logout()" style="display:none;">Disconnect</button>
@@ -1335,7 +1335,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <script>
 'use strict';
 /* ═══════════════════════════════════════════════════════════════════
-   iKandy — Renderer
+   IKANDY — Renderer
    All Spotify auth/polling is in main.js (Node).
    This renderer receives push data via IPC and handles visuals.
    ═══════════════════════════════════════════════════════════════════ */
@@ -1501,7 +1501,7 @@ let _physicsWords = [];
 
 function initPhysicsCanvas() {
   // No canvas needed — we use DOM divs which scale perfectly always
-  console.log('[iKandy] Physics DOM mode ready');
+  console.log('[IKANDY] Physics DOM mode ready');
 }
 
 function getBassEnergy() {
@@ -1634,7 +1634,7 @@ async function ensureAudioRunning() {
   if (_audioResumed) return;
   if (audioCtx && audioCtx.state === 'suspended') {
     await audioCtx.resume();
-    console.log('[iKandy] AudioContext resumed on user gesture');
+    console.log('[IKANDY] AudioContext resumed on user gesture');
   }
   _audioResumed = true;
 }
@@ -1678,14 +1678,14 @@ async function autoConnectSystemAudio() {
     });
     stream.getVideoTracks().forEach(t => t.stop());
     if (!stream.getAudioTracks().length) {
-      console.warn('[iKandy] Auto-connect: no audio track — user will need to click 🎤');
+      console.warn('[IKANDY] Auto-connect: no audio track — user will need to click 🎤');
       return;
     }
     await connectAudioStream(stream, 'System Audio', true);
-    console.log('[iKandy] System audio auto-connected on load');
+    console.log('[IKANDY] System audio auto-connected on load');
   } catch(e) {
     // Silently fail — user can click 🎤 manually
-    console.warn('[iKandy] Auto-connect audio failed:', e.message);
+    console.warn('[IKANDY] Auto-connect audio failed:', e.message);
   }
 }
 
@@ -1709,11 +1709,11 @@ async function startSystemAudioCapture() {
     if (!stream.getAudioTracks().length) {
       toast('⚠ No audio captured — tick "Share audio" and try again'); return;
     }
-    console.log('[iKandy] Screen share audio track:', stream.getAudioTracks()[0].label);
+    console.log('[IKANDY] Screen share audio track:', stream.getAudioTracks()[0].label);
     await connectAudioStream(stream, 'Application audio');
   } catch(e) {
     if (e.name === 'NotAllowedError') toast('Capture cancelled — click 🎤 Reconnect System Audio to try again');
-    else { toast('Audio capture failed: ' + e.message); console.error('[iKandy] getDisplayMedia error:', e); }
+    else { toast('Audio capture failed: ' + e.message); console.error('[IKANDY] getDisplayMedia error:', e); }
   }
 }
 
@@ -1727,13 +1727,13 @@ async function connectAudioStream(stream, label, silent = false) {
   window._boostGainNode = boostGain;
   _systemAudioSrc.connect(boostGain);
   boostGain.connect(analyserNode);
-  console.log('[iKandy] Audio chain: stream → boost(4x) → analyser [visuals only, no echo]');
+  console.log('[IKANDY] Audio chain: stream → boost(4x) → analyser [visuals only, no echo]');
   if (!silent) {
     setTimeout(() => {
       const data = new Uint8Array(analyserNode.frequencyBinCount);
       analyserNode.getByteFrequencyData(data);
       const peak = Math.max(...data);
-      console.log('[iKandy] Signal check — peak:', peak, '| AudioCtx:', audioCtx.state);
+      console.log('[IKANDY] Signal check — peak:', peak, '| AudioCtx:', audioCtx.state);
       if (peak < 5) toast('⚠ No audio signal detected. Make sure music is playing.');
       else toast('✓ Audio signal active — visuals reacting to music');
     }, 3000);
@@ -1756,8 +1756,8 @@ function fadeLoading() {
   setTimeout(() => ld.classList.add('gone'), 550);
 }
 function setupSpotifyIPC() {
-  window.ikandy.onAuthResult(state => {
-    console.log('[iKandy] auth-result:', state);
+  window.IKANDY.onAuthResult(state => {
+    console.log('[IKANDY] auth-result:', state);
     if (state.needsSetup) {
       fadeLoading();
       el('setup').style.display = 'flex';
@@ -1808,7 +1808,7 @@ function setupSpotifyIPC() {
     }
   });
 
-  window.ikandy.onSpotifyState(state => {
+  window.IKANDY.onSpotifyState(state => {
     if (state.type === 'local') {
       el('hud').style.display      = 'none';
       el('controls').style.display = 'none';
@@ -1855,7 +1855,7 @@ function setupSpotifyIPC() {
         trackId = state.id;
         lyrics = []; lyricsSync = false; lastLyricIdx = -1;
         el('lyric-line').classList.add('blank');
-        console.log('[iKandy] Track change:', state.title);
+        console.log('[IKANDY] Track change:', state.title);
         advancePreset();
         // Restart cycle timer on track change so it reliably fires
         if (autoCycle) { clearTimeout(cycleTimer); startCycle(); }
@@ -1863,7 +1863,7 @@ function setupSpotifyIPC() {
     }
   });
 
-  window.ikandy.onLyrics(({ type, raw }) => {
+  window.IKANDY.onLyrics(({ type, raw }) => {
     lyrics = []; lyricsSync = false; lastLyricIdx = -1;
     if (type === 'synced') {
       lyrics = parseLRC(raw); lyricsSync = true;
@@ -1883,12 +1883,12 @@ function setupSpotifyIPC() {
     setTimeout(() => { el('lyric-status').textContent = ''; }, 4000);
   });
 
-  window.ikandy.rendererReady();
-  console.log('[iKandy] IPC listeners registered, rendererReady sent');
+  window.IKANDY.rendererReady();
+  console.log('[IKANDY] IPC listeners registered, rendererReady sent');
 
   // Auto-updater notifications
-  if (window.ikandy.onUpdateStatus) {
-    window.ikandy.onUpdateStatus(({ status }) => {
+  if (window.IKANDY.onUpdateStatus) {
+    window.IKANDY.onUpdateStatus(({ status }) => {
       if (status === 'available') {
         toast('⬆ Update found — downloading in background…', 4000);
       } else if (status === 'ready') {
@@ -1896,7 +1896,7 @@ function setupSpotifyIPC() {
         const banner = document.createElement('div');
         banner.id = 'update-banner';
         banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--sp);color:#000;padding:10px 20px;display:flex;align-items:center;justify-content:center;gap:16px;font-family:var(--ui);font-size:13px;font-weight:600;';
-        banner.innerHTML = '⬆ iKandy update ready — <button onclick="window.ikandy.installUpdate()" style="background:#000;color:#fff;border:none;padding:6px 16px;font-family:var(--ui);font-size:12px;cursor:pointer;font-weight:600;">Restart & Install</button> <button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:#000;cursor:pointer;font-size:16px;padding:0 4px;">✕</button>';
+        banner.innerHTML = '⬆ IKANDY update ready — <button onclick="window.IKANDY.installUpdate()" style="background:#000;color:#fff;border:none;padding:6px 16px;font-family:var(--ui);font-size:12px;cursor:pointer;font-weight:600;">Restart & Install</button> <button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:#000;cursor:pointer;font-size:16px;padding:0 4px;">✕</button>';
         document.body.prepend(banner);
       }
     });
@@ -1965,14 +1965,14 @@ function setPlayIcon(playing) {
 async function spAction(cmd) {
   const type = typeof cmd === 'string' ? cmd : cmd.type;
   if (currentSource === 'vlc') {
-    await window.ikandy.vlcAction(typeof cmd === 'string' ? { type: cmd } : cmd);
+    await window.IKANDY.vlcAction(typeof cmd === 'string' ? { type: cmd } : cmd);
     return;
   }
   if (type === 'playpause') {
     const wasPlaying = trackPlaying;
     setPlayIcon(!wasPlaying);
     try {
-      const result = await window.ikandy.action(cmd);
+      const result = await window.IKANDY.action(cmd);
       if (result && !result.ok) setPlayIcon(wasPlaying);
       else trackPlaying = !wasPlaying;
     } catch(e) { setPlayIcon(wasPlaying); }
@@ -1980,12 +1980,12 @@ async function spAction(cmd) {
   }
   if (type === 'stop') {
     // Spotify: seek to 0 then pause
-    await window.ikandy.action({ type: 'seek', position_ms: 0 });
-    await window.ikandy.action({ type: 'pause' });
+    await window.IKANDY.action({ type: 'seek', position_ms: 0 });
+    await window.IKANDY.action({ type: 'pause' });
     setPlayIcon(false); trackPlaying = false;
     return;
   }
-  await window.ikandy.action(cmd);
+  await window.IKANDY.action(cmd);
 }
 
 let _volDebounce = null;
@@ -1995,9 +1995,9 @@ function setVolume(val) {
   clearTimeout(_volDebounce);
   _volDebounce = setTimeout(() => {
     if (currentSource === 'vlc') {
-      window.ikandy.vlcAction({ type: 'volume', value: val });
+      window.IKANDY.vlcAction({ type: 'volume', value: val });
     } else {
-      window.ikandy.action({ type: 'volume', value: val });
+      window.IKANDY.action({ type: 'volume', value: val });
     }
   }, 300);
 }
@@ -2009,7 +2009,7 @@ async function saveSetup() {
   const input = el('client-id-input');
   const id = (input?.value || '').trim();
   if (!id || id.length < 10) { el('setup-error').style.display = 'block'; return; }
-  const result = await window.ikandy.saveClientId(id);
+  const result = await window.IKANDY.saveClientId(id);
   if (result.ok) {
     el('setup').style.display = 'none';
     el('login').style.display = 'flex';
@@ -2021,7 +2021,7 @@ async function saveSetup() {
 }
 async function changeClientId() {
   if (!confirm('This will disconnect Spotify and return to setup. Continue?')) return;
-  await window.ikandy.clearClientId();
+  await window.IKANDY.clearClientId();
   // Close sidebar and show setup screen
   if (sidebarOpen) toggleSidebar();
   el('setup').style.display = 'flex';
@@ -2030,7 +2030,7 @@ async function changeClientId() {
   el('setup-error').style.display = 'none';
 }
 async function startLogin() {
-  const id = await window.ikandy.getClientId();
+  const id = await window.IKANDY.getClientId();
   if (!id) {
     // No Client ID — bring back the full centered setup screen
     el('setup').style.display  = 'flex';
@@ -2039,7 +2039,7 @@ async function startLogin() {
     if (sidebarOpen) toggleSidebar();
     return;
   }
-  window.ikandy.startAuth();
+  window.IKANDY.startAuth();
 }
 /* ── PLAYLIST PANEL ── */
 let _playlists = [], _plLoaded = false, _activePlUri = '', _plSearchStr = '';
@@ -2053,7 +2053,7 @@ function closePlaylistPanel() {
 }
 async function loadPlaylists() {
   el('plp-grid').innerHTML = '<div style="padding:48px;text-align:center;color:var(--dim);font-size:13px;">Loading…</div>';
-  const result = await window.ikandy.getPlaylists();
+  const result = await window.IKANDY.getPlaylists();
   if (!result.ok) {
     el('plp-grid').innerHTML = `<div style="padding:48px;text-align:center;color:var(--red);">${esc(result.error || 'Failed')}</div>`;
     return;
@@ -2086,7 +2086,7 @@ function plpFilter(q) {
 /* ── PLAY PLAYLIST ── */
 async function playPlaylist(uri, id) {
   if (currentSource === 'vlc') {
-    await window.ikandy.setSource('spotify');
+    await window.IKANDY.setSource('spotify');
     currentSource = 'spotify';
     applySourceUI('spotify');
     updateBadge(true, 'Connected');
@@ -2096,7 +2096,7 @@ async function playPlaylist(uri, id) {
   _activePlUri = uri;
   buildPlpGrid(_playlists);
   closePlaylistPanel();
-  const result = await window.ikandy.playPlaylist(uri);
+  const result = await window.IKANDY.playPlaylist(uri);
   if (result && result.ok === false) toast('Could not start playlist — open Spotify first');
 }
 
@@ -2140,9 +2140,9 @@ function seekTrack(e) {
   _pollAnchorProgress = posMs;
   _pollAnchorTime = performance.now();
   if (currentSource === 'vlc') {
-    window.ikandy.vlcAction({ type: 'seek', position: Math.round(posMs / 1000) });
+    window.IKANDY.vlcAction({ type: 'seek', position: Math.round(posMs / 1000) });
   } else {
-    window.ikandy.action({ type: 'seek', position_ms: posMs });
+    window.IKANDY.action({ type: 'seek', position_ms: posMs });
   }
 }
 
@@ -2156,12 +2156,12 @@ function skipToLocal() {
   updateBadge(false, 'No Spotify — use VLC or Local');
 }
 
-function logout() { window.ikandy.logout(); }
+function logout() { window.IKANDY.logout(); }
 
 /* ── SOURCE MODE ── */
 let currentSource = 'spotify';
 async function initSource() {
-  const s = await window.ikandy.getSource();
+  const s = await window.IKANDY.getSource();
   currentSource = s.mode || 'spotify';
   if (s.vlcPort)     el('vlc-port-input').value = s.vlcPort;
   if (s.vlcPassword) el('vlc-pass-input').value  = s.vlcPassword;
@@ -2183,7 +2183,7 @@ let _isPremium = false; // track premium state across source switches
 async function setSourceMode(mode) {
   // If switching to Spotify with no Client ID, go straight to setup
   if (mode === 'spotify') {
-    const id = await window.ikandy.getClientId();
+    const id = await window.IKANDY.getClientId();
     if (!id) {
       if (sidebarOpen) toggleSidebar();
       el('setup').style.display = 'flex';
@@ -2195,13 +2195,13 @@ async function setSourceMode(mode) {
   }
   currentSource = mode;
   applySourceUI(mode);
-  window.ikandy.action({ type: 'telemetry', source_mode: mode });
+  window.IKANDY.action({ type: 'telemetry', source_mode: mode });
   if (mode === 'local') {
-    await window.ikandy.setSource('local');
+    await window.IKANDY.setSource('local');
     updateBadge(false, 'Local — click 🎤');
     return;
   }
-  await window.ikandy.setSource(mode);
+  await window.IKANDY.setSource(mode);
   if (mode === 'vlc') {
     // VLC always shows full HUD and controls — unlocked
     el('hud').style.display      = '';
@@ -2226,15 +2226,15 @@ let _vlcConnected = false;
 async function vlcConnect() {
   const port = parseInt(el('vlc-port-input').value) || 8080;
   const pass = el('vlc-pass-input').value || '';
-  await window.ikandy.setVlcConfig({ port, password: pass });
+  await window.IKANDY.setVlcConfig({ port, password: pass });
   el('vlc-status').textContent = 'Testing connection…';
   el('vlc-status').style.color = 'var(--dim)';
-  const result = await window.ikandy.vlcTest();
+  const result = await window.IKANDY.vlcTest();
   if (result.ok) {
     el('vlc-status').textContent = '✓ Connected to VLC';
     el('vlc-status').style.color = 'var(--sp)';
     _vlcConnected = true;
-    await window.ikandy.setSource('vlc');
+    await window.IKANDY.setSource('vlc');
     currentSource = 'vlc';
     el('hud').style.display      = '';
     el('controls').style.display = '';
@@ -2401,14 +2401,14 @@ function getBlend() { return +(el('blend-s')?.value || 2.5); }
 
 /* ── CUSTOM PRESET FOLDER ── */
 async function pickPresetFolder() {
-  const result = await window.ikandy.pickPresetFolder();
+  const result = await window.IKANDY.pickPresetFolder();
   if (!result?.ok) return;
   applyCustomPresets(result);
   toast(`✓ Loaded ${result.count} presets from folder`);
 }
 
 async function clearPresetFolder() {
-  await window.ikandy.clearPresetFolder();
+  await window.IKANDY.clearPresetFolder();
   // Reload built-in presets
   loadPresets();
   el('preset-folder-row').style.display = 'none';
@@ -2465,7 +2465,7 @@ function toggleAuto() {
   autoCycle = !autoCycle;
   syncAutoState();
   if (autoCycle) startCycle(); else clearTimeout(cycleTimer);
-  window.ikandy.action({ type: 'telemetry', auto_cycle: autoCycle });
+  window.IKANDY.action({ type: 'telemetry', auto_cycle: autoCycle });
 }
 function startCycle() {
   clearTimeout(cycleTimer);
@@ -2925,7 +2925,7 @@ function setGrain(v) {
   _grainOpacity = v;
   el('grain-v').textContent = v.toFixed(2);
   grainCanvas.style.opacity = v;
-  localStorage.setItem('ikandy-grain', v);
+  localStorage.setItem('IKANDY-grain', v);
   if (v > 0 && !_grainTimer) _grainTimer = setInterval(drawGrain, 80);
   if (v === 0 && _grainTimer) { clearInterval(_grainTimer); _grainTimer = null; grainCtx.clearRect(0,0,256,256); }
 }
@@ -2949,7 +2949,7 @@ function drawScanlines() {
 function setScanlines(v) {
   el('scan-v').textContent = v.toFixed(2);
   scanCanvas.style.opacity = v;
-  localStorage.setItem('ikandy-scan', v);
+  localStorage.setItem('IKANDY-scan', v);
 }
 
 // ── Viz opacity ────────────────────────────────────────────────────
@@ -2974,7 +2974,7 @@ function setFxMode(mode) {
   if (hasImg) stopRippleLoop();
   // Restore viz opacity
   el('viz-opacity-sl').value = 1; setVizOpacity(1);
-  localStorage.setItem('ikandy-fxmode', 'viz');
+  localStorage.setItem('IKANDY-fxmode', 'viz');
 }
 
 /* ── COLOR PALETTE ── */
@@ -3023,7 +3023,7 @@ function setPalette(name) {
   el('color-bg').style.background = bgCol;
   document.querySelectorAll('.pal-sw').forEach(s =>
     s.classList.toggle('active', s.dataset.color === name));
-  localStorage.setItem('ikandy-palette', name);
+  localStorage.setItem('IKANDY-palette', name);
 }
 
 // ── Background image — multi-shader FX engine ─────────────────────
@@ -4346,8 +4346,8 @@ function setImgFx(fx) {
     startRippleLoop();
   }
 
-  localStorage.setItem('ikandy-imgfx',  fx);
-  localStorage.setItem('ikandy-fxmode', fx);
+  localStorage.setItem('IKANDY-imgfx',  fx);
+  localStorage.setItem('IKANDY-fxmode', fx);
 }
 
 function onBgFileChange(input) {
@@ -4396,7 +4396,7 @@ function onBgFileChange(input) {
 let _bgFiles = [], _bgCycleIdx = 0, _bgCycleTimer = null, _bgCycleSeconds = 15;
 
 async function pickBgFolder() {
-  const result = await window.ikandy.pickImageFolder();
+  const result = await window.IKANDY.pickImageFolder();
   if (!result.ok || !result.files.length) { toast('No images found in folder'); return; }
   _bgFiles = result.files;
   _bgCycleIdx = 0;
@@ -4449,10 +4449,10 @@ function initVibeSettings() {
   el('viz').style.display = 'block';
   _allFxKeys.forEach(k => el('ifx-'+k)?.classList.remove('active'));
 
-  const savedPalette = localStorage.getItem('ikandy-palette') || 'none';
+  const savedPalette = localStorage.getItem('IKANDY-palette') || 'none';
   setPalette(savedPalette);
-  const savedGrain = parseFloat(localStorage.getItem('ikandy-grain') || '0');
-  const savedScan  = parseFloat(localStorage.getItem('ikandy-scan')  || '0');
+  const savedGrain = parseFloat(localStorage.getItem('IKANDY-grain') || '0');
+  const savedScan  = parseFloat(localStorage.getItem('IKANDY-scan')  || '0');
   el('grain-sl').value = savedGrain; setGrain(savedGrain);
   el('scan-sl').value  = savedScan;  setScanlines(savedScan);
 }
@@ -4477,10 +4477,10 @@ function setTheme(name) {
   r.setProperty('--dim',     t.dim);
   document.querySelectorAll('.theme-sw').forEach(s =>
     s.classList.toggle('active', s.dataset.theme === name));
-  localStorage.setItem('ikandy-theme', name);
+  localStorage.setItem('IKANDY-theme', name);
 }
 function initTheme() {
-  setTheme(localStorage.getItem('ikandy-theme') || 'gold');
+  setTheme(localStorage.getItem('IKANDY-theme') || 'gold');
 }
 
 async function boot() {
@@ -4494,8 +4494,8 @@ async function boot() {
   loadPresets(); lp(85);
 
   // Restore saved custom preset folder if any
-  if (window.ikandy.getPresetFolder) {
-    window.ikandy.getPresetFolder().then(result => {
+  if (window.IKANDY.getPresetFolder) {
+    window.IKANDY.getPresetFolder().then(result => {
       if (result?.ok && result.count) applyCustomPresets(result);
     }).catch(() => {});
   }
@@ -4534,7 +4534,7 @@ async function boot() {
    TOOLTIP TOUR — starts after Spotify connected (tkStart called on success)
    ═══════════════════════════════════════════════════════════════════ */
 (function() {
-  const DONE_KEY = 'ikandy-tour3-done';
+  const DONE_KEY = 'IKANDY-tour3-done';
   const g = id => document.getElementById(id);
 
   const STEPS = [
@@ -4655,6 +4655,7 @@ async function boot() {
   function startFrom(i, delay) {
     _sidebarWasOpen = !!window.sidebarOpen;
     cur = i;
+    localStorage.setItem(DONE_KEY, '1'); // mark done immediately so close-mid-tour doesn't replay
     // Collapse all accordions so tour's open/close is predictable
     document.querySelectorAll('#sbi .acc-hd.open').forEach(h => window.accToggle(h));
     // Always start with sidebar closed
@@ -4666,13 +4667,14 @@ async function boot() {
     }
   }
 
+  let _tkStarted = false;
   window.tkNext  = next;
   window.tkSkip  = skip;
-  window.tkStart = function() { if (isDone()) return; startFrom(0, 900); };
+  window.tkStart = function() { if (isDone() || _tkStarted) return; _tkStarted = true; startFrom(0, 900); };
   window.tkRestart = function() { localStorage.removeItem(DONE_KEY); startFrom(0, 100); };
 })();
 
-boot().catch(e => { console.error('[iKandy] Boot failed:', e); toast('Boot error: ' + e.message); });
+boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error: ' + e.message); });
 </script>
 <!-- TOOLTIP TOUR -->
 <div id="tk-mask"><div id="tk-hole"></div></div>
