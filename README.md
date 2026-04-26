@@ -1,8 +1,8 @@
-# iKandy — Music Visualizer
+# IKANDY — Music Visualizer
 
 A dark, cinematic music visualizer for Windows built on MilkDrop/Butterchurn. Works with Spotify, VLC, or any system audio.
 
-![iKandy Screenshot](https://via.placeholder.com/900x500/0a0a0f/d4a843?text=iKandy)
+![IKANDY Screenshot](https://via.placeholder.com/900x500/0a0a0f/d4a843?text=IKANDY)
 
 ---
 
@@ -28,7 +28,7 @@ A dark, cinematic music visualizer for Windows built on MilkDrop/Butterchurn. Wo
 
 ## Installation
 
-1. Download `iKandy Setup x.x.x.exe` from [Releases](../../releases)
+1. Download `IKANDY Setup x.x.x.exe` from [Releases](../../releases)
 2. Run the installer — Windows SmartScreen may warn you, click **More info → Run anyway** (the app is not code-signed)
 3. On first launch, enter your Spotify Client ID
 
@@ -42,9 +42,9 @@ A dark, cinematic music visualizer for Windows built on MilkDrop/Butterchurn. Wo
    ```
    http://127.0.0.1:8888/callback
    ```
-4. Copy the **Client ID** and paste it into iKandy on first launch
+4. Copy the **Client ID** and paste it into IKANDY on first launch
 
-This uses your own Spotify API credentials — iKandy never sees your Spotify password.
+This uses your own Spotify API credentials — IKANDY never sees your Spotify password.
 
 ---
 
@@ -64,7 +64,7 @@ To use VLC as an audio source:
 
 1. In VLC: **Tools → Preferences → All → Interface → Main interfaces** → check **Web**
 2. Set a password, restart VLC
-3. In iKandy sidebar → Source → VLC, enter port (default `8080`) and password
+3. In IKANDY sidebar → Source → VLC, enter port (default `8080`) and password
 
 ---
 
@@ -79,7 +79,7 @@ To use VLC as an audio source:
 
 ## Support
 
-If you find iKandy useful, consider supporting development:
+If you find IKANDY useful, consider supporting development:
 
 ☕ [buymeacoffee.com/felixbagoftricks](https://buymeacoffee.com/felixbagoftricks)
 
