@@ -921,9 +921,8 @@ function createWindow() {
   // Remove the native menu entirely
   mainWindow.setMenu(null);
 
-  mainWindow.maximize();
-  mainWindow.show();
-  mainWindow.loadFile('IKANDY.html');
+  mainWindow.once('ready-to-show', () => { mainWindow.maximize(); mainWindow.show(); });
+  mainWindow.loadFile(path.join(__dirname, 'IKANDY.html'));
   // mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   // Register Ctrl+Shift+I to toggle DevTools

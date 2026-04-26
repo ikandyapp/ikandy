@@ -1,7 +1,7 @@
 {
-  "name": "ikandy",
+  "name": "IKANDY",
   "version": "1.0.0",
-  "description": "iKandy — Music visualizer (Butterchurn / MilkDrop)",
+  "description": "IKANDY — Music visualizer (Butterchurn / MilkDrop)",
   "main": "main.js",
   "author": "Felix Bag of Tricks",
   "license": "MIT",
@@ -19,13 +19,15 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.ikandy.ikandy",
-    "productName": "iKandy",
+    "appId": "com.IKANDY.IKANDY",
+    "productName": "IKANDY",
+    "executableName": "IKANDY",
     "copyright": "Felix Bag of Tricks",
     "files": [
       "main.js",
       "preload.js",
-      "ikandy.html",
+      "IKANDY.html",
+      "assets/**/*",
       "node_modules/**/*"
     ],
     "mac": {
@@ -57,9 +59,14 @@
       "target": [
         "AppImage"
       ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "IKANDYapp",
+      "repo": "IKANDY"
     }
   },
   "dependencies": {
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.1.7"
   }
 }

@@ -1,9 +1,9 @@
 /**
- * iKandy - Preload Script
+ * IKANDY - Preload Script
  */
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('ikandy', {
+contextBridge.exposeInMainWorld('IKANDY', {
   // Auth
   startAuth:  ()     => ipcRenderer.invoke('start-auth'),
   logout:     ()     => ipcRenderer.invoke('logout'),
@@ -50,4 +50,4 @@ contextBridge.exposeInMainWorld('ikandy', {
   rendererReady: ()    => ipcRenderer.send('renderer-ready'),
 });
 
-console.log('[iKandy Preload] Ready. Platform:', process.platform);
+console.log('[IKANDY Preload] Ready. Platform:', process.platform);

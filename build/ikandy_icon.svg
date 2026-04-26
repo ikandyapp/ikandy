@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <clipPath id="eyeclip">
+      <path d="M18,128 Q128,28 238,128 Q128,228 18,128 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- No background — transparent -->
+
+  <!-- Outer ellipse glow rings -->
+  <ellipse cx="128" cy="128" rx="100" ry="64" fill="none" stroke="#7b2fff" stroke-width="1.2" opacity="0.5"/>
+  <ellipse cx="128" cy="128" rx="100" ry="64" fill="none" stroke="#00d4ff" stroke-width="0.6" opacity="0.3"/>
+
+  <!-- Eye almond -->
+  <path d="M18,128 Q128,28 238,128 Q128,228 18,128 Z" fill="#0d1a35"/>
+  <path d="M18,128 Q128,28 238,128 Q128,228 18,128 Z" fill="none" stroke="#00d4ff" stroke-width="2.5"/>
+
+  <!-- Scan lines clipped to eye -->
+  <g clip-path="url(#eyeclip)" opacity="0.07">
+    <line x1="18" y1="100" x2="238" y2="100" stroke="#00d4ff" stroke-width="1.2"/>
+    <line x1="18" y1="115" x2="238" y2="115" stroke="#00d4ff" stroke-width="1.2"/>
+    <line x1="18" y1="141" x2="238" y2="141" stroke="#00d4ff" stroke-width="1.2"/>
+    <line x1="18" y1="156" x2="238" y2="156" stroke="#00d4ff" stroke-width="1.2"/>
+  </g>
+
+  <!-- Iris outer ring -->
+  <circle cx="128" cy="128" r="54" fill="#0a0f20"/>
+  <circle cx="128" cy="128" r="54" fill="none" stroke="#7b2fff" stroke-width="2.8"/>
+
+  <!-- Iris detail rings -->
+  <circle cx="128" cy="128" r="45" fill="none" stroke="#5a1fd1" stroke-width="0.9" opacity="0.6"/>
+  <circle cx="128" cy="128" r="36" fill="none" stroke="#00d4ff" stroke-width="0.9" opacity="0.5"/>
+
+  <!-- Spokes -->
+  <line x1="128" y1="74" x2="128" y2="83" stroke="#00d4ff" stroke-width="1.8" opacity="0.7"/>
+  <line x1="128" y1="173" x2="128" y2="182" stroke="#00d4ff" stroke-width="1.8" opacity="0.7"/>
+  <line x1="74" y1="128" x2="83" y2="128" stroke="#00d4ff" stroke-width="1.8" opacity="0.7"/>
+  <line x1="173" y1="128" x2="182" y2="128" stroke="#00d4ff" stroke-width="1.8" opacity="0.7"/>
+  <line x1="89" y1="89" x2="96" y2="96" stroke="#7b2fff" stroke-width="1.8" opacity="0.6"/>
+  <line x1="160" y1="160" x2="167" y2="167" stroke="#7b2fff" stroke-width="1.8" opacity="0.6"/>
+  <line x1="167" y1="89" x2="160" y2="96" stroke="#7b2fff" stroke-width="1.8" opacity="0.6"/>
+  <line x1="96" y1="160" x2="89" y2="167" stroke="#7b2fff" stroke-width="1.8" opacity="0.6"/>
+
+  <!-- Hex inside iris -->
+  <polygon points="128,94 151,107 151,133 128,146 105,133 105,107" fill="none" stroke="#00d4ff" stroke-width="1.4" opacity="0.85"/>
+
+  <!-- Pupil layers -->
+  <circle cx="128" cy="128" r="24" fill="#7b2fff" opacity="0.25"/>
+  <circle cx="128" cy="128" r="17" fill="#7b2fff" opacity="0.4"/>
+  <circle cx="128" cy="128" r="11" fill="#00d4ff"/>
+  <circle cx="128" cy="128" r="5.5" fill="#ffffff"/>
+
+  <!-- Specular highlight -->
+  <circle cx="137" cy="119" r="3.5" fill="white" opacity="0.6"/>
+</svg>
