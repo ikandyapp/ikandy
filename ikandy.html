@@ -75,7 +75,8 @@ html, body {
 }
 #loading.fade { opacity: 0; pointer-events: none; }
 #loading.gone { display: none; }
-.ld-logo { font-family: var(--display); font-size: 60px; letter-spacing: .2em; color: var(--acc); }
+.ld-logo { font-family: var(--display); font-size: 60px; letter-spacing: .2em; color: var(--acc); opacity: 0; transition: opacity 0.15s; }
+.ld-logo.ready { opacity: 1; }
 .ld-sub  { font-size: 11px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
 #ld-bar  { width: 200px; height: 2px; background: rgba(255,255,255,.06); border-radius: 1px; overflow: hidden; }
 #ld-fill { height: 100%; background: var(--acc); width: 0%; transition: width .35s; }
@@ -4505,6 +4506,15 @@ function initTheme() {
 }
 
 async function boot() {
+  // Wait for Bebas Neue to load before showing the logo — prevents trail/jump
+  document.fonts.load('60px "Bebas Neue"').then(() => {
+    const logo = el('ld-logo');
+    if (logo) logo.classList.add('ready');
+  }).catch(() => {
+    const logo = el('ld-logo');
+    if (logo) logo.classList.add('ready'); // show anyway on error
+  });
+
   lp(10);
   await waitForButterchurn();
   lp(55);
