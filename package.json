@@ -19,7 +19,7 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.IKANDY.IKANDY",
+    "appId": "com.ikandy.ikandy",
     "productName": "IKANDY",
     "executableName": "IKANDY",
     "copyright": "Felix Bag of Tricks",
@@ -62,8 +62,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "IKANDYapp",
-      "repo": "IKANDY"
+      "owner": "ikandyapp",
+      "repo": "ikandy"
     }
   },
   "dependencies": {
