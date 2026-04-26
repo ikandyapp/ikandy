@@ -5,7 +5,17 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>iKandy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Load Bebas Neue locally — eliminates font-swap flicker on startup */
+  @font-face {
+    font-family: 'Bebas Neue';
+    src: url('./assets/BebasNeue.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: block; /* block rendering until font ready — no swap flash */
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=block" rel="stylesheet">
 <style>
 /* ─── RESET & TOKENS ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -834,14 +844,14 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 
 <!-- LOADING -->
 <div id="loading">
-  <div class="ld-logo">IKANDY</div>
+  <div class="ld-logo">iKandy</div>
   <div class="ld-sub">MilkDrop Engine</div>
   <div id="ld-bar"><div id="ld-fill"></div></div>
 </div>
 
 <!-- LOGIN -->
 <div id="setup">
-  <div class="setup-logo">IKANDY</div>
+  <div class="setup-logo">iKandy</div>
   <div class="setup-sub">First-time setup</div>
   <p class="setup-note">
     Enter your Spotify Client ID.<br>
@@ -862,7 +872,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 </div>
 
 <div id="login">
-  <div class="login-logo">IKANDY</div>
+  <div class="login-logo">iKandy</div>
   <div class="login-sub">Music Visualizer</div>
   <button id="sp-login-btn" onclick="startLogin()">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1038,7 +1048,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <!-- APP BRANDING -->
   <div id="app-brand">
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div id="app-name">IKANDY</div>
+      <div id="app-name">iKandy</div>
       <button id="acc-all-btn" onclick="accToggleAll()" title="Expand / Collapse all"
         style="background:none;border:1px solid var(--bdr);border-radius:4px;color:var(--dim);
         font-family:var(--ui);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
@@ -1325,7 +1335,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <script>
 'use strict';
 /* ═══════════════════════════════════════════════════════════════════
-   iKANDY — Renderer
+   iKandy — Renderer
    All Spotify auth/polling is in main.js (Node).
    This renderer receives push data via IPC and handles visuals.
    ═══════════════════════════════════════════════════════════════════ */

@@ -371,7 +371,7 @@ function startAuthServer(pkceVerifier) {
       body{background:#060608;color:#b89a5a;font-family:sans-serif;display:flex;
       align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px;}
       h1{font-size:40px;letter-spacing:.22em;}p{color:#444;font-size:13px;}
-    </style></head><body><h1>IKANDY ✓</h1>
+    </style></head><body><h1>iKandy ✓</h1>
     <p>Connected! You can close this tab.</p>
     <script>setTimeout(()=>window.close(),1500);</script></body></html>`);
 
