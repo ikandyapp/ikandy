@@ -1318,6 +1318,14 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
         <span class="svv" id="physics-size-v">1.25×</span>
       </div>
     </div>
+    <div id="physics-speed-row" style="display:none;">
+      <span class="lbl">Word Speed</span>
+      <div class="svr">
+        <input type="range" id="physics-speed-sl" min="0.1" max="2" step="0.1" value="0.3"
+          oninput="setPhysicsSpeed(+this.value)">
+        <span class="svv" id="physics-speed-v">0.3×</span>
+      </div>
+    </div>
     <div id="lyrics-box"></div>
   </div>
 
@@ -1382,14 +1390,17 @@ let _skipCount = 0;
 let _speedSkip = 1;
 function renderLoop(ts) {
   requestAnimationFrame(renderLoop);
+  // Always update progress and lyrics — never frameskip these
+  if (trackPlaying && _pollAnchorTime > 0 && trackDuration > 0) {
+    const elapsed = performance.now() - _pollAnchorTime;
+    trackProgress = Math.min(_pollAnchorProgress + elapsed, trackDuration);
+  }
+  drawLyricOverlay(ts);
+  if (trackDuration > 0) updateProgressBar(trackProgress, trackDuration);
   if (_speedSkip > 0) {
     _skipCount++;
     if (_skipCount <= _speedSkip) return;
     _skipCount = 0;
-  }
-  if (trackPlaying && _pollAnchorTime > 0 && trackDuration > 0) {
-    const elapsed = performance.now() - _pollAnchorTime;
-    trackProgress = Math.min(_pollAnchorProgress + elapsed, trackDuration);
   }
   _lastRafTs = ts;
   if (visualizer) visualizer.render();
@@ -1426,23 +1437,32 @@ function renderLoop(ts) {
 
     if (_bgTexture) updateRippleAmp(peak);
   }
-  drawLyricOverlay();
-  if (trackDuration > 0) updateProgressBar(trackProgress, trackDuration);
 }
 
 let _lastLyricText = '';
 let _lyricMode = 'classic'; // 'classic' or 'physics'
 
 let _physicsSizeMultiplier = 1.25; // 25% bigger than base by default
+let _physicsSpeedMultiplier = 0.3;
+function setPhysicsSpeed(val) {
+  _physicsSpeedMultiplier = val;
+  const v = el('physics-speed-v');
+  if (v) v.textContent = val.toFixed(1) + '×';
+  localStorage.setItem('IKANDY-physics-speed', val);
+}
 
 function setPhysicsSize(val) {
   _physicsSizeMultiplier = val;
   const v = el('physics-size-v');
   if (v) v.textContent = val.toFixed(1) + '×';
-  // Respawn current lyric at new size so change is immediate
-  if (_lyricMode === 'physics' && _lastLyricText) {
+  localStorage.setItem('IKANDY-physics-size', val);
+  // Clear old DOM elements and respawn at new size immediately
+  if (_lyricMode === 'physics') {
+    _physicsWords.forEach(w => { if (w.el) w.el.remove(); });
     _physicsWords = [];
-    spawnPhysicsWords(_lastLyricText);
+    const wrap = el('physics-wrap');
+    if (wrap) wrap.innerHTML = '';
+    if (_lastLyricText) spawnPhysicsWords(_lastLyricText);
   }
 }
 
@@ -1455,6 +1475,8 @@ function setLyricMode(mode) {
   // Show size slider only in physics mode
   const sizeRow = el('physics-size-row');
   if (sizeRow) sizeRow.style.display = mode === 'physics' ? 'block' : 'none';
+  const speedRow = el('physics-speed-row');
+  if (speedRow) speedRow.style.display = mode === 'physics' ? 'block' : 'none';
   // Clear physics canvas when switching
   const wrap = el('physics-wrap');
   if (wrap) wrap.innerHTML = '';
@@ -1462,7 +1484,7 @@ function setLyricMode(mode) {
   el('lyric-line').classList.add('blank');
 }
 
-function drawLyricOverlay() {
+function drawLyricOverlay(ts = 0) {
   const lineEl = el('lyric-line');
   if (!lyricsOn || !lyrics.length) {
     lineEl.classList.add('blank');
@@ -1475,7 +1497,7 @@ function drawLyricOverlay() {
       _lastLyricText = line;
       spawnPhysicsWords(line);
     }
-    renderPhysicsWords();
+    renderPhysicsWords(ts);
   } else {
     // Classic mode
     const pc = el('physics-canvas');
@@ -1498,6 +1520,7 @@ function drawLyricOverlay() {
    PHYSICS LYRICS ENGINE
    ═══════════════════════════════════════════════════════════════════ */
 let _physicsWords = [];
+let _renderPhysicsLast = 0;
 
 function initPhysicsCanvas() {
   // No canvas needed — we use DOM divs which scale perfectly always
@@ -1521,66 +1544,66 @@ function spawnPhysicsWords(line) {
   const H = window.innerHeight;
   const cx = W / 2, cy = H / 2;
   const words = line.trim().split(/\s+/).filter(Boolean);
-  const bass   = getBassEnergy();
-  const energy = 0.5 + bass * 2.5;
 
   // Fade out existing words fast
   _physicsWords.forEach(w => { w.ttl = Math.min(w.ttl, 400); });
 
-  // Font size from slider
   const fontSize = Math.round(40 * _physicsSizeMultiplier);
+  const spd = _physicsSpeedMultiplier; // 0.1 – 2.0
 
   words.forEach((word, i) => {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = (2 + Math.random() * 4) * energy;
-    const hue   = Math.random() < 0.25 ? Math.random() * 360 : -1;
-
     setTimeout(() => {
       const div = document.createElement('div');
       div.className = 'pw';
       div.textContent = word;
       div.style.fontSize = fontSize + 'px';
+      const hue = Math.random() < 0.25 ? Math.random() * 360 : -1;
       if (hue >= 0) div.style.color = `hsl(${hue}, 90%, 70%)`;
 
-      // Spawn near center with slight scatter
-      const x = cx + (Math.random() - 0.5) * W * 0.2;
-      const y = cy + (Math.random() - 0.5) * H * 0.2;
+      // Spawn near center
+      const x = cx + (Math.random() - 0.5) * W * 0.15;
+      const y = cy + (Math.random() - 0.5) * H * 0.15;
       div.style.left    = x + 'px';
       div.style.top     = y + 'px';
       div.style.opacity = '0';
       wrap.appendChild(div);
 
+      // Gentle outward drift — speed slider controls this directly
+      const angle = Math.random() * Math.PI * 2;
+      const launch = (0.3 + Math.random() * 0.4) * spd; // slow, controlled
+
       _physicsWords.push({
         el:       div,
         x, y,
-        vx:       Math.cos(angle) * speed,
-        vy:       Math.sin(angle) * speed - 1.5,
-        rotation: (Math.random() - 0.5) * 20,
-        rotSpeed: (Math.random() - 0.5) * 2,
+        vx:       Math.cos(angle) * launch,
+        vy:       Math.sin(angle) * launch - (0.2 * spd), // slight upward bias
+        rotation: (Math.random() - 0.5) * 15,
+        rotSpeed: (Math.random() - 0.5) * 0.5 * spd,
         alpha:    0,
-        ttl:      2500 + Math.random() * 1000,
+        ttl:      2800 + Math.random() * 800,
         born:     performance.now(),
-        mass:     0.85 + Math.random() * 0.3,
-        // No zone bounds — full screen chaos
-        bx1: 40, bx2: W - 40, by1: 40, by2: H - 40,
+        mass:     0.9 + Math.random() * 0.2,
+        bx1: 20, bx2: W - 20, by1: 20, by2: H - 20,
       });
-    }, i * 45);
+    }, i * 60);
   });
 }
-function renderPhysicsWords() {
-  if (!_physicsWords.length) return;
-  const now  = performance.now();
-  const bass = getBassEnergy();
-  const W    = window.innerWidth;
-  const H    = window.innerHeight;
 
-  // Beat impulse
-  if (bass > 0.35) {
-    const impulse = (bass - 0.35) * 5;
+function renderPhysicsWords(ts) {
+  if (!_physicsWords.length) return;
+  const now = performance.now();
+  const dt  = Math.min((ts - (_renderPhysicsLast || ts)) / 16.67, 2);
+  _renderPhysicsLast = ts;
+  const bass = getBassEnergy();
+  const spd  = _physicsSpeedMultiplier;
+
+  // Very gentle beat pulse — just a nudge, not a cannon
+  if (bass > 0.6) {
+    const impulse = (bass - 0.6) * 0.4 * spd;
     _physicsWords.forEach(w => {
       if (!w.el) return;
-      const cx = (w.bx1 + w.bx2) / 2;
-      const cy = (w.by1 + w.by2) / 2;
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
       const dx = w.x - cx, dy = w.y - cy;
       const dist = Math.sqrt(dx*dx + dy*dy) || 1;
       w.vx += (dx / dist) * impulse;
@@ -1593,36 +1616,34 @@ function renderPhysicsWords() {
     const age    = now - w.born;
     const fading = age > w.ttl - 400;
 
-    // Physics
-    w.vy       += 0.04 * w.mass;
-    w.vx       *= 0.985;
-    w.vy       *= 0.985;
-    w.x        += w.vx;
-    w.y        += w.vy;
-    w.rotation += w.rotSpeed;
-    w.rotSpeed *= 0.98;
+    // Gravity pulls down gently — speed slider scales it
+    w.vy += 0.04 * w.mass * spd * dt;
 
-    // Bounce
-    if (w.x < w.bx1)  { w.x = w.bx1;  w.vx =  Math.abs(w.vx) * 0.5; }
-    if (w.x > w.bx2)  { w.x = w.bx2;  w.vx = -Math.abs(w.vx) * 0.5; }
-    if (w.y < w.by1)  { w.y = w.by1;  w.vy =  Math.abs(w.vy) * 0.5; }
-    if (w.y > w.by2)  { w.y = w.by2;  w.vy = -Math.abs(w.vy) * 0.6; }
+    // Friction — words slow to a gentle drift
+    w.vx *= Math.pow(0.97, dt);
+    w.vy *= Math.pow(0.97, dt);
 
-    // Alpha
-    if (fading) w.alpha = Math.max(0, w.alpha - 0.03);
-    else        w.alpha = Math.min(0.95, w.alpha + 0.08);
+    w.x += w.vx * dt;
+    w.y += w.vy * dt;
+    w.rotation += w.rotSpeed * dt;
+    w.rotSpeed *= Math.pow(0.99, dt);
 
-    // Apply to DOM
+    // Soft bounce
+    if (w.x < w.bx1) { w.x = w.bx1; w.vx =  Math.abs(w.vx) * 0.3; }
+    if (w.x > w.bx2) { w.x = w.bx2; w.vx = -Math.abs(w.vx) * 0.3; }
+    if (w.y < w.by1) { w.y = w.by1; w.vy =  Math.abs(w.vy) * 0.3; }
+    if (w.y > w.by2) { w.y = w.by2; w.vy = -Math.abs(w.vy) * 0.3; }
+
+    // Alpha fade
+    if (fading) w.alpha = Math.max(0, w.alpha - 0.025);
+    else        w.alpha = Math.min(0.95, w.alpha + 0.06);
+
     w.el.style.transform = `translate(-50%, -50%) rotate(${w.rotation}deg)`;
     w.el.style.left    = w.x + 'px';
     w.el.style.top     = w.y + 'px';
     w.el.style.opacity = w.alpha;
 
-    // Remove when invisible and expired
-    if (w.alpha <= 0 && age > w.ttl) {
-      w.el.remove();
-      return false;
-    }
+    if (w.alpha <= 0 && age > w.ttl) { w.el.remove(); return false; }
     return true;
   });
 }
@@ -4504,6 +4525,25 @@ async function boot() {
   const savedSpeed  = localStorage.getItem('viz-speed');
   const savedSmooth = localStorage.getItem('viz-smoothing');
   if (savedSpeed)  { const sl = el('speed-sl'); if (sl) { sl.value = savedSpeed;  setSpeed(+savedSpeed); } }
+
+  // Migrate old key names if present
+  if (!localStorage.getItem('IKANDY-physics-speed') && localStorage.getItem('ikandy-physics-speed'))
+    localStorage.setItem('IKANDY-physics-speed', localStorage.getItem('ikandy-physics-speed'));
+  if (!localStorage.getItem('IKANDY-physics-size') && localStorage.getItem('ikandy-physics-size'))
+    localStorage.setItem('IKANDY-physics-size', localStorage.getItem('ikandy-physics-size'));
+
+  const savedPhysicsSpeed = localStorage.getItem('IKANDY-physics-speed');
+  const savedPhysicsSize  = localStorage.getItem('IKANDY-physics-size');
+  if (savedPhysicsSpeed) {
+    const v = Math.min(2, Math.max(0.1, +savedPhysicsSpeed)); // clamp to valid range
+    const sl = el('physics-speed-sl'); if (sl) sl.value = v;
+    setPhysicsSpeed(v);
+  }
+  if (savedPhysicsSize) {
+    const v = Math.min(4, Math.max(0.5, +savedPhysicsSize));
+    const sl = el('physics-size-sl'); if (sl) sl.value = v;
+    setPhysicsSize(v);
+  }
   if (savedSmooth) { const sl = el('sm-sl');    if (sl) { sl.value = savedSmooth; setSmoothing(+savedSmooth); } }
 
   resize();
