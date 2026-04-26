@@ -293,13 +293,21 @@ async function fetchLyrics(title, artist) {
   const cleanTitle  = title.replace(/\s*[\(\[].*[\)\]]/g, '').trim();
 
   // Helper: fetch one LRCLIB url and extract lyrics payload
-  async function tryLrclib(url) {
+  // Validates returned track name matches what we asked for (prevents false positives)
+  async function tryLrclib(url, validateTitle) {
     try {
       const res = await httpsGet(url);
       if (res.status !== 200) return null;
       let data = JSON.parse(res.body);
       if (Array.isArray(data)) data = data[0];
       if (!data) return null;
+      // Validate track name matches if we have one to check against
+      if (validateTitle && data.trackName) {
+        const returned = data.trackName.toLowerCase().trim();
+        const expected = validateTitle.toLowerCase().trim();
+        // Allow if returned name contains expected or vice versa (handles subtitles etc)
+        if (!returned.includes(expected) && !expected.includes(returned)) return null;
+      }
       if (data.syncedLyrics) return { type: 'synced', raw: data.syncedLyrics, name: data.trackName };
       if (data.plainLyrics)  return { type: 'plain',  raw: data.plainLyrics };
       return null;
@@ -310,9 +318,9 @@ async function fetchLyrics(title, artist) {
   // fall back to plain if no synced found, all in one round-trip time
   const base = 'https://lrclib.net/api';
   const [r1, r2, r3] = await Promise.all([
-    tryLrclib(`${base}/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`),
-    tryLrclib(`${base}/search?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`),
-    tryLrclib(`${base}/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`),
+    tryLrclib(`${base}/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`, cleanTitle),
+    tryLrclib(`${base}/search?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`, cleanTitle),
+    tryLrclib(`${base}/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`, cleanTitle),
   ]);
 
   // Prefer synced over plain, prefer earlier strategies
@@ -650,7 +658,7 @@ ipcMain.handle('vlc-test', async () => {
   } catch(e) { return { ok: false, error: 'VLC not reachable — is it running with Web interface enabled?' }; }
 });
 ipcMain.handle('vlc-action', async (_e, action) => {
-  const allowedVlcActions = ['play','pause','playpause','next','prev','volume','seek'];
+  const allowedVlcActions = ['play','pause','playpause','next','prev','volume','seek','stop','restart'];
   if (!action?.type || !allowedVlcActions.includes(action.type)) return { ok: false, error: 'Invalid action' };
   try {
     const auth = Buffer.from(`:${vlcPassword}`).toString('base64');
@@ -661,20 +669,111 @@ ipcMain.handle('vlc-action', async (_e, action) => {
       setTimeout(pollVLC, 800);
       return { ok: true };
     }
+    if (action.type === 'restart') {
+      await httpGet(`http://localhost:${vlcPort}/requests/status.json?command=seek&val=0`,
+        { Authorization: 'Basic ' + auth });
+      setTimeout(pollVLC, 800);
+      return { ok: true };
+    }
     if (action.type === 'volume') {
-      // VLC volume is 0-512 (256 = 100%). Convert from 0-100.
       const vol = Math.round((action.value / 100) * 256);
       await httpGet(`http://localhost:${vlcPort}/requests/status.json?command=volume&val=${vol}`,
         { Authorization: 'Basic ' + auth });
       return { ok: true };
     }
-    const cmds = { playpause: 'pl_pause', next: 'pl_next', prev: 'pl_previous', play: 'pl_play', pause: 'pl_pause' };
+    const cmds = { playpause: 'pl_pause', next: 'pl_next', prev: 'pl_previous', play: 'pl_play', pause: 'pl_pause', stop: 'pl_stop' };
     const cmd  = cmds[action.type];
     if (!cmd) return { ok: false };
     await httpGet(`http://localhost:${vlcPort}/requests/status.json?command=${cmd}`,
       { Authorization: 'Basic ' + auth });
     setTimeout(pollVLC, 800);
     return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('get-playlists', async () => {
+  try {
+    const items = [];
+    let url = 'https://api.spotify.com/v1/me/playlists?limit=50';
+    while (url) {
+      const res = await httpsGet(url, { Authorization: 'Bearer ' + tokens.access_token });
+      if (res.status !== 200) break;
+      const data = JSON.parse(res.body);
+      items.push(...(data.items || []));
+      url = data.next || null;
+    }
+    return { ok: true, items };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('play-playlist', async (_e, uri) => {
+  if (uri !== 'liked' && !String(uri).match(/^spotify:(playlist|album|artist):[a-zA-Z0-9]+$/)) {
+    return { ok: false, error: 'Invalid URI' };
+  }
+  try {
+    let body;
+    if (uri === 'liked') {
+      const res = await httpsGet('https://api.spotify.com/v1/me/tracks?limit=50',
+        { Authorization: 'Bearer ' + tokens.access_token });
+      const data = JSON.parse(res.body);
+      const uris = data.items.map(i => i.track.uri);
+      body = JSON.stringify({ uris });
+    } else {
+      body = JSON.stringify({ context_uri: uri });
+    }
+    await httpsRequest('PUT', 'https://api.spotify.com/v1/me/player/play', body,
+      { Authorization: 'Bearer ' + tokens.access_token, 'Content-Type': 'application/json' });
+    setTimeout(pollSpotify, 800);
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('playback-action', async (_e, action) => {
+  const allowedActions = ['play','pause','playpause','next','prev','previous','volume','seek','poll','telemetry','focus-window'];
+  if (!action?.type || !allowedActions.includes(action.type)) return { ok: false, error: 'Invalid action' };
+
+  if (action.type === 'focus-window') {
+    if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
+    return { ok: true };
+  }
+  if (action.type === 'telemetry') return { ok: true };
+  if (action.type === 'poll') { pollSpotify(); return { ok: true }; }
+
+  try {
+    const auth = { Authorization: 'Bearer ' + tokens.access_token };
+    if (action.type === 'playpause') {
+      const endpoint = lastKnownPlaying ? 'pause' : 'play';
+      await httpsRequest('PUT', `https://api.spotify.com/v1/me/player/${endpoint}`, '', auth);
+      lastKnownPlaying = !lastKnownPlaying;
+      return { ok: true };
+    }
+    if (action.type === 'play') {
+      await httpsRequest('PUT', 'https://api.spotify.com/v1/me/player/play', '', auth);
+      lastKnownPlaying = true; return { ok: true };
+    }
+    if (action.type === 'pause') {
+      await httpsRequest('PUT', 'https://api.spotify.com/v1/me/player/pause', '', auth);
+      lastKnownPlaying = false; return { ok: true };
+    }
+    if (action.type === 'next') {
+      await httpsRequest('POST', 'https://api.spotify.com/v1/me/player/next', '', auth);
+      setTimeout(pollSpotify, 800); return { ok: true };
+    }
+    if (action.type === 'prev' || action.type === 'previous') {
+      await httpsRequest('POST', 'https://api.spotify.com/v1/me/player/previous', '', auth);
+      setTimeout(pollSpotify, 800); return { ok: true };
+    }
+    if (action.type === 'seek') {
+      const ms = Math.max(0, Math.round(action.position_ms ?? (action.position * 1000) ?? 0));
+      await httpsRequest('PUT', `https://api.spotify.com/v1/me/player/seek?position_ms=${ms}`, '', auth);
+      setTimeout(pollSpotify, 500); return { ok: true };
+    }
+    if (action.type === 'volume') {
+      const vol = Math.max(0, Math.min(100, Math.round(action.value)));
+      await httpsRequest('PUT', `https://api.spotify.com/v1/me/player/volume?volume_percent=${vol}`, '', auth);
+      return { ok: true };
+    }
+    return { ok: false, error: 'Unknown action' };
   } catch(e) { return { ok: false, error: e.message }; }
 });
 
@@ -701,113 +800,6 @@ ipcMain.handle('pick-image-folder', async () => {
   return { ok: true, files, dir };
 });
 
-ipcMain.handle('get-playlists', async () => {
-  const valid = await ensureValidToken();
-  if (!valid) return { ok: false, error: 'Not authenticated' };
-  try {
-    let playlists = [], url = 'https://api.spotify.com/v1/me/playlists?limit=50';
-    while (url) {
-      const res  = await httpsGet(url, { Authorization: 'Bearer ' + tokens.access_token });
-      if (res.status !== 200) break;
-      const data = JSON.parse(res.body);
-      playlists = playlists.concat(data.items.filter(Boolean).map(p => ({
-        id:    p.id,
-        name:  p.name,
-        total: p.tracks?.total ?? 0,
-        image: p.images?.[0]?.url || '',
-        uri:   p.uri,
-      })));
-      url = data.next || null;
-    }
-    return { ok: true, playlists };
-  } catch(e) { return { ok: false, error: e.message }; }
-});
-
-ipcMain.handle('play-playlist', async (_e, uri) => {
-  if (uri !== 'liked' && !String(uri).match(/^spotify:(playlist|album|artist):[a-zA-Z0-9]+$/)) {
-    return { ok: false, error: 'Invalid URI' };
-  }
-  const valid = await ensureValidToken();
-  if (!valid) return { ok: false };
-  try {
-    let body;
-    if (uri === 'liked') {
-      const lr = await httpsGet('https://api.spotify.com/v1/me/tracks?limit=50',
-        { Authorization: 'Bearer ' + tokens.access_token });
-      const data = JSON.parse(lr.body);
-      const uris = data.items.map(i => i.track.uri);
-      body = JSON.stringify({ uris });
-    } else {
-      body = JSON.stringify({ context_uri: uri });
-    }
-    const r = await httpsRequest('PUT', 'https://api.spotify.com/v1/me/player/play', body,
-      { Authorization: 'Bearer ' + tokens.access_token, 'Content-Type': 'application/json' });
-    console.log('[iKandy] play-playlist status:', r.status, r.body);
-    setTimeout(pollCurrentTrack, 1500);
-    return { ok: r.status === 204 || r.status === 202 };
-  } catch(e) { return { ok: false, error: e.message }; }
-});
-
-ipcMain.handle('playback-action', async (_e, action) => {
-  const allowedActions = ['play','pause','playpause','next','prev','previous','volume','seek','poll','telemetry'];
-  if (!action?.type || !allowedActions.includes(action.type)) return { ok: false, error: 'Invalid action' };
-
-  // Telemetry — no Spotify token needed
-  if (action.type === 'telemetry') {
-    if (action.source_mode !== undefined) _telemetry.source_mode = action.source_mode;
-    if (action.auto_cycle  !== undefined) _telemetry.auto_cycle  = action.auto_cycle;
-    return { ok: true };
-  }
-
-  const valid = await ensureValidToken();
-  if (!valid) return { ok: false };
-  const base = 'https://api.spotify.com/v1/me/player/';
-  const hdr  = { Authorization: 'Bearer ' + tokens.access_token };
-  try {
-    switch(action.type) {
-      case 'next':
-        await httpsPost(base + 'next', '', hdr); break;
-      case 'prev':
-      case 'previous':
-        await httpsPost(base + 'previous', '', hdr); break;
-      case 'play':
-        await httpsRequest('PUT', base + 'play', '', hdr); break;
-      case 'pause':
-        await httpsRequest('PUT', base + 'pause', '', hdr); break;
-      case 'volume': {
-        // PUT /me/player/volume?volume_percent=N  (0-100, no body)
-        const vol = Math.max(0, Math.min(100, Math.round(action.value)));
-        const r = await httpsRequest('PUT',
-          `https://api.spotify.com/v1/me/player/volume?volume_percent=${vol}`, '', hdr);
-        console.log('[iKandy] Volume set to', vol, '— status:', r.status);
-        return { ok: r.status === 204 };
-      }
-      case 'seek': {
-        const posMs = Math.max(0, Math.round(action.position_ms));
-        await httpsRequest('PUT', `${base}seek?position_ms=${posMs}`, '', hdr);
-        setTimeout(pollCurrentTrack, 800);
-        return { ok: true };
-      }
-      case 'playpause':
-        // pause = PUT, play = PUT (not POST — POST returns 405)
-        if (lastKnownPlaying) {
-          const r = await httpsRequest('PUT', base + 'pause', '', hdr);
-          console.log('[iKandy] pause — status:', r.status);
-          if (r.status === 204) lastKnownPlaying = false;
-        } else {
-          const r = await httpsRequest('PUT', base + 'play', '', hdr);
-          console.log('[iKandy] play — status:', r.status);
-          if (r.status === 204) lastKnownPlaying = true;
-        }
-        break;
-    }
-    // Poll after action — give Spotify 1.5s to process the command
-    // then poll twice: once at 1.5s and once at 4s for reliability
-    setTimeout(pollCurrentTrack, 1500);
-    setTimeout(pollCurrentTrack, 4000);
-    return { ok: true };
-  } catch(e) { return { ok: false, error: e.message }; }
-});
 
 // ── Enable getDisplayMedia in Electron ───────────────────────────────────────
 // Electron blocks getDisplayMedia by default. This handler intercepts the
@@ -942,10 +934,9 @@ async function pollVLC() {
     const progress = (data.time   || 0) * 1000;
     const playing  = data.state === 'playing';
     const trackId  = `${title}::${artist}`;
-    // VLC volume: 0-512 where 256=100%
     const volume   = data.volume != null ? Math.round((data.volume / 256) * 100) : null;
-    // VLC art: served locally via HTTP
-    const art = `http://localhost:${vlcPort}/art`;
+    // VLC art: served locally via HTTP with auth
+    const art = `http://:${vlcPassword}@localhost:${vlcPort}/art`;
 
     lastKnownPlaying = playing;
     mainWindow?.webContents.send('spotify-state', {
@@ -1078,7 +1069,7 @@ app.whenReady().then(() => {
   // This prevents auth-result arriving before setupSpotifyIPC() runs
   ipcMain.once('renderer-ready', async () => {
     console.log('[iKandy] Renderer ready — checking token');
-    // Always start in Spotify mode regardless of saved source
+
     if (sourceMode === 'vlc' || sourceMode === 'local') {
       sourceMode = 'spotify';
       console.log('[iKandy] Non-spotify mode saved but starting in Spotify mode');

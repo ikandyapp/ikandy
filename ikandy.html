@@ -965,6 +965,10 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <button class="cb" id="cb-pp" onclick="spAction('playpause')" title="Play / Pause">
     <svg id="pp-icon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
   </button>
+  <!-- Stop -->
+  <button class="cb" id="cb-stop" onclick="spAction('stop')" title="Stop">
+    <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+  </button>
   <!-- Skip Forward -->
   <button class="cb" id="cb-next" onclick="spAction('next')" title="Next">
     <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
@@ -1934,6 +1938,13 @@ async function spAction(cmd) {
       if (result && !result.ok) setPlayIcon(wasPlaying);
       else trackPlaying = !wasPlaying;
     } catch(e) { setPlayIcon(wasPlaying); }
+    return;
+  }
+  if (type === 'stop') {
+    // Spotify: seek to 0 then pause
+    await window.ikandy.action({ type: 'seek', position_ms: 0 });
+    await window.ikandy.action({ type: 'pause' });
+    setPlayIcon(false); trackPlaying = false;
     return;
   }
   await window.ikandy.action(cmd);
