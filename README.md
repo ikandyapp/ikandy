@@ -81,7 +81,7 @@ To use VLC as an audio source:
 
 If you find IKANDY useful, consider supporting development:
 
-☕ [buymeacoffee.com/felixbagoftricks](https://buymeacoffee.com/felixbagoftricks)
+☕ [buymeacoffee.com/ikandy](https://mc.buymeacoffee.com/links/SyvKeqcIaFwPBVxKxignsuywbfgscknBvhKXIwnxGKhnefxFjMcgyAslBxXHKXgdkalkFAVPKExKxIGMCxgWsqk/3480126?link=ikandy)
 
 ---
 
