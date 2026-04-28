@@ -1016,6 +1016,66 @@ ipcMain.handle('clear-preset-folder', () => {
   return { ok: true };
 });
 
+// ── Preset thumbnail persistent cache ─────────────────────────────────────────
+const crypto = require('crypto');
+const THUMB_DIR = () => path.join(app.getPath('userData'), 'IKANDY-preset-thumbs');
+
+function thumbFile(presetName) {
+  // SHA1 hash → safe filename, immune to weird preset name characters
+  const hash = crypto.createHash('sha1').update(String(presetName)).digest('hex').slice(0, 16);
+  return path.join(THUMB_DIR(), hash + '.jpg');
+}
+
+function ensureThumbDir() {
+  try { fs.mkdirSync(THUMB_DIR(), { recursive: true }); } catch(e) {}
+}
+
+ipcMain.handle('preset-thumb-load-all', async (_e, presetNames) => {
+  ensureThumbDir();
+  const result = {};
+  if (!Array.isArray(presetNames)) return result;
+  for (const name of presetNames) {
+    if (typeof name !== 'string') continue;
+    try {
+      const file = thumbFile(name);
+      if (fs.existsSync(file)) {
+        const buf = fs.readFileSync(file);
+        result[name] = 'data:image/jpeg;base64,' + buf.toString('base64');
+      }
+    } catch(e) {}
+  }
+  return result;
+});
+
+ipcMain.handle('preset-thumb-save', async (_e, payload) => {
+  if (!payload || typeof payload !== 'object') return { ok: false };
+  const { name, dataUrl } = payload;
+  if (!name || typeof name !== 'string') return { ok: false };
+  if (!dataUrl || typeof dataUrl !== 'string') return { ok: false };
+  const m = dataUrl.match(/^data:image\/jpeg;base64,(.+)$/);
+  if (!m) return { ok: false, error: 'Invalid data URL' };
+  ensureThumbDir();
+  try {
+    const buf = Buffer.from(m[1], 'base64');
+    if (buf.length > 500_000) return { ok: false, error: 'Too large' };
+    fs.writeFileSync(thumbFile(name), buf);
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('preset-thumb-clear', async () => {
+  try {
+    const dir = THUMB_DIR();
+    if (!fs.existsSync(dir)) return { ok: true };
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith('.jpg')) {
+        try { fs.unlinkSync(path.join(dir, f)); } catch(e) {}
+      }
+    }
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('pick-image-folder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
@@ -1090,13 +1150,14 @@ function setupSession() {
       }
     }
     // Content Security Policy — restrict to known safe origins
+    // 'wasm-unsafe-eval' is required for butterchurn@3.0+ which compiles preset equations to WASM
     headers['Content-Security-Policy'] = [
       "default-src 'self';" +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net;" +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net;" +
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;" +
       "font-src 'self' data: https://fonts.gstatic.com;" +
       "img-src 'self' blob: data: http://localhost:* https://i.scdn.co https://*.spotifycdn.com https://*.scdn.co;" +
-      "connect-src 'self' https://api.spotify.com https://lrclib.net https://*.supabase.co;" +
+      "connect-src 'self' https://api.spotify.com https://lrclib.net https://*.supabase.co https://cdn.jsdelivr.net;" +
       "media-src 'self' blob:;"
     ];
     callback({ responseHeaders: headers });

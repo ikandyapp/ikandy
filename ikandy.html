@@ -592,15 +592,17 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 }
 #plp-search:focus { border-color: var(--sp); }
 #plp-search::placeholder { color: var(--dim); }
-#plp-grid {
+#plp-grid-wrap {
   flex: 1; overflow-y: auto; padding: 14px clamp(10px, 3vw, 20px) 28px;
+  box-sizing: border-box;
+}
+#plp-grid-wrap::-webkit-scrollbar { width: 4px; }
+#plp-grid-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
+#plp-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
   gap: 10px; align-content: start;
-  box-sizing: border-box;
 }
-#plp-grid::-webkit-scrollbar { width: 4px; }
-#plp-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
 .plcard {
   border: 1px solid var(--bdr); border-radius: 8px;
   background: var(--surface); cursor: pointer;
@@ -1124,7 +1126,9 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <div id="plp-toolbar">
     <input type="text" id="plp-search" placeholder="Search playlists…" oninput="plpFilter(this.value)">
   </div>
-  <div id="plp-grid"></div>
+  <div id="plp-grid-wrap">
+    <div id="plp-grid"></div>
+  </div>
   <div id="plp-empty">No playlists found</div>
 </div>
 
@@ -1133,6 +1137,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <div id="pp-header">
     <h2>PRESETS</h2>
     <span id="pp-count"></span>
+    <span id="pp-thumb-progress" style="font-size:11px;color:var(--dim);margin-left:8px;display:none;"></span>
     <button id="pp-close" onclick="closePresetPanel()">✕</button>
   </div>
   <div id="pp-toolbar">
@@ -1458,8 +1463,19 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 
 
 <!-- Butterchurn CDN -->
-<script src="https://cdn.jsdelivr.net/npm/butterchurn@2.6.7/lib/butterchurn.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js" defer></script>
+<script type="module">
+  // butterchurn@3.0.0-beta.5 is ESM-only — load via import and expose to window
+  // so the rest of the (non-module) app code can access it as window.butterchurn.
+  // Match jberg's official demo path: dist/butterchurn.js (not .min.js, which appears not to exist or to be ESM-incompatible).
+  try {
+    const mod = await import('https://cdn.jsdelivr.net/npm/butterchurn@3.0.0-beta.5/dist/butterchurn.js');
+    window.butterchurn = mod.default || mod;
+    console.log('[iKandy] butterchurn 3.0.0-beta.5 loaded via ESM import');
+  } catch (e) {
+    console.error('[iKandy] Failed to load butterchurn engine:', e);
+  }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/base.min.js" defer></script>
 
 <script>
 'use strict';
@@ -1524,7 +1540,26 @@ function renderLoop(ts) {
     _skipCount = 0;
   }
   _lastRafTs = ts;
-  if (visualizer) visualizer.render();
+  if (visualizer) {
+    try {
+      visualizer.render();
+    } catch (e) {
+      // WASM runtime errors from butterchurn 3.0 (e.g. "float unrepresentable in integer range")
+      // happen when a preset's equation produces NaN/Infinity. Mark this preset broken and skip.
+      const badIdx = currentIdx;
+      if (badIdx != null && !window._brokenPresets.has(badIdx)) {
+        window._brokenPresets.add(badIdx);
+        console.warn(`[iKandy] Render-time crash on preset "${allNames[badIdx]}" — marking broken (${window._brokenPresets.size} total)`);
+        // Jump to the next non-broken preset on the next tick
+        setTimeout(() => {
+          for (let i = 1; i < allPresets.length; i++) {
+            const next = (badIdx + i) % allPresets.length;
+            if (!window._brokenPresets.has(next)) { loadPreset(next, 0); break; }
+          }
+        }, 0);
+      }
+    }
+  }
   // Feed audio to fx + drive grain/vignette
   if (analyserNode) {
     const d = new Uint8Array(analyserNode.frequencyBinCount);
@@ -2582,6 +2617,99 @@ function getLabel(name) {
   return label || name;
 }
 
+/* ── EXTRA PRESET PACK LOADER ── */
+// Handles all known pack shapes:
+//   Old (@2.4.7 base):   window.butterchurnPresets is { default: { getPresets: fn } } OR has getPresets directly OR IS the preset map
+//   New (@3.0.0-beta):   window.<packname> is { default: presetMap } where presetMap is the dict directly
+async function loadAllPresetPacks() {
+  // Mirror the EXACT logic the existing loadPresets() uses, then add new-pack shape detection.
+  function extractPresets(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    // First try the same unwrapping the old code uses
+    const packs = obj.default || obj;
+    if (packs && typeof packs.getPresets === 'function') {
+      try {
+        const m = packs.getPresets();
+        if (m && typeof m === 'object' && Object.keys(m).length > 0) return m;
+      } catch(e) {}
+    }
+    // Otherwise, packs might BE the preset map directly (old format) or wrapped under .default (new format)
+    for (const candidate of [packs, obj.default, obj]) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const keys = Object.keys(candidate);
+      if (keys.length < 5) continue;
+      const sample = candidate[keys[0]];
+      if (sample && typeof sample === 'object' &&
+          (sample.baseVals || sample.shapes || sample.waves || sample.version !== undefined)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  const merged = {};
+  // 3.0.0-beta base pack sets window.base. Older 2.4.7 pack sets window.butterchurnPresets.
+  // Try both — extractPresets returns null cleanly if neither has data.
+  const basePresets = extractPresets(window.base) || extractPresets(window.butterchurnPresets);
+  if (basePresets) Object.assign(merged, basePresets);
+  const baseCount = Object.keys(merged).length;
+  console.log(`[iKandy] Base pack: ${baseCount} presets`);
+
+  // Extra packs from butterchurn-presets@3.0.0-beta.4 — compatible with butterchurn@3.0.0-beta.5 engine.
+  const extraPacks = [
+    { url: 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/extra.min.js',      global: 'extra' },
+    { url: 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/md1.min.js',        global: 'md1' },
+    { url: 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/nonMinimal.min.js', global: 'nonMinimal' },
+  ];
+
+  for (const pack of extraPacks) {
+    try {
+      await new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = pack.url;
+        let done = false;
+        const finish = () => { if (!done) { done = true; resolve(); } };
+        s.onload  = finish;
+        s.onerror = () => { console.warn(`[iKandy] pack 404/error: ${pack.url}`); finish(); };
+        setTimeout(finish, 15000);
+        document.head.appendChild(s);
+      });
+      const beforeKeys = new Set(Object.keys(merged));
+      const newPresets = extractPresets(window[pack.global]);
+      if (newPresets) {
+        Object.assign(merged, newPresets);
+        const added = Object.keys(merged).filter(k => !beforeKeys.has(k)).length;
+        console.log(`[iKandy] ${pack.url.split('/').pop()}: +${added} new presets (window.${pack.global})`);
+      } else {
+        console.warn(`[iKandy] ${pack.url.split('/').pop()}: loaded but no presets found`);
+      }
+    } catch (e) {
+      console.warn(`[iKandy] Failed to load ${pack.url}:`, e);
+    }
+  }
+
+  // Replace the global with the merged map so all existing code works unchanged.
+  const finalCount = Object.keys(merged).length;
+  window.butterchurnPresets = {
+    getPresets: () => merged,
+    default: { getPresets: () => merged },
+  };
+  console.log(`[iKandy] Total preset library: ${finalCount} presets (added ${finalCount - baseCount})`);
+  setTimeout(() => {
+    if (typeof toast === 'function') {
+      const added = finalCount - baseCount;
+      const broken = (window._brokenPresets && window._brokenPresets.size) || 0;
+      const working = finalCount - broken;
+      if (added > 0) toast(`Loaded ${working} working presets (+${added} from extra packs)`);
+      else toast(`Loaded ${working} presets — extra packs unavailable`);
+    }
+  }, 2500);
+  return finalCount;
+}
+
+// Tracks presets whose EEL/expression code crashes butterchurn 2.6.7 — we skip these
+window._brokenPresets = new Set();
+
 function loadPresets() {
   const packs = butterchurnPresets.default || butterchurnPresets;
   const rawMap = typeof packs.getPresets === 'function' ? packs.getPresets() : packs;
@@ -2593,19 +2721,45 @@ function loadPresets() {
   allPresets = allNames.map(n => rawMap[n]);
   el('pp-count').textContent = allNames.length + ' presets';
   el('pc-count').textContent = allNames.length;
-  loadPreset(Math.floor(Math.random() * allPresets.length), 0);
+  // Try random presets until one loads cleanly (skip broken ones)
+  for (let tries = 0; tries < 20; tries++) {
+    const idx = Math.floor(Math.random() * allPresets.length);
+    if (window._brokenPresets.has(idx)) continue;
+    if (loadPreset(idx, 0)) break;
+  }
 }
 
 function loadPreset(idx, blend, manual = false) {
-  if (!allPresets.length || !visualizer) return;
-  currentIdx = ((idx % allPresets.length) + allPresets.length) % allPresets.length;
-  visualizer.loadPreset(allPresets[currentIdx], +(blend ?? getBlend()));
+  if (!allPresets.length || !visualizer) return false;
+  const tryIdx = ((idx % allPresets.length) + allPresets.length) % allPresets.length;
+  // Skip presets we've already seen crash
+  if (window._brokenPresets.has(tryIdx)) {
+    // Try the next non-broken preset
+    for (let i = 1; i < allPresets.length; i++) {
+      const next = (tryIdx + i) % allPresets.length;
+      if (!window._brokenPresets.has(next)) return loadPreset(next, blend, manual);
+    }
+    return false;
+  }
+  // Wrap engine call — some new presets have EEL code butterchurn 2.6.7 can't compile
+  try {
+    visualizer.loadPreset(allPresets[tryIdx], +(blend ?? getBlend()));
+  } catch (e) {
+    window._brokenPresets.add(tryIdx);
+    console.warn(`[iKandy] Broken preset (skipping): ${allNames[tryIdx]}`,
+      `— ${window._brokenPresets.size} broken so far`);
+    // Recurse to the next preset
+    if (window._brokenPresets.size < allPresets.length) {
+      return loadPreset(tryIdx + 1, blend, manual);
+    }
+    return false;
+  }
+  currentIdx = tryIdx;
   const name = getLabel(allNames[currentIdx]);
   const pname = el('pname-sb');
   if (pname) pname.textContent = name;
   const pnameNav = el('pname');
   if (pnameNav) pnameNav.textContent = name;
-  const prev = el('ppcard-' + (currentIdx === 0 ? allPresets.length - 1 : currentIdx - 1));
   document.querySelectorAll('.pcard.active').forEach(e => e.classList.remove('active'));
   const cur = el('ppcard-' + currentIdx);
   if (cur) cur.classList.add('active');
@@ -2619,6 +2773,7 @@ function loadPreset(idx, blend, manual = false) {
       if (pb) pb.classList.add('on');
     }, 0);
   }
+  return true;
 }
 
 function getBlend() { return +(el('blend-s')?.value || 2.5); }
@@ -2629,6 +2784,9 @@ async function pickPresetFolder() {
   if (!result?.ok) return;
   applyCustomPresets(result);
   toast(`✓ Loaded ${result.count} presets from folder`);
+  // Reset disk-load flag so we re-check disk for the new preset name set
+  _thumbDiskLoaded = false;
+  prewarmThumbs();
 }
 
 async function clearPresetFolder() {
@@ -2637,6 +2795,8 @@ async function clearPresetFolder() {
   loadPresets();
   el('preset-folder-row').style.display = 'none';
   el('preset-folder-btn').style.display = '';
+  _thumbDiskLoaded = false;
+  prewarmThumbs();
   toast('Custom presets removed — built-ins restored');
 }
 
@@ -2767,10 +2927,12 @@ function buildGrid() {
   setTimeout(queueVisibleThumbs, 50);
 }
 
-/* ── PRESET INLINE THUMBNAILS ── */
+/* ── PRESET INLINE THUMBNAILS (persistent) ── */
 const _previewCache = {};
 let _previewViz = null, _thumbQueue = [], _thumbRunning = false;
 let _previewEl = null, _previewRaf = null, _previewTimer = null; // kept for compat
+let _thumbDiskLoaded = false;
+let _thumbTotal = 0, _thumbDone = 0;
 
 const _thumbCanvas = document.createElement('canvas');
 _thumbCanvas.width  = 240;
@@ -2780,9 +2942,21 @@ async function initPreviewViz() {
   if (_previewViz) return;
   await waitForButterchurn();
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  _previewViz = butterchurn.default.createVisualizer(ctx, _thumbCanvas,
+  const bc = butterchurn.default || butterchurn;
+  _previewViz = bc.createVisualizer(ctx, _thumbCanvas,
     { width: 240, height: 150, pixelRatio: 1 });
-  await _previewViz.loadPresets(window.butterchurnPresets.getPresets(), 0);
+}
+
+function _updateThumbProgress() {
+  const el2 = document.getElementById('pp-thumb-progress');
+  if (!el2) return;
+  if (_thumbDone >= _thumbTotal || _thumbTotal === 0) {
+    el2.style.display = 'none';
+    el2.textContent = '';
+  } else {
+    el2.style.display = '';
+    el2.textContent = `building previews ${_thumbDone}/${_thumbTotal}`;
+  }
 }
 
 async function runThumbQueue() {
@@ -2792,20 +2966,32 @@ async function runThumbQueue() {
   const presets = window.butterchurnPresets.getPresets();
   while (_thumbQueue.length) {
     const { name, idx } = _thumbQueue.shift();
-    if (_previewCache[name]) { applyThumb(name, idx); continue; }
-    _previewViz.loadPreset(presets[name], 0);
-    // Render ~2s worth of frames (60 frames @ ~30ms each)
-    await new Promise(resolve => {
-      let f = 0;
-      function frame() {
-        _previewViz.render();
-        if (++f < 60) requestAnimationFrame(frame);
-        else resolve();
+    if (_previewCache[name]) { applyThumb(name, idx); _thumbDone++; _updateThumbProgress(); continue; }
+    if (!presets[name]) { _thumbDone++; _updateThumbProgress(); continue; }
+    try {
+      _previewViz.loadPreset(presets[name], 0);
+      // Render ~2s worth of frames (60 frames @ ~30ms each)
+      await new Promise(resolve => {
+        let f = 0;
+        function frame() {
+          try { _previewViz.render(); } catch(e) {}
+          if (++f < 60) requestAnimationFrame(frame);
+          else resolve();
+        }
+        requestAnimationFrame(frame);
+      });
+      const dataUrl = _thumbCanvas.toDataURL('image/jpeg', 0.75);
+      _previewCache[name] = dataUrl;
+      applyThumb(name, idx);
+      // Persist to disk (fire-and-forget — don't block the queue)
+      if (window.IKANDY && window.IKANDY.saveThumb) {
+        window.IKANDY.saveThumb(name, dataUrl).catch(() => {});
       }
-      requestAnimationFrame(frame);
-    });
-    _previewCache[name] = _thumbCanvas.toDataURL('image/jpeg', 0.75);
-    applyThumb(name, idx);
+    } catch(e) {
+      // Skip broken presets, keep going
+    }
+    _thumbDone++;
+    _updateThumbProgress();
     // Yield between presets so UI stays responsive
     await new Promise(r => setTimeout(r, 16));
   }
@@ -2813,11 +2999,24 @@ async function runThumbQueue() {
 }
 
 function applyThumb(name, idx) {
+  // idx may be undefined when called from prewarm (no card yet) — that's fine
+  if (idx === undefined || idx === null) return;
   const img     = document.getElementById('pthumb-' + idx);
   const pending = document.getElementById('ppending-' + idx);
   if (!img) return;
   img.src = _previewCache[name];
   img.onload = () => { img.classList.add('loaded'); if (pending) pending.style.display = 'none'; };
+}
+
+// Apply any cached thumbs to currently-rendered cards (used after disk load)
+function _applyAllCachedToGrid() {
+  const grid = document.getElementById('pp-grid');
+  if (!grid) return;
+  grid.querySelectorAll('.pcard').forEach(card => {
+    const idx  = parseInt(card.id.replace('ppcard-', ''));
+    const name = card.dataset.presetName;
+    if (name && _previewCache[name]) applyThumb(name, idx);
+  });
 }
 
 function queueVisibleThumbs() {
@@ -2827,13 +3026,63 @@ function queueVisibleThumbs() {
   cards.forEach(card => {
     const idx  = parseInt(card.id.replace('ppcard-', ''));
     const name = card.dataset.presetName;
-    if (!name || _previewCache[name]) return;
+    if (!name) return;
+    if (_previewCache[name]) { applyThumb(name, idx); return; }
     // Queue if not already queued
     if (!_thumbQueue.find(q => q.name === name)) {
       _thumbQueue.push({ name, idx });
+      _thumbTotal++;
     }
   });
+  _updateThumbProgress();
   runThumbQueue();
+}
+
+// Pre-warm: load disk cache, then queue every missing preset for background generation.
+// Runs once at boot (and again whenever the preset list changes, e.g. custom folder).
+async function prewarmThumbs() {
+  if (!Array.isArray(allNames) || !allNames.length) return;
+  if (!window.IKANDY || !window.IKANDY.loadAllThumbs) return;
+
+  // 1. Load whatever's already on disk into the in-memory cache
+  if (!_thumbDiskLoaded) {
+    try {
+      const cached = await window.IKANDY.loadAllThumbs(allNames);
+      if (cached && typeof cached === 'object') {
+        for (const k of Object.keys(cached)) _previewCache[k] = cached[k];
+      }
+    } catch(e) {}
+    _thumbDiskLoaded = true;
+    // If panel is already open with cards built, populate them
+    _applyAllCachedToGrid();
+  }
+
+  // 2. Queue any presets that don't have thumbs yet — for the WHOLE library, not just visible
+  for (const name of allNames) {
+    if (_previewCache[name]) continue;
+    if (_thumbQueue.find(q => q.name === name)) continue;
+    _thumbQueue.push({ name, idx: null }); // idx null = no card to update yet (panel may be closed)
+    _thumbTotal++;
+  }
+  _updateThumbProgress();
+  // Kick off background generation. Won't block boot.
+  runThumbQueue();
+}
+
+async function rebuildAllThumbs() {
+  if (!window.IKANDY || !window.IKANDY.clearThumbs) return;
+  await window.IKANDY.clearThumbs();
+  for (const k of Object.keys(_previewCache)) delete _previewCache[k];
+  _thumbDiskLoaded = false;
+  _thumbTotal = 0; _thumbDone = 0;
+  // Clear any rendered thumb images
+  document.querySelectorAll('.pcard-thumb.loaded').forEach(img => {
+    img.classList.remove('loaded');
+    img.src = '';
+  });
+  document.querySelectorAll('.pcard-pending').forEach(p => p.style.display = '');
+  toast('Rebuilding preview thumbnails…');
+  await prewarmThumbs();
 }
 
 // Kept stubs for compat with card hover events (now no-ops)
@@ -2845,11 +3094,11 @@ const _liveLabel  = document.getElementById('pp-live-label');
 async function initLiveViz() {
   if (_liveViz) return;
   await waitForButterchurn();
-  _liveViz = butterchurn.default.createVisualizer(
+  const bc = butterchurn.default || butterchurn;
+  _liveViz = bc.createVisualizer(
     new (window.AudioContext || window.webkitAudioContext)(),
     _liveCanvas, { width: 200, height: 125, pixelRatio: 1 }
   );
-  await _liveViz.loadPresets(window.butterchurnPresets.getPresets(), 0);
 }
 
 function positionLive(cardEl) {
@@ -2872,11 +3121,11 @@ const FW = 480, FH = 300; // flyout dimensions
 async function initFlyoutViz() {
   if (_flyoutViz) return;
   await waitForButterchurn();
-  _flyoutViz = butterchurn.default.createVisualizer(
+  const bc = butterchurn.default || butterchurn;
+  _flyoutViz = bc.createVisualizer(
     new (window.AudioContext || window.webkitAudioContext)(),
     _flyoutCanvas, { width: FW, height: FH, pixelRatio: 1 }
   );
-  await _flyoutViz.loadPresets(window.butterchurnPresets.getPresets(), 0);
 }
 
 async function showPreview(name, idx, cardEl) {
@@ -2905,7 +3154,8 @@ async function showPreview(name, idx, cardEl) {
       const startTime = Date.now();
       function loop() {
         if (Date.now() - startTime > 5000) { _flyoutRaf = null; return; }
-        _flyoutViz.render(); _flyoutRaf = requestAnimationFrame(loop);
+        try { _flyoutViz.render(); } catch(e) { _flyoutRaf = null; return; }
+        _flyoutRaf = requestAnimationFrame(loop);
       }
       loop();
     }, 250);
@@ -2934,7 +3184,8 @@ async function showPreview(name, idx, cardEl) {
     const startTime = Date.now();
     function loop() {
       if (Date.now() - startTime > 5000) { _liveRaf = null; return; }
-      _liveViz.render(); _liveRaf = requestAnimationFrame(loop);
+      try { _liveViz.render(); } catch(e) { _liveRaf = null; return; }
+      _liveRaf = requestAnimationFrame(loop);
     }
     loop();
   }, 300);
@@ -3142,7 +3393,10 @@ document.addEventListener('keydown', e => {
 /* ── BOOT ── */
 async function waitForButterchurn() {
   for (let i = 0; i < 200; i++) {
-    if (typeof butterchurn !== 'undefined' && typeof butterchurnPresets !== 'undefined') return;
+    // 3.0.0-beta.4 base pack sets window.base (not window.butterchurnPresets)
+    // Check both for compatibility / safety
+    const presetsReady = typeof window.base !== 'undefined' || typeof window.butterchurnPresets !== 'undefined';
+    if (typeof butterchurn !== 'undefined' && presetsReady) return;
     await sleep(80);
   }
   throw new Error('Butterchurn CDN timed out');
@@ -6570,14 +6824,20 @@ async function bootApp() {
   initAudio();
   lp(65);
   initButterchurn();
-  lp(80);
+  lp(78);
+  await loadAllPresetPacks();
+  lp(82);
   loadPresets(); lp(85);
 
   // Restore saved custom preset folder if any
   if (window.IKANDY.getPresetFolder) {
     window.IKANDY.getPresetFolder().then(result => {
       if (result?.ok && result.count) applyCustomPresets(result);
-    }).catch(() => {});
+      // Prewarm thumbnails AFTER custom folder check so we use the right preset list
+      prewarmThumbs();
+    }).catch(() => { prewarmThumbs(); });
+  } else {
+    prewarmThumbs();
   }
 
   // Restore saved visual settings

@@ -22,6 +22,11 @@ contextBridge.exposeInMainWorld('IKANDY', {
   getPresetFolder:  () => ipcRenderer.invoke('get-preset-folder'),
   clearPresetFolder:() => ipcRenderer.invoke('clear-preset-folder'),
 
+  // Preset thumbnail persistent cache
+  loadAllThumbs: (names)         => ipcRenderer.invoke('preset-thumb-load-all', names),
+  saveThumb:     (name, dataUrl) => ipcRenderer.invoke('preset-thumb-save', { name, dataUrl }),
+  clearThumbs:   ()              => ipcRenderer.invoke('preset-thumb-clear'),
+
   // Playlists
   getPlaylists: ()     => ipcRenderer.invoke('get-playlists'),
   playPlaylist: (uri)  => ipcRenderer.invoke('play-playlist', uri),
