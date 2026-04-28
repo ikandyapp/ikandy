@@ -39,11 +39,15 @@ let tokens       = {};        // { access_token, refresh_token, expires_at }
 let lastTrackId     = null;
 let lastKnownPlaying = false;   // cached play state for playpause without extra GET
 let isRateLimited   = false;
+let lastKnownProduct = null;  // 'premium' | 'free' | null — cached from /me, source of truth for UI
 
 // ── Source mode ───────────────────────────────────────────────────────────────
 let sourceMode   = 'spotify';
 let vlcPort      = 8080;
 let vlcPassword  = '';
+let foobarPort   = 8880;  // Beefweb default
+let foobarPassword = '';
+let foobarVolBounds = { min: -100, max: 0, type: 'db' }; // cached from last poll
 const SOURCE_FILE = () => path.join(app.getPath('userData'), 'IKANDY-source.json');
 function loadSource() {
   try {
@@ -51,10 +55,17 @@ function loadSource() {
     sourceMode  = s.mode        || 'spotify';
     vlcPort     = s.vlcPort     || 8080;
     vlcPassword = s.vlcPassword || '';
+    foobarPort     = s.foobarPort     || 8880;
+    foobarPassword = s.foobarPassword || '';
   } catch(e) {}
 }
 function saveSource() {
-  try { fs.writeFileSync(SOURCE_FILE(), JSON.stringify({ mode: sourceMode, vlcPort, vlcPassword })); } catch(e) {}
+  try { fs.writeFileSync(SOURCE_FILE(), JSON.stringify({ mode: sourceMode, vlcPort, vlcPassword, foobarPort, foobarPassword })); } catch(e) {}
+}
+function foobarAuthHeaders() {
+  if (!foobarPassword) return {};
+  const auth = Buffer.from(`:${foobarPassword}`).toString('base64');
+  return { Authorization: 'Basic ' + auth };
 }
 function loadTokens() {
   try {
@@ -124,6 +135,32 @@ function httpGet(url, headers = {}) {
     });
     req.on('error', reject);
     req.setTimeout(3000, () => { req.destroy(); reject(new Error('timeout')); });
+  });
+}
+
+function httpRequest(method, url, body, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const parsed  = new URL(url);
+    const bodyStr = typeof body === 'string' ? body : (body ? JSON.stringify(body) : '');
+    const options = {
+      hostname: parsed.hostname,
+      port:     parsed.port || 80,
+      path:     parsed.pathname + parsed.search,
+      method,
+      headers: {
+        ...(bodyStr ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) } : {}),
+        ...headers,
+      },
+    };
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on('error', reject);
+    req.setTimeout(3000, () => { req.destroy(); reject(new Error('timeout')); });
+    if (bodyStr) req.write(bodyStr);
+    req.end();
   });
 }
 
@@ -419,6 +456,7 @@ function startAuthServer(pkceVerifier) {
           { Authorization: 'Bearer ' + data.access_token });
         if (me.status === 200) product = JSON.parse(me.body).product || 'free';
       } catch(e) {}
+      lastKnownProduct = product;
       console.log('[IKANDY] Spotify product:', product);
       mainWindow?.webContents.send('auth-result', { success: true, product });
 
@@ -469,6 +507,12 @@ function startPolling() {
     pollVLC();
     pollTimer = setInterval(pollVLC, POLL_INTERVAL);
     console.log('[IKANDY] VLC polling started');
+    return;
+  }
+  if (sourceMode === 'foobar') {
+    pollFoobar();
+    pollTimer = setInterval(pollFoobar, POLL_INTERVAL);
+    console.log('[IKANDY] Foobar polling started');
     return;
   }
 
@@ -559,7 +603,8 @@ ipcMain.handle('logout', () => {
 });
 
 ipcMain.handle('is-authed', () => ({
-  authed: !!(tokens.access_token && tokens.expires_at > Date.now() + 60000)
+  authed: !!(tokens.access_token && tokens.expires_at > Date.now() + 60000),
+  product: lastKnownProduct,
 }));
 
 ipcMain.handle('get-client-id', () => ({ id: getClientId() }));
@@ -581,9 +626,9 @@ ipcMain.handle('clear-client-id', () => {
   return { ok: true };
 });
 
-ipcMain.handle('get-source',  () => ({ mode: sourceMode, vlcPort, vlcPassword }));
+ipcMain.handle('get-source',  () => ({ mode: sourceMode, vlcPort, vlcPassword, foobarPort, foobarPassword }));
 ipcMain.handle('set-source',  async (_e, mode) => {
-  if (!['spotify','vlc','local'].includes(mode)) return { ok: false, error: 'Invalid mode' };
+  if (!['spotify','vlc','local','foobar'].includes(mode)) return { ok: false, error: 'Invalid mode' };
   const prev = sourceMode;
   sourceMode = mode;
   saveSource();
@@ -607,6 +652,8 @@ ipcMain.handle('set-source',  async (_e, mode) => {
               { Authorization: 'Basic ' + auth });
           }
         }
+      } else if (prev === 'foobar') {
+        await httpRequest('POST', `http://localhost:${foobarPort}/api/player/pause`, '', foobarAuthHeaders());
       }
     } catch(e) { /* best effort */ }
     mainWindow?.webContents.send('spotify-state', { type: 'local' });
@@ -614,7 +661,32 @@ ipcMain.handle('set-source',  async (_e, mode) => {
   }
   try {
     const auth = Buffer.from(`:${vlcPassword}`).toString('base64');
-    if (prev === 'spotify' && mode === 'vlc') {
+    // Switching TO foobar — pause whatever was playing
+    if (mode === 'foobar') {
+      if (prev === 'spotify' && tokens.access_token) {
+        await httpsRequest('PUT', 'https://api.spotify.com/v1/me/player/pause', '',
+          { Authorization: 'Bearer ' + tokens.access_token });
+      } else if (prev === 'vlc') {
+        try {
+          const statusRes = await httpGet(`http://localhost:${vlcPort}/requests/status.json`,
+            { Authorization: 'Basic ' + auth });
+          if (statusRes.status === 200) {
+            const vlcData = JSON.parse(statusRes.body);
+            if (vlcData.state === 'playing') {
+              await httpGet(`http://localhost:${vlcPort}/requests/status.json?command=pl_pause`,
+                { Authorization: 'Basic ' + auth });
+            }
+          }
+        } catch(e) {}
+      }
+      mainWindow?.webContents.send('spotify-state', { type: 'track', playing: false });
+    }
+    // Switching FROM foobar — pause foobar
+    else if (prev === 'foobar') {
+      try { await httpRequest('POST', `http://localhost:${foobarPort}/api/player/pause`, '', foobarAuthHeaders()); } catch(e) {}
+      mainWindow?.webContents.send('spotify-state', { type: 'track', playing: false });
+    }
+    else if (prev === 'spotify' && mode === 'vlc') {
       // Pause Spotify
       if (tokens.access_token) {
         await httpsRequest('PUT', 'https://api.spotify.com/v1/me/player/pause', '',
@@ -688,6 +760,114 @@ ipcMain.handle('vlc-action', async (_e, action) => {
     await httpGet(`http://localhost:${vlcPort}/requests/status.json?command=${cmd}`,
       { Authorization: 'Basic ' + auth });
     setTimeout(pollVLC, 800);
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+// ── Foobar2000 (Beefweb) IPC ──────────────────────────────────────────────────
+// Volume mapping: fb2k uses dB by default (logarithmic). Linear UI % → dB:
+//   dB = 20 * log10(pct/100). 50% → ~-6dB (perceptually half), 10% → -20dB.
+// For 'linear' volume type, scale directly across [min, max].
+function pctToFoobarVol(pct) {
+  const { min, max, type } = foobarVolBounds;
+  const p = Math.max(0, Math.min(100, pct));
+  if (type === 'linear') return min + (p / 100) * (max - min);
+  if (p <= 0) return min;
+  const db = 20 * Math.log10(p / 100);
+  return Math.max(min, Math.min(max, db));
+}
+function foobarVolToPct(v) {
+  const { min, max, type } = foobarVolBounds;
+  if (type === 'linear') {
+    if (max <= min) return null;
+    return Math.round(Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100)));
+  }
+  // dB → linear → %
+  const linear = Math.pow(10, v / 20);
+  return Math.round(Math.max(0, Math.min(100, linear * 100)));
+}
+
+ipcMain.handle('set-foobar-config', (_e, { port, password }) => {
+  const p = parseInt(port);
+  foobarPort = (p >= 1 && p <= 65535) ? p : 8880;
+  foobarPassword = typeof password === 'string' ? password.slice(0, 256) : '';
+  saveSource();
+  return { ok: true };
+});
+ipcMain.handle('foobar-test', async () => {
+  try {
+    const res = await httpGet(`http://localhost:${foobarPort}/api/player`, foobarAuthHeaders());
+    if (res.status === 200) return { ok: true };
+    if (res.status === 401) return { ok: false, error: 'Wrong password' };
+    return { ok: false, error: `HTTP ${res.status}` };
+  } catch(e) { return { ok: false, error: 'foobar2000 not reachable — is it running with Beefweb installed?' }; }
+});
+ipcMain.handle('foobar-action', async (_e, action) => {
+  const allowed = ['play','pause','playpause','next','prev','volume','seek','stop','restart'];
+  if (!action?.type || !allowed.includes(action.type)) return { ok: false, error: 'Invalid action' };
+  try {
+    const base = `http://localhost:${foobarPort}/api`;
+    const hdrs = foobarAuthHeaders();
+    if (action.type === 'seek') {
+      const sec = Math.max(0, Math.round(action.position));
+      await httpRequest('POST', `${base}/player`, { position: sec }, hdrs);
+      setTimeout(pollFoobar, 600);
+      return { ok: true };
+    }
+    if (action.type === 'restart') {
+      await httpRequest('POST', `${base}/player`, { position: 0 }, hdrs);
+      setTimeout(pollFoobar, 600);
+      return { ok: true };
+    }
+    if (action.type === 'volume') {
+      await httpRequest('POST', `${base}/player`, { volume: pctToFoobarVol(action.value) }, hdrs);
+      return { ok: true };
+    }
+    if (action.type === 'stop') {
+      // Beefweb's /player/stop clears the active item — play afterward fails.
+      // Mirror Spotify pattern: seek to 0 then pause, so play resumes cleanly.
+      await httpRequest('POST', `${base}/player`, { position: 0 }, hdrs);
+      await httpRequest('POST', `${base}/player/pause`, '', hdrs);
+      setTimeout(pollFoobar, 600);
+      return { ok: true };
+    }
+    const paths = {
+      play:      '/player/play',
+      pause:     '/player/pause',
+      playpause: '/player/pause/toggle',
+      next:      '/player/next',
+      prev:      '/player/previous',
+    };
+    const p = paths[action.type];
+    if (!p) return { ok: false };
+    await httpRequest('POST', `${base}${p}`, '', hdrs);
+    setTimeout(pollFoobar, 600);
+    return { ok: true };
+  } catch(e) { return { ok: false, error: e.message }; }
+});
+
+ipcMain.handle('get-foobar-playlists', async () => {
+  try {
+    const res = await httpGet(`http://localhost:${foobarPort}/api/playlists`, foobarAuthHeaders());
+    if (res.status !== 200) return { ok: false, error: `HTTP ${res.status}` };
+    const data = JSON.parse(res.body);
+    const playlists = (data.playlists || []).map(p => ({
+      id:    p.id,
+      name:  p.title || p.name || '(untitled)',
+      uri:   `fb2k:${p.id}`,    // synthetic uri for renderer state tracking
+      image: null,              // fb2k has no playlist art
+      total: p.itemCount || 0,
+    }));
+    return { ok: true, playlists };
+  } catch(e) { return { ok: false, error: 'foobar2000 not reachable' }; }
+});
+
+ipcMain.handle('play-foobar-playlist', async (_e, id) => {
+  if (!id || typeof id !== 'string') return { ok: false, error: 'Invalid playlist id' };
+  try {
+    // POST /api/player/play/{playlistId}/{itemIndex} activates and plays
+    await httpRequest('POST', `http://localhost:${foobarPort}/api/player/play/${encodeURIComponent(id)}/0`, '', foobarAuthHeaders());
+    setTimeout(pollFoobar, 600);
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
 });
@@ -869,13 +1049,29 @@ function setupDesktopCapturer() {
     // Must provide a video source — Electron requires it even for audio-only capture.
     // We get the first screen source (silently, no picker) just to satisfy the requirement,
     // then stop the video track in the renderer. Audio loopback is what we actually use.
-    desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-      if (sources.length > 0) {
-        callback({ video: sources[0], audio: 'loopback' });
-      } else {
-        callback({});
-      }
-    }).catch(() => callback({}));
+    desktopCapturer.getSources({ types: ['screen'] })
+      .then(sources => {
+        if (sources.length > 0) {
+          console.log('[IKANDY] desktopCapturer: using source', sources[0].name, '— audio: loopback');
+          callback({ video: sources[0], audio: 'loopback' });
+        } else {
+          // No screen sources — try window sources as fallback
+          console.warn('[IKANDY] desktopCapturer: no screen sources, trying windows...');
+          return desktopCapturer.getSources({ types: ['window'] }).then(windows => {
+            if (windows.length > 0) {
+              console.log('[IKANDY] desktopCapturer: fallback to window source', windows[0].name);
+              callback({ video: windows[0], audio: 'loopback' });
+            } else {
+              console.error('[IKANDY] desktopCapturer: no sources found — attempting audio-only loopback');
+              callback({ audio: 'loopback' });
+            }
+          });
+        }
+      })
+      .catch(err => {
+        console.error('[IKANDY] desktopCapturer error:', err.message);
+        callback({ audio: 'loopback' }); // still attempt loopback even if source enum failed
+      });
   });
   console.log('[IKANDY] desktopCapturer / getDisplayMedia enabled');
 }
@@ -899,7 +1095,7 @@ function setupSession() {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net;" +
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;" +
       "font-src 'self' data: https://fonts.gstatic.com;" +
-      "img-src 'self' blob: data: https://i.scdn.co https://*.spotifycdn.com https://*.scdn.co;" +
+      "img-src 'self' blob: data: http://localhost:* https://i.scdn.co https://*.spotifycdn.com https://*.scdn.co;" +
       "connect-src 'self' https://api.spotify.com https://lrclib.net https://*.supabase.co;" +
       "media-src 'self' blob:;"
     ];
@@ -1040,6 +1236,63 @@ async function pollVLC() {
   }
 }
 
+// ── Foobar2000 (Beefweb) polling ──────────────────────────────────────────────
+async function pollFoobar() {
+  try {
+    const cols = encodeURIComponent('%title%,%artist%,%album%,%length_seconds%');
+    const res  = await httpGet(`http://localhost:${foobarPort}/api/player?trcolumns=${cols}`, foobarAuthHeaders());
+    if (res.status === 401) {
+      mainWindow?.webContents.send('spotify-state', { type: 'error', message: 'foobar: wrong password' });
+      return;
+    }
+    if (res.status !== 200) {
+      mainWindow?.webContents.send('spotify-state', { type: 'error', message: `foobar: HTTP ${res.status}` });
+      return;
+    }
+    const data = JSON.parse(res.body);
+    const p    = data.player || {};
+    const item = p.activeItem || {};
+    const c    = item.columns || [];
+    const title    = c[0] || 'Unknown';
+    const artist   = c[1] || '';
+    const album    = c[2] || '';
+    const lengthS  = Number(c[3]) || item.duration || 0;
+    const duration = Math.round(lengthS * 1000);
+    const progress = Math.round((item.position || 0) * 1000);
+    const playing  = p.playbackState === 'playing';
+    const trackId  = `${title}::${artist}`;
+
+    // Cache volume bounds for the slider mapping
+    if (p.volume && typeof p.volume.min === 'number' && typeof p.volume.max === 'number') {
+      foobarVolBounds = { min: p.volume.min, max: p.volume.max, type: p.volume.type || 'db' };
+    }
+    const volume = (p.volume && typeof p.volume.value === 'number')
+      ? foobarVolToPct(p.volume.value)
+      : null;
+
+    // Beefweb artwork endpoint — only valid when something is loaded
+    // Embed creds in URL (renderer <img>) when password set, matching VLC's approach
+    const hasItem = item.playlistId && item.index >= 0;
+    const cred = foobarPassword ? `:${encodeURIComponent(foobarPassword)}@` : '';
+    const art = hasItem
+      ? `http://${cred}localhost:${foobarPort}/api/artwork/${encodeURIComponent(item.playlistId)}/${item.index}`
+      : '';
+
+    lastKnownPlaying = playing;
+    mainWindow?.webContents.send('spotify-state', {
+      type: 'track', id: trackId, title, artist, album,
+      art, progress, duration, playing, timestamp: Date.now(), volume,
+    });
+
+    if (trackId !== lastTrackId) {
+      lastTrackId = trackId;
+      if (title !== 'Unknown') fetchLyrics(title, artist);
+    }
+  } catch(e) {
+    mainWindow?.webContents.send('spotify-state', { type: 'error', message: 'foobar: not reachable — is it running?' });
+  }
+}
+
 // ── Telemetry ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://grimznincoiujnurhmlx.supabase.co/rest/v1';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyaW16bmluY29pdWpudXJobWx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxNDQ5NzAsImV4cCI6MjA5MjcyMDk3MH0.X-eXBp4gF3RthSt10As83Ft4z5rOc929IMdis5BSuxk';
@@ -1161,7 +1414,7 @@ app.whenReady().then(() => {
   ipcMain.once('renderer-ready', async () => {
     console.log('[IKANDY] Renderer ready — checking token');
 
-    if (sourceMode === 'vlc' || sourceMode === 'local') {
+    if (sourceMode === 'vlc' || sourceMode === 'local' || sourceMode === 'foobar') {
       sourceMode = 'spotify';
       console.log('[IKANDY] Non-spotify mode saved but starting in Spotify mode');
     }
@@ -1182,6 +1435,7 @@ app.whenReady().then(() => {
           { Authorization: 'Bearer ' + tokens.access_token });
         if (me.status === 200) {
           const product = JSON.parse(me.body).product || 'free';
+          lastKnownProduct = product;
           // Send product update so UI can unlock premium controls if needed
           mainWindow?.webContents.send('auth-result', { success: true, restored: true, product });
         }

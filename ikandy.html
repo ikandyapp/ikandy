@@ -32,7 +32,7 @@
   --sp:  #1DB954;
   --red: #e05050;
   --r: 6px;
-  --pw: 280px;
+  --pw: 340px;
   --sb-bg: rgba(6,6,10,.98);
   --ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --display: 'Bebas Neue', sans-serif;
@@ -63,9 +63,57 @@ html, body {
   z-index: 2; pointer-events: none; opacity: 0; transition: opacity .4s;
   mix-blend-mode: overlay;
 }
+#aurora-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 3; pointer-events: none; opacity: 0; transition: opacity .6s;
+  mix-blend-mode: screen;
+}
+#pawrticles-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 4; pointer-events: none; opacity: 0; transition: opacity .6s;
+  mix-blend-mode: screen;
+}
+#ripple-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 5; pointer-events: none; opacity: 0; transition: opacity .6s;
+  mix-blend-mode: screen;
+}
+#waveray-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 6; pointer-events: none; opacity: 0; transition: opacity .6s;
+  mix-blend-mode: screen;
+}
+#fire-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 7; pointer-events: none; opacity: 0; transition: opacity .6s;
+  mix-blend-mode: screen;
+}
+/* PATCH 11: SINGULARITY — black hole scene */
+#singularity-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 8; pointer-events: none; opacity: 0; transition: opacity .6s;
+  mix-blend-mode: screen;
+}
 #viz { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
 
 /* ─── LOADING ─── */
+/* ─── SEIZURE WARNING ─── */
+#seizure-warning {
+  position: fixed; inset: 0; z-index: 200;
+  background: #060608;
+  display: none; flex-direction: column; align-items: center;
+  justify-content: center; gap: 20px; padding: 40px;
+  text-align: center;
+}
+#seizure-warning .sw-logo { font-family: var(--display); font-size: 48px; letter-spacing: .2em; color: var(--acc); }
+#seizure-warning .sw-title { font-size: 18px; font-weight: 700; color: var(--txt); letter-spacing: .05em; }
+#seizure-warning .sw-body  { font-size: 13px; color: var(--dim); line-height: 1.7; max-width: 480px; }
+#seizure-warning .sw-btns  { display: flex; gap: 12px; margin-top: 8px; }
+#seizure-warning .sw-accept { padding: 12px 32px; background: var(--acc-dim); border: 1px solid var(--acc); border-radius: var(--r); color: var(--acc-txt); font-family: var(--ui); font-size: 13px; font-weight: 700; letter-spacing: .05em; cursor: pointer; transition: opacity .15s; }
+#seizure-warning .sw-accept:hover { opacity: .8; }
+#seizure-warning .sw-decline { padding: 12px 20px; background: transparent; border: 1px solid var(--bdr); border-radius: var(--r); color: var(--dim); font-family: var(--ui); font-size: 12px; cursor: pointer; transition: opacity .15s; }
+#seizure-warning .sw-decline:hover { opacity: .7; }
+
 #loading {
   position: fixed; inset: 0; z-index: 100;
   background: #060608; /* solid fallback — no flicker before var(--bg) resolves */
@@ -77,9 +125,10 @@ html, body {
 #loading.gone { display: none; }
 .ld-logo { font-family: var(--display); font-size: 60px; letter-spacing: .2em; color: var(--acc); opacity: 0; transition: opacity 0.15s; }
 .ld-logo.ready { opacity: 1; }
-.ld-sub  { font-size: 11px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; }
-#ld-bar  { width: 200px; height: 2px; background: rgba(255,255,255,.06); border-radius: 1px; overflow: hidden; }
+.ld-sub  { font-size: 11px; letter-spacing: .2em; color: var(--dim); text-transform: uppercase; opacity: 0; transition: opacity 0.15s; }
+#ld-bar  { width: 200px; height: 2px; background: rgba(255,255,255,.06); border-radius: 1px; overflow: hidden; opacity: 0; transition: opacity 0.15s; }
 #ld-fill { height: 100%; background: var(--acc); width: 0%; transition: width .35s; }
+#loading.ready .ld-sub, #loading.ready #ld-bar { opacity: 1; }
 
 /* ─── LOGIN SCREEN ─── */
 #login {
@@ -293,6 +342,7 @@ html, body {
 /* When .ui-hidden is on body, everything except the canvas fades out */
 body.ui-hidden #pnav,
 body.ui-hidden #ptab,
+body.ui-hidden #ltab,
 body.ui-hidden #controls,
 body.ui-hidden #hud,
 body.ui-hidden #lyric-wrap,
@@ -302,11 +352,29 @@ body.ui-hidden #status-badge {
   transition: opacity .5s ease;
 }
 /* Restore on mouse move — handled in JS */
-#pnav, #ptab, #controls, #hud, #lyric-wrap, #status-badge {
+#pnav, #ptab, #ltab, #controls, #hud, #lyric-wrap, #status-badge {
   transition: opacity .5s ease;
 }
 
-/* ─── SIDEBAR TAB ─── */
+/* ─── LEFT TAB ─── */
+#ltab {
+  position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 31;
+  background: rgba(6,6,8,.92); border: 1px solid var(--bdr); border-left: none;
+  border-radius: 0 var(--r) var(--r) 0; padding: 12px 8px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 5px; align-items: center;
+  transition: left .22s cubic-bezier(.4,0,.2,1);
+  backdrop-filter: blur(8px);
+}
+#ltab.shifted { left: var(--pw); }
+#ltab span {
+  display: block; width: 15px; height: 1.5px; background: var(--acc);
+  transition: transform .18s, opacity .18s;
+}
+#ltab.open span:nth-child(1) { transform: rotate(45deg) translate(2px, 2px); }
+#ltab.open span:nth-child(2) { opacity: 0; }
+#ltab.open span:nth-child(3) { transform: rotate(-45deg) translate(2px, -2px); }
+
+/* ─── RIGHT TAB ─── */
 #ptab {
   position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 31;
   background: rgba(6,6,8,.92); border: 1px solid var(--bdr); border-right: none;
@@ -324,7 +392,21 @@ body.ui-hidden #status-badge {
 #ptab.open span:nth-child(2) { opacity: 0; }
 #ptab.open span:nth-child(3) { transform: rotate(-45deg) translate(2px, -2px); }
 
-/* ─── SIDEBAR ─── */
+/* ─── LEFT SIDEBAR (Source / Info) ─── */
+#sb-left {
+  position: fixed; left: 0; top: 0; bottom: 0; width: var(--pw); z-index: 30;
+  background: var(--sb-bg); border-right: 1px solid var(--bdr);
+  display: flex; flex-direction: column;
+  transform: translateX(calc(-1 * var(--pw)));
+  transition: transform .22s cubic-bezier(.4,0,.2,1);
+  backdrop-filter: blur(12px);
+}
+#sb-left.open { transform: translateX(0); }
+#sb-left-i { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 24px; }
+#sb-left-i::-webkit-scrollbar { width: 2px; }
+#sb-left-i::-webkit-scrollbar-thumb { background: rgba(255,255,255,.06); }
+
+/* ─── RIGHT SIDEBAR (FX / Effects) ─── */
 #sb {
   position: fixed; right: 0; top: 0; bottom: 0; width: var(--pw); z-index: 30;
   background: var(--sb-bg); border-left: 1px solid var(--bdr);
@@ -337,6 +419,23 @@ body.ui-hidden #status-badge {
 #sbi { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 24px; }
 #sbi::-webkit-scrollbar { width: 2px; }
 #sbi::-webkit-scrollbar-thumb { background: rgba(255,255,255,.06); }
+
+/* ─── FX PANEL HEADER ─── */
+#fx-panel-header {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--bdr2);
+  flex-shrink: 0;
+}
+#fx-panel-title {
+  font-family: var(--display);
+  font-size: 13px; letter-spacing: .25em;
+  color: var(--acc-txt); text-transform: uppercase;
+  margin-bottom: 2px;
+}
+#fx-panel-sub {
+  font-size: 9px; color: var(--dim);
+  letter-spacing: .12em; text-transform: uppercase;
+}
 
 /* ─── COLOR PALETTE ─── */
 #palette-grid {
@@ -384,7 +483,7 @@ body.ui-hidden #status-badge {
 /* ─── ACCORDION ─── */
 .acc-hd {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--bdr2);
+  padding: 7px 14px; cursor: pointer; border-bottom: 1px solid var(--bdr2);
   font-size: 10px; letter-spacing: .1em; font-weight: 700;
   color: var(--acc); text-transform: uppercase;
   transition: background .12s, color .12s; user-select: none;
@@ -392,7 +491,7 @@ body.ui-hidden #status-badge {
 .acc-hd:hover { background: rgba(255,255,255,.02); color: var(--acc-txt); }
 .acc-hd .chev { transition: transform .2s; font-size: 10px; color: var(--dim); }
 .acc-hd.open .chev { transform: rotate(90deg); }
-.acc-bd { display: none; padding: 12px 14px 8px; border-bottom: 1px solid var(--bdr2); }
+.acc-bd { display: none; padding: 8px 14px 6px; border-bottom: 1px solid var(--bdr2); background: rgba(255,255,255,.025); }
 .acc-bd.open { display: block; }
 
 /* ─── FORM ELEMENTS ─── */
@@ -413,11 +512,11 @@ body.ui-hidden #status-badge {
 .lbl {
   font-size: 10px; font-weight: 600; color: var(--dim);
   text-transform: uppercase; letter-spacing: .06em;
-  margin-bottom: 4px; display: block;
+  margin-bottom: 3px; display: block;
 }
 .lbl-hint { display: none; }
 #app-brand {
-  padding: 16px 14px 10px;
+  padding: 10px 14px 8px;
   border-bottom: 1px solid var(--bdr2);
 }
 #app-name {
@@ -431,7 +530,7 @@ body.ui-hidden #status-badge {
   text-transform: uppercase;
 }
 #theme-swatches {
-  display: flex; gap: 6px; margin-top: 10px;
+  display: flex; gap: 6px; margin-top: 6px;
 }
 .theme-sw {
   width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
@@ -440,7 +539,7 @@ body.ui-hidden #status-badge {
 }
 .theme-sw:hover { transform: scale(1.2); }
 .theme-sw.active { border-color: rgba(255,255,255,.6); }
-.svr { display: grid; grid-template-columns: 1fr 34px; align-items: center; gap: 6px; margin-bottom: 8px; }
+.svr { display: grid; grid-template-columns: 1fr 34px; align-items: center; gap: 6px; margin-bottom: 5px; }
 .svv { font-size: 10px; color: var(--acc); text-align: right; }
 input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 
@@ -448,9 +547,9 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 .btn {
   font-family: var(--ui); font-size: 11px; font-weight: 600;
   letter-spacing: .04em; text-transform: uppercase;
-  padding: 8px 12px; border: 1px solid var(--bdr); background: transparent;
+  padding: 6px 12px; border: 1px solid var(--bdr); background: transparent;
   color: var(--dim); cursor: pointer; border-radius: var(--r);
-  transition: all .12s; width: 100%; margin-bottom: 6px;
+  transition: all .12s; width: 100%; margin-bottom: 5px;
   display: block; text-align: center;
 }
 .btn:hover   { border-color: var(--acc); color: var(--acc-txt); }
@@ -469,7 +568,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 #playlist-panel.open { transform: translateY(0); }
 #plp-header {
   display: flex; align-items: center; gap: 12px;
-  padding: 18px 20px 14px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+  padding: 18px clamp(10px, 3vw, 20px) 14px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
 }
 #plp-header h2 {
   font-family: var(--display); font-size: 32px; letter-spacing: .1em;
@@ -484,7 +583,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 #plp-close:hover { color: var(--txt); }
 #plp-toolbar {
   display: flex; gap: 8px; align-items: center;
-  padding: 10px 20px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
+  padding: 10px clamp(10px, 3vw, 20px); border-bottom: 1px solid var(--bdr); flex-shrink: 0;
 }
 #plp-search {
   flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
@@ -494,10 +593,11 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 #plp-search:focus { border-color: var(--sp); }
 #plp-search::placeholder { color: var(--dim); }
 #plp-grid {
-  flex: 1; overflow-y: auto; padding: 14px 20px 28px;
+  flex: 1; overflow-y: auto; padding: 14px clamp(10px, 3vw, 20px) 28px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
   gap: 10px; align-content: start;
+  box-sizing: border-box;
 }
 #plp-grid::-webkit-scrollbar { width: 4px; }
 #plp-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 2px; }
@@ -822,7 +922,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 
 /* ─── RESPONSIVE ─── */
 @media (max-width: 480px) {
-  :root { --pw: 260px; }
+  :root { --pw: 310px; }
   #hud-art    { width: 60px; height: 60px; }
   #hud-title  { font-size: 22px; }
   #hud-artist { font-size: 12px; }
@@ -841,6 +941,22 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <div id="pp-live-preview">
   <canvas id="pp-live-canvas" width="200" height="125"></canvas>
   <div id="pp-live-label"></div>
+</div>
+
+<!-- SEIZURE WARNING -->
+<div id="seizure-warning">
+  <div class="sw-logo">IKANDY</div>
+  <div class="sw-title">⚠ Photosensitivity Warning</div>
+  <div class="sw-body">
+    This app displays rapidly changing lights, colors, and patterns.<br>
+    If you or anyone viewing this app has a history of epilepsy or seizures,
+    photosensitivity, or other conditions that may be affected by flashing lights,
+    please consult a doctor before using IKANDY.
+  </div>
+  <div class="sw-btns">
+    <button class="sw-accept" onclick="seizureAccept()">I Understand — Continue</button>
+    <button class="sw-decline" onclick="seizureDecline()">Exit</button>
+  </div>
 </div>
 
 <!-- LOADING -->
@@ -909,6 +1025,12 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <canvas id="vignette-canvas"></canvas>
 <canvas id="grain-canvas"></canvas>
 <canvas id="scanline-canvas"></canvas>
+<canvas id="aurora-canvas"></canvas>
+<canvas id="pawrticles-canvas"></canvas>
+<canvas id="ripple-canvas"></canvas>
+<canvas id="waveray-canvas"></canvas>
+<canvas id="fire-canvas"></canvas>
+<canvas id="singularity-canvas"></canvas>
 
 <input type="file" id="bg-file-input" accept="image/*" style="display:none" onchange="onBgFileChange(this)">
 <div id="drop"><p>DROP AUDIO HERE</p></div>
@@ -1039,29 +1161,36 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   </div>
 </div>
 
-<!-- SIDEBAR TOGGLE TAB -->
-<div id="ptab" onclick="toggleSidebar()"><span></span><span></span><span></span></div>
+<!-- LEFT TAB -->
+<div id="ltab" onclick="handleLeftTab()"><span></span><span></span><span></span></div>
 
-<!-- SIDEBAR -->
-<div id="sb">
-<div id="sbi">
+<!-- LEFT SIDEBAR (Source / Info) -->
+<div id="sb-left">
+<div id="sb-left-i">
 
   <!-- APP BRANDING -->
   <div id="app-brand">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div id="app-name">IKANDY</div>
-      <button id="acc-all-btn" onclick="accToggleAll()" title="Expand / Collapse all"
-        style="background:none;border:1px solid var(--bdr);border-radius:4px;color:var(--dim);
-        font-family:var(--ui);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
-        padding:3px 8px;cursor:pointer;transition:all .15s;white-space:nowrap;"
-        onmouseover="this.style.borderColor='var(--acc)';this.style.color='var(--acc-txt)'"
-        onmouseout="this.style.borderColor='var(--bdr)';this.style.color='var(--dim)'">
-        ⊞ All
-      </button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button id="sync-btn" title="Sync panels — both open together"
+          onclick="toggleSync()"
+          style="background:var(--acc-dim);border:1px solid var(--acc);border-radius:4px;color:var(--acc-txt);
+          font-family:var(--ui);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+          padding:3px 7px;cursor:pointer;transition:all .15s;white-space:nowrap;"
+          onmouseover="this.style.opacity='.8'" onmouseout="this.style.opacity='1'">
+          ⇔ Sync
+        </button>
+        <button id="acc-all-btn" onclick="accToggleAll()" title="Expand / Collapse all"
+          style="background:none;border:1px solid var(--bdr);border-radius:4px;color:var(--dim);
+          font-family:var(--ui);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+          padding:3px 8px;cursor:pointer;transition:all .15s;white-space:nowrap;">
+          ⊞ All
+        </button>
+      </div>
     </div>
     <div id="app-tagline">Visual music &nbsp;·&nbsp; v1.0</div>
-    <a href="https://spotify.com" target="_blank" style="display:inline-flex;align-items:center;gap:6px;
-      margin-top:8px;text-decoration:none;opacity:0.7;transition:opacity .2s;"
+    <a href="https://spotify.com" target="_blank" style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;text-decoration:none;opacity:0.7;transition:opacity .2s;"
       onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="#1DB954" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
@@ -1069,12 +1198,12 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <span style="font-size:10px;color:#1DB954;letter-spacing:.06em;text-transform:uppercase;font-weight:600;">Powered by Spotify</span>
     </a>
     <div id="theme-swatches">
-      <div class="theme-sw active" data-theme="gold"      style="background:#d4a843;" onclick="setTheme('gold')"      title="Gold"></div>
-      <div class="theme-sw"        data-theme="neon"      style="background:#ff2d8a;" onclick="setTheme('neon')"      title="Neon"></div>
-      <div class="theme-sw"        data-theme="forest"    style="background:#4caf7d;" onclick="setTheme('forest')"    title="Forest"></div>
-      <div class="theme-sw"        data-theme="dusk"      style="background:#9b72cf;" onclick="setTheme('dusk')"      title="Dusk"></div>
-      <div class="theme-sw"        data-theme="ice"       style="background:#5bc8f5;" onclick="setTheme('ice')"       title="Ice"></div>
-      <div class="theme-sw"        data-theme="white"     style="background:#e8e8e8;" onclick="setTheme('white')"     title="White"></div>
+      <div class="theme-sw active" data-theme="gold"   style="background:#d4a843;" onclick="setTheme('gold')"   title="Gold"></div>
+      <div class="theme-sw"        data-theme="neon"   style="background:#ff2d8a;" onclick="setTheme('neon')"   title="Neon"></div>
+      <div class="theme-sw"        data-theme="forest" style="background:#4caf7d;" onclick="setTheme('forest')" title="Forest"></div>
+      <div class="theme-sw"        data-theme="dusk"   style="background:#9b72cf;" onclick="setTheme('dusk')"   title="Dusk"></div>
+      <div class="theme-sw"        data-theme="ice"    style="background:#5bc8f5;" onclick="setTheme('ice')"    title="Ice"></div>
+      <div class="theme-sw"        data-theme="white"  style="background:#e8e8e8;" onclick="setTheme('white')"  title="White"></div>
     </div>
   </div>
 
@@ -1083,215 +1212,52 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <span>Source</span><span class="chev">›</span>
   </div>
   <div class="acc-bd open">
-    <!-- Mode toggle -->
-    <div style="display:flex;gap:6px;margin-bottom:14px;">
-      <button id="src-spotify-btn" class="btn primary" style="flex:1;margin:0;font-size:11px;"
-        onclick="setSourceMode('spotify')">Spotify</button>
-      <button id="src-vlc-btn" class="btn" style="flex:1;margin:0;font-size:11px;"
-        onclick="setSourceMode('vlc')">VLC</button>
-      <button id="src-local-btn" class="btn" style="flex:1;margin:0;font-size:11px;"
-        onclick="setSourceMode('local')">Local</button>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+      <button id="src-spotify-btn" class="btn primary" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('spotify')">Spotify</button>
+      <button id="src-vlc-btn" class="btn" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('vlc')">VLC</button>
+      <button id="src-foobar-btn" class="btn" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('foobar')">foobar2000</button>
+      <button id="src-local-btn" class="btn" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('local')">Local</button>
     </div>
-
-    <!-- Audio capture — always visible regardless of source -->
-    <button class="btn" id="recapture-btn" onclick="startSystemAudioCapture()"
-      style="margin-bottom:8px;border-color:var(--sp);color:var(--sp);">
-      🎤 Reconnect System Audio
-    </button>
-
-    <!-- Spotify panel -->
+    <button class="btn" id="recapture-btn" onclick="startSystemAudioCapture()" style="margin-bottom:6px;border-color:var(--sp);color:var(--sp);">🎤 Reconnect System Audio</button>
     <div id="src-spotify-panel">
-      <div id="sp-info" style="font-size:12px;color:var(--dim);line-height:1.6;margin-bottom:12px;">
-        Not connected.
-      </div>
+      <div id="sp-info" style="font-size:12px;color:var(--dim);line-height:1.6;margin-bottom:10px;">Not connected.</div>
       <button class="btn green" id="sb-connect" onclick="startLogin()">Connect Spotify</button>
-      <div style="font-size:11px;color:var(--dim);margin-top:8px;line-height:1.6;">
-        Open Spotify and start playing something before using IKANDY's controls.
-      </div>
+      <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.6;">Open Spotify and start playing something before using IKANDY's controls.</div>
       <button class="btn" id="sb-playlists-btn" onclick="openPlaylistPanel()" style="display:none;border-color:var(--sp);color:var(--sp);margin-top:4px;">Playlists</button>
       <button class="btn danger" id="sb-disconnect" onclick="logout()" style="display:none;">Disconnect</button>
       <button class="btn" id="sb-change-client" onclick="changeClientId()" style="display:none;font-size:10px;padding:5px;color:var(--dim);margin-top:4px;">Change Client ID</button>
       <div id="sp-device" style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.5;"></div>
-      <button class="btn" id="manual-fetch-btn" onclick="manualFetchOnce()"
-        style="display:none;margin-top:8px;font-size:11px;padding:7px 12px;">
-        Fetch Current Track (manual)
-      </button>
+      <button class="btn" id="manual-fetch-btn" onclick="manualFetchOnce()" style="display:none;margin-top:6px;font-size:11px;padding:6px 12px;">Fetch Current Track (manual)</button>
     </div>
-
-    <!-- VLC panel -->
     <div id="src-vlc-panel" style="display:none;">
-      <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:8px;">
         Enable VLC's Web interface:<br>
         <span style="color:var(--acc);">Tools → Preferences → All → Interface → Main interfaces → check "Web"</span><br>
         Set a password, restart VLC.
       </div>
-      <input id="vlc-port-input" type="number" value="8080" min="1" max="65535"
-        placeholder="Port (default 8080)"
-        style="width:100%;margin-bottom:6px;padding:8px 10px;background:rgba(255,255,255,.06);
-        border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);
-        font-family:var(--ui);font-size:12px;outline:none;">
+      <input id="vlc-port-input" type="number" value="8080" min="1" max="65535" placeholder="Port (default 8080)"
+        style="width:100%;margin-bottom:5px;padding:7px 10px;background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-family:var(--ui);font-size:12px;outline:none;">
       <input id="vlc-pass-input" type="password" placeholder="VLC Web password"
-        style="width:100%;margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,.06);
-        border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);
-        font-family:var(--ui);font-size:12px;outline:none;">
+        style="width:100%;margin-bottom:8px;padding:7px 10px;background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-family:var(--ui);font-size:12px;outline:none;">
       <button class="btn green" onclick="vlcConnect()">Connect VLC</button>
-      <div id="vlc-status" style="font-size:11px;margin-top:8px;color:var(--dim);line-height:1.5;"></div>
+      <div id="vlc-status" style="font-size:11px;margin-top:6px;color:var(--dim);line-height:1.5;"></div>
     </div>
-
-    <!-- Local Audio panel -->
+    <div id="src-foobar-panel" style="display:none;">
+      <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:8px;">
+        Install <span style="color:var(--acc);">foo_beefweb</span> in foobar2000:<br>
+        <span style="color:var(--acc);">File → Preferences → Components → Install</span>, then enable in <span style="color:var(--acc);">Preferences → Tools → Beefweb</span>.<br>
+        Default port is 8880.
+      </div>
+      <input id="foobar-port-input" type="number" value="8880" min="1" max="65535" placeholder="Port (default 8880)"
+        style="width:100%;margin-bottom:5px;padding:7px 10px;background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-family:var(--ui);font-size:12px;outline:none;">
+      <input id="foobar-pass-input" type="password" placeholder="Password (optional)"
+        style="width:100%;margin-bottom:8px;padding:7px 10px;background:rgba(255,255,255,.06);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-family:var(--ui);font-size:12px;outline:none;">
+      <button class="btn green" onclick="foobarConnect()">Connect foobar2000</button>
+      <button class="btn" id="fb-playlists-btn" onclick="openPlaylistPanel()" style="display:none;border-color:var(--sp);color:var(--sp);margin-top:4px;">Playlists</button>
+      <div id="foobar-status" style="font-size:11px;margin-top:6px;color:var(--dim);line-height:1.5;"></div>
+    </div>
     <div id="src-local-info" style="display:none;font-size:11px;color:var(--dim);line-height:1.6;padding:4px 0;">
       Click <span style="color:var(--acc-txt);">🎤 System Audio</span> above, pick your audio source and check <span style="color:var(--acc-txt);">"Share audio"</span> to start the visualizer.
-    </div>
-  </div>
-
-  <!-- PRESETS -->
-  <div class="acc-hd open" id="acc-presets" onclick="accToggle(this)">
-    <span>Presets</span>
-    <span id="pc-count" style="font-size:10px;color:var(--dim);font-weight:400;margin-left:4px;"></span>
-    <span class="chev">›</span>
-  </div>
-  <div class="acc-bd open">
-    <div style="font-size:12px;color:var(--dim);margin-bottom:10px;">
-      Now: <span id="pname-sb" style="color:var(--acc);">—</span>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:10px;">
-      <button class="btn primary" style="margin:0;flex:1;" onclick="openPresetPanel()">Browse All →</button>
-      <button class="btn" style="width:auto;padding:10px 14px;margin:0;" onclick="randPreset(false)" title="Random (keeps auto)">⟳</button>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <button class="btn" style="width:auto;padding:5px 12px;margin:0;font-size:11px;" id="auto-sb" onclick="toggleAuto()">Auto-cycle</button>
-      <input type="number" id="cycle-s" value="20" min="5" max="300"
-        style="width:50px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);
-        color:var(--txt);font-family:var(--ui);font-size:12px;padding:5px 7px;
-        border-radius:var(--r);outline:none;">
-      <span style="font-size:11px;color:var(--dim);">s · blend</span>
-      <input type="number" id="blend-s" value="2.5" min="0" max="10" step=".5"
-        style="width:50px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);
-        color:var(--txt);font-family:var(--ui);font-size:12px;padding:5px 7px;
-        border-radius:var(--r);outline:none;">
-      <span style="font-size:11px;color:var(--dim);">s</span>
-    </div>
-
-    <!-- Custom preset folder -->
-    <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--bdr2);">
-      <div style="font-size:11px;color:var(--dim);margin-bottom:8px;line-height:1.5;">
-        <span style="color:var(--acc);">📂 Custom Presets</span> — load community .json preset files from a folder.
-      </div>
-      <div id="preset-folder-row" style="display:none;margin-bottom:8px;">
-        <div id="preset-folder-name" style="font-size:11px;color:var(--sp);margin-bottom:6px;word-break:break-all;"></div>
-        <button class="btn" onclick="clearPresetFolder()" style="width:100%;font-size:11px;padding:6px;">✕ Remove Folder</button>
-      </div>
-      <button class="btn" id="preset-folder-btn" onclick="pickPresetFolder()" style="width:100%;font-size:11px;padding:7px;">📂 Load Preset Folder</button>
-    </div>
-  </div>
-
-  <!-- VISUALS -->
-  <div class="acc-hd" id="acc-visuals" onclick="accToggle(this)">
-    <span>Visuals</span><span class="chev">›</span>
-  </div>
-  <div class="acc-bd">
-
-    <span class="lbl">Speed
-      <span class="lbl-hint">How fast the animation moves</span>
-    </span>
-    <div class="svr">
-      <input type="range" id="speed-sl" min="1" max="5" step="1" value="3"
-        oninput="setSpeed(+this.value)">
-      <span class="svv" id="speed-v">3</span>
-    </div>
-
-    <span class="lbl">Reactivity
-      <span class="lbl-hint">How much the visuals respond to music</span>
-    </span>
-    <div class="svr">
-      <input type="range" id="sens-sl" min=".3" max="4" step=".05" value="1.5"
-        oninput="setSensitivity(+this.value)">
-      <span class="svv" id="sens-v">1.50</span>
-    </div>
-
-    <span class="lbl">Smoothness
-      <span class="lbl-hint">Higher = slower, dreamier motion</span>
-    </span>
-    <div class="svr">
-      <input type="range" id="sm-sl" min=".4" max=".98" step=".01" value=".75"
-        oninput="setSmoothing(+this.value)">
-      <span class="svv" id="sm-v">.75</span>
-    </div>
-
-    <span class="lbl">Viz Opacity</span>
-    <div class="svr">
-      <input type="range" id="viz-opacity-sl" min="0" max="1" step=".05" value="1"
-        oninput="setVizOpacity(+this.value)">
-      <span class="svv" id="viz-opacity-v">1.0</span>
-    </div>
-
-  </div>
-
-  <!-- VIBE -->
-  <div class="acc-hd" id="acc-vibe" onclick="accToggle(this)">
-    <span>Vibe</span><span class="chev">›</span>
-  </div>
-  <div class="acc-bd">
-
-    <!-- BACKGROUND SOURCE -->
-    <span class="lbl">Background</span>
-    <button id="bg-upload-btn" onclick="el('bg-file-input').click()">📷 Single Image</button>
-    <button id="bg-folder-btn" onclick="pickBgFolder()" style="width:100%;padding:8px;border:1px dashed var(--bdr);border-radius:var(--r);background:transparent;color:var(--dim);font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .13s;margin-bottom:5px;">📁 Cycle Folder</button>
-    <div style="font-size:10px;color:var(--dim);margin-bottom:8px;">Best: 1920×1080 or any 16:9</div>
-    <div id="bg-filename" style="display:none;"></div>
-    <div id="bg-cycle-row" style="display:none;align-items:center;gap:8px;margin-bottom:8px;">
-      <span style="font-size:11px;color:var(--dim);">Every</span>
-      <input type="number" id="bg-cycle-s" value="15" min="3" max="300"
-        style="width:55px;padding:5px 7px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);
-        border-radius:var(--r);color:var(--txt);font-family:var(--ui);font-size:12px;outline:none;"
-        oninput="setBgCycleTime(+this.value)">
-      <span style="font-size:11px;color:var(--dim);">s</span>
-    </div>
-    <button class="btn" id="bg-clear-btn" onclick="clearBgImage()" style="display:none;font-size:11px;padding:5px 10px;margin-bottom:10px;">✕ Remove</button>
-
-    <!-- FX MODE — always visible -->
-    <span class="lbl" style="margin-top:4px;">FX Mode</span>
-    <!-- ALL 12 FX — always visible, single select -->
-    <div id="imgfx-row">
-      <div style="font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">Lo-Fi</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px;">
-        <button class="vibe-btn" id="ifx-raindrops" onclick="setImgFx('raindrops')">Rain</button>
-        <button class="vibe-btn" id="ifx-inkbleed"   onclick="setImgFx('inkbleed')">Ink</button>
-        <button class="vibe-btn" id="ifx-vhswarp"    onclick="setImgFx('vhswarp')">VHS</button>
-        <button class="vibe-btn" id="ifx-fog"        onclick="setImgFx('fog')">Fog</button>
-        <button class="vibe-btn" id="ifx-watercolor" onclick="setImgFx('watercolor')">Paint</button>
-        <button class="vibe-btn" id="ifx-dustfilm"   onclick="setImgFx('dustfilm')">Film</button>
-      </div>
-      <div style="font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">Cyber</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:10px;">
-        <button class="vibe-btn" id="ifx-liquidmetal" onclick="setImgFx('liquidmetal')">Metal</button>
-        <button class="vibe-btn" id="ifx-shatter"     onclick="setImgFx('shatter')">Shatter</button>
-        <button class="vibe-btn" id="ifx-datacorrupt" onclick="setImgFx('datacorrupt')">Corrupt</button>
-        <button class="vibe-btn" id="ifx-plasmaarc"   onclick="setImgFx('plasmaarc')">Plasma</button>
-        <button class="vibe-btn" id="ifx-hologram"    onclick="setImgFx('hologram')">Holo</button>
-        <button class="vibe-btn" id="ifx-heatwave"    onclick="setImgFx('heatwave')">Heat</button>
-      </div>
-      <span class="lbl">Strength</span>
-      <div class="svr" style="margin-bottom:8px;">
-        <input type="range" id="fx-strength-sl" min="0" max="2" step="0.05" value="1"
-          oninput="setFxStrength(+this.value)">
-        <span class="svv" id="fx-strength-v">1.0</span>
-      </div>
-
-    </div>
-
-    <span class="lbl">Grain</span>
-    <div class="svr">
-      <input type="range" id="grain-sl" min="0" max="1" step=".05" value="0"
-        oninput="setGrain(+this.value)">
-      <span class="svv" id="grain-v">0</span>
-    </div>
-
-    <span class="lbl">Scanlines</span>
-    <div class="svr">
-      <input type="range" id="scan-sl" min="0" max=".8" step=".05" value="0"
-        oninput="setScanlines(+this.value)">
-      <span class="svv" id="scan-v">0</span>
     </div>
   </div>
 
@@ -1300,38 +1266,192 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <span>Lyrics</span><span class="chev">›</span>
   </div>
   <div class="acc-bd">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
       <span id="lyric-status" style="font-size:12px;color:var(--dim);">—</span>
-      <button class="btn" id="overlay-btn" onclick="toggleOverlay()"
-        style="width:auto;padding:4px 10px;margin:0;font-size:11px;">Overlay ON</button>
+      <button class="btn" id="overlay-btn" onclick="toggleOverlay()" style="width:auto;padding:4px 10px;margin:0;font-size:11px;">Overlay ON</button>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:8px;">
-      <button class="btn" id="lyric-classic-btn" onclick="setLyricMode('classic')"
-        style="flex:1;padding:5px 8px;font-size:11px;margin:0;border-color:var(--sp);color:var(--sp);">Classic</button>
-      <button class="btn" id="lyric-physics-btn" onclick="setLyricMode('physics')"
-        style="flex:1;padding:5px 8px;font-size:11px;margin:0;">Physics</button>
+    <div style="display:flex;gap:6px;margin-bottom:6px;">
+      <button class="btn" id="lyric-classic-btn" onclick="setLyricMode('classic')" style="flex:1;padding:5px 8px;font-size:11px;margin:0;border-color:var(--sp);color:var(--sp);">Classic</button>
+      <button class="btn" id="lyric-physics-btn" onclick="setLyricMode('physics')" style="flex:1;padding:5px 8px;font-size:11px;margin:0;">Physics</button>
     </div>
     <div id="physics-size-row" style="display:none;">
       <span class="lbl">Word Size</span>
       <div class="svr">
-        <input type="range" id="physics-size-sl" min="0.5" max="4" step="0.1" value="1.25"
-          oninput="setPhysicsSize(+this.value)">
-        <span class="svv" id="physics-size-v">1.25×</span>
+        <input type="range" id="physics-size-sl" min="0.5" max="4" step="0.1" value="1.25" oninput="setPhysicsSize(+this.value)">
+        <span class="svv" id="physics-size-v">1.25x</span>
       </div>
     </div>
     <div id="physics-speed-row" style="display:none;">
       <span class="lbl">Word Speed</span>
       <div class="svr">
-        <input type="range" id="physics-speed-sl" min="0.1" max="2" step="0.1" value="0.3"
-          oninput="setPhysicsSpeed(+this.value)">
-        <span class="svv" id="physics-speed-v">0.3×</span>
+        <input type="range" id="physics-speed-sl" min="0.1" max="2" step="0.1" value="0.3" oninput="setPhysicsSpeed(+this.value)">
+        <span class="svv" id="physics-speed-v">0.3x</span>
       </div>
     </div>
     <div id="lyrics-box"></div>
   </div>
 
+</div></div><!-- /sb-left -->
 
-</div></div><!-- /sidebar -->
+<!-- RIGHT TAB -->
+<div id="ptab" onclick="handleRightTab()"><span></span><span></span><span></span></div>
+
+<!-- RIGHT SIDEBAR (FX / Effects) -->
+<div id="sb">
+<div id="sbi">
+
+  <!-- FX PANEL HEADER -->
+  <div id="fx-panel-header">
+    <div id="fx-panel-title">FX Control</div>
+    <div id="fx-panel-sub">Effects &amp; Visuals</div>
+  </div>
+
+  <!-- MASTER CONTROLS -->
+  <div class="acc-hd open" id="acc-master" onclick="accToggle(this)">
+    <span>Master Controls</span><span style="font-size:9px;color:var(--dim);font-weight:400;margin-left:4px;letter-spacing:.06em;">AFFECTS ALL</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd open">
+    <span class="lbl">Reactivity<span class="lbl-hint">How much the visuals respond to music</span></span>
+    <div class="svr">
+      <input type="range" id="sens-sl" min=".3" max="4" step=".05" value="1.5" oninput="setSensitivity(+this.value)">
+      <span class="svv" id="sens-v">1.50</span>
+    </div>
+    <span class="lbl">Smoothness<span class="lbl-hint">Higher = slower, dreamier motion</span></span>
+    <div class="svr">
+      <input type="range" id="sm-sl" min=".4" max=".98" step=".01" value=".75" oninput="setSmoothing(+this.value)">
+      <span class="svv" id="sm-v">.75</span>
+    </div>
+    <span class="lbl">Grain</span>
+    <div class="svr">
+      <input type="range" id="grain-sl" min="0" max="1" step=".05" value="0" oninput="setGrain(+this.value)">
+      <span class="svv" id="grain-v">0</span>
+    </div>
+    <span class="lbl">Scanlines</span>
+    <div class="svr">
+      <input type="range" id="scan-sl" min="0" max=".8" step=".05" value="0" oninput="setScanlines(+this.value)">
+      <span class="svv" id="scan-v">0</span>
+    </div>
+  </div>
+
+  <!-- WAVEFORM -->
+  <div class="acc-hd open" id="acc-presets" onclick="accToggle(this)">
+    <span>Waveform</span>
+    <span id="pc-count" style="font-size:10px;color:var(--dim);font-weight:400;margin-left:4px;"></span>
+    <span class="chev">›</span>
+  </div>
+  <div class="acc-bd open">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <button id="viz-toggle-btn" class="vibe-btn active" onclick="toggleViz()" style="width:auto;padding:5px 14px;">● On</button>
+      <div style="font-size:12px;color:var(--dim);">Now: <span id="pname-sb" style="color:var(--acc);">—</span></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button class="btn" style="margin:0;flex:1;font-size:10px;padding:6px 10px;" onclick="openPresetPanel()">Browse All →</button>
+      <button class="btn" style="width:auto;padding:6px 12px;margin:0;" onclick="randPreset(false)" title="Random">⟳</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <button class="btn" style="width:auto;padding:5px 12px;margin:0;font-size:11px;" id="auto-sb" onclick="toggleAuto()">Auto-cycle</button>
+      <input type="number" id="cycle-s" value="20" min="5" max="300" style="width:50px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);color:var(--txt);font-family:var(--ui);font-size:12px;padding:5px 7px;border-radius:var(--r);outline:none;">
+      <span style="font-size:11px;color:var(--dim);">s · blend</span>
+      <input type="number" id="blend-s" value="2.5" min="0" max="10" step=".5" style="width:50px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);color:var(--txt);font-family:var(--ui);font-size:12px;padding:5px 7px;border-radius:var(--r);outline:none;">
+      <span style="font-size:11px;color:var(--dim);">s</span>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--bdr2);">
+      <span class="lbl">Speed<span class="lbl-hint">Preset animation speed</span></span>
+      <div class="svr">
+        <input type="range" id="speed-sl" min="1" max="5" step="1" value="3" oninput="setSpeed(+this.value)">
+        <span class="svv" id="speed-v">3</span>
+      </div>
+      <span class="lbl">Viz Opacity</span>
+      <div class="svr">
+        <input type="range" id="viz-opacity-sl" min="0" max="1" step=".05" value="1" oninput="setVizOpacity(+this.value)">
+        <span class="svv" id="viz-opacity-v">1.0</span>
+      </div>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--bdr2);">
+      <div style="font-size:11px;color:var(--dim);margin-bottom:6px;line-height:1.5;"><span style="color:var(--acc);">📂 Custom Presets</span> — load community .json preset files.</div>
+      <div id="preset-folder-row" style="display:none;margin-bottom:6px;">
+        <div id="preset-folder-name" style="font-size:11px;color:var(--sp);margin-bottom:5px;word-break:break-all;"></div>
+        <button class="btn" onclick="clearPresetFolder()" style="width:100%;font-size:11px;padding:5px;">✕ Remove Folder</button>
+      </div>
+      <button class="btn" id="preset-folder-btn" onclick="pickPresetFolder()" style="width:100%;font-size:11px;padding:6px;">📂 Load Preset Folder</button>
+    </div>
+  </div>
+
+  <!-- SCENES -->
+  <div class="acc-hd" id="acc-scenes" onclick="accToggle(this)">
+    <span>Scenes</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <button id="scene-toggle-btn" class="vibe-btn" onclick="toggleScene()" style="width:auto;padding:5px 14px;">○ Off</button>
+      <span style="font-size:11px;color:var(--dim);">Audio-reactive overlay</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px;">
+      <button class="vibe-btn" id="scene-fire"       onclick="selectScene('fire')">Fire EQ</button>
+      <button class="vibe-btn" id="scene-ripple"     onclick="selectScene('ripple')">Spectrum</button>
+      <button class="vibe-btn" id="scene-waveray"    onclick="selectScene('waveray')">Waveray</button>
+      <button class="vibe-btn" id="scene-aurora"     onclick="selectScene('aurora')">Aurora</button>
+      <button class="vibe-btn" id="scene-pawrticles" onclick="selectScene('pawrticles')">Starfield</button>
+      <button class="vibe-btn" id="scene-singularity" onclick="selectScene('singularity')">Singularity</button>
+    </div>
+    <span class="lbl">Intensity</span>
+    <div class="svr">
+      <input type="range" id="scene-intensity-sl" min="0.2" max="2" step="0.05" value="1" oninput="setSceneIntensity(+this.value)">
+      <span class="svv" id="scene-intensity-v">1.0</span>
+    </div>
+  </div>
+
+  <!-- VIBE -->
+  <div class="acc-hd" id="acc-vibe" onclick="accToggle(this)">
+    <span>Vibe</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd">
+    <span class="lbl">Background</span>
+    <button id="bg-upload-btn" onclick="el('bg-file-input').click()">📷 Single Image</button>
+    <button id="bg-folder-btn" onclick="pickBgFolder()" style="width:100%;padding:6px;border:1px dashed var(--bdr);border-radius:var(--r);background:transparent;color:var(--dim);font-family:var(--ui);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:all .13s;margin-bottom:5px;">📁 Cycle Folder</button>
+    <div style="font-size:10px;color:var(--dim);margin-bottom:6px;">Best: 1920×1080 or any 16:9</div>
+    <div id="bg-filename" style="display:none;"></div>
+    <div id="bg-cycle-row" style="display:none;align-items:center;gap:8px;margin-bottom:6px;">
+      <span style="font-size:11px;color:var(--dim);">Every</span>
+      <input type="number" id="bg-cycle-s" value="15" min="3" max="300" style="width:55px;padding:5px 7px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-family:var(--ui);font-size:12px;outline:none;" oninput="setBgCycleTime(+this.value)">
+      <span style="font-size:11px;color:var(--dim);">s</span>
+    </div>
+    <button class="btn" id="bg-clear-btn" onclick="clearBgImage()" style="display:none;font-size:11px;padding:5px 10px;margin-bottom:8px;">✕ Remove</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:4px;margin-bottom:8px;">
+      <span class="lbl" style="margin:0;">FX Mode</span>
+      <button id="fx-toggle-btn" class="vibe-btn" onclick="toggleFxMode()" style="width:auto;padding:5px 14px;opacity:.35;pointer-events:none;">○ Off</button>
+    </div>
+    <div id="imgfx-lock-note" style="font-size:10px;color:var(--dim);margin-bottom:8px;line-height:1.5;opacity:.7;">
+      ↑ Load an image above to enable FX
+    </div>
+    <div id="imgfx-row" style="opacity:.35;pointer-events:none;">
+      <div style="font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">Lo-Fi</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px;">
+        <button class="vibe-btn" id="ifx-raindrops" onclick="setImgFx('raindrops')">Rain</button>
+        <button class="vibe-btn" id="ifx-inkbleed"   onclick="setImgFx('inkbleed')">Ink</button>
+        <button class="vibe-btn" id="ifx-vhswarp"    onclick="setImgFx('vhswarp')">VHS</button>
+        <button class="vibe-btn" id="ifx-fog"        onclick="setImgFx('fog')">Fog</button>
+        <button class="vibe-btn" id="ifx-watercolor" onclick="setImgFx('watercolor')">Paint</button>
+        <button class="vibe-btn" id="ifx-dustfilm"   onclick="setImgFx('dustfilm')">Film</button>
+      </div>
+      <div style="font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;">Cyber</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px;">
+        <button class="vibe-btn" id="ifx-liquidmetal" onclick="setImgFx('liquidmetal')">Metal</button>
+        <button class="vibe-btn" id="ifx-shatter"     onclick="setImgFx('shatter')">Shatter</button>
+        <button class="vibe-btn" id="ifx-datacorrupt" onclick="setImgFx('datacorrupt')">Corrupt</button>
+        <button class="vibe-btn" id="ifx-plasmaarc"   onclick="setImgFx('plasmaarc')">Plasma</button>
+        <button class="vibe-btn" id="ifx-hologram"    onclick="setImgFx('hologram')">Holo</button>
+        <button class="vibe-btn" id="ifx-heatwave"    onclick="setImgFx('heatwave')">Heat</button>
+      </div>
+      <span class="lbl">Strength</span>
+      <div class="svr" style="margin-bottom:6px;">
+        <input type="range" id="fx-strength-sl" min="0" max="2" step="0.05" value="1" oninput="setFxStrength(+this.value)">
+        <span class="svv" id="fx-strength-v">1.0</span>
+      </div>
+    </div>
+  </div>
+
+</div></div><!-- /sb right -->
 
 <div id="toast"></div>
 
@@ -1422,6 +1542,15 @@ function renderLoop(ts) {
     let trebSum = 0;
     for (let i = trebleStart; i < binCount; i++) trebSum += d[i];
     const trebleRaw = trebSum / (binCount - trebleStart) / 255;
+
+    // Mid — 8% to 75% of bins (vocals, harmonics)
+    const midEnd = Math.floor(binCount * 0.75);
+    let midSum = 0;
+    for (let i = bassEnd; i < midEnd; i++) midSum += d[i];
+    const midRaw = midSum / (midEnd - bassEnd) / 255;
+
+    // Feed Aurora
+    updateAuroraAudio(bassRaw, midRaw, trebleRaw);
 
     // Overall peak for image FX shader
     const peak = Math.max(...d) / 255;
@@ -1696,7 +1825,7 @@ async function autoConnectSystemAudio() {
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { width: 1, height: 1, frameRate: 1 },
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 44100 },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
     });
     stream.getVideoTracks().forEach(t => t.stop());
     if (!stream.getAudioTracks().length) {
@@ -1725,7 +1854,7 @@ async function startSystemAudioCapture() {
     toast('🎵 Pick the Spotify window → check "Share audio" → click Share');
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { width: 1, height: 1, frameRate: 1 },
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 44100 },
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
     });
     stream.getVideoTracks().forEach(t => t.stop());
     if (!stream.getAudioTracks().length) {
@@ -1786,7 +1915,7 @@ function setupSpotifyIPC() {
       el('login').style.display = 'none';
       el('client-id-input').value = '';
       el('setup-error').style.display = 'none';
-      if (sidebarOpen) toggleSidebar();
+      if (sidebarOpen || leftSidebarOpen) toggleBothSidebars();
       setTimeout(() => {}, 0); // setup screen shown
       return;
     }
@@ -1990,6 +2119,10 @@ async function spAction(cmd) {
     await window.IKANDY.vlcAction(typeof cmd === 'string' ? { type: cmd } : cmd);
     return;
   }
+  if (currentSource === 'foobar') {
+    await window.IKANDY.foobarAction(typeof cmd === 'string' ? { type: cmd } : cmd);
+    return;
+  }
   if (type === 'playpause') {
     const wasPlaying = trackPlaying;
     setPlayIcon(!wasPlaying);
@@ -2018,6 +2151,8 @@ function setVolume(val) {
   _volDebounce = setTimeout(() => {
     if (currentSource === 'vlc') {
       window.IKANDY.vlcAction({ type: 'volume', value: val });
+    } else if (currentSource === 'foobar') {
+      window.IKANDY.foobarAction({ type: 'volume', value: val });
     } else {
       window.IKANDY.action({ type: 'volume', value: val });
     }
@@ -2045,7 +2180,7 @@ async function changeClientId() {
   if (!confirm('This will disconnect Spotify and return to setup. Continue?')) return;
   await window.IKANDY.clearClientId();
   // Close sidebar and show setup screen
-  if (sidebarOpen) toggleSidebar();
+  if (sidebarOpen || leftSidebarOpen) toggleBothSidebars();
   el('setup').style.display = 'flex';
   el('login').style.display = 'none';
   el('client-id-input').value = '';
@@ -2058,24 +2193,31 @@ async function startLogin() {
     el('setup').style.display  = 'flex';
     el('login').style.display  = 'none';
     // Close sidebar so setup screen is fully visible
-    if (sidebarOpen) toggleSidebar();
+    if (sidebarOpen || leftSidebarOpen) toggleBothSidebars();
     return;
   }
   window.IKANDY.startAuth();
 }
 /* ── PLAYLIST PANEL ── */
-let _playlists = [], _plLoaded = false, _activePlUri = '', _plSearchStr = '';
+let _playlists = [], _plLoaded = false, _plSource = '', _activePlUri = '', _plSearchStr = '';
 
 async function openPlaylistPanel() {
   el('playlist-panel').classList.add('open');
-  if (!_plLoaded) await loadPlaylists();
+  if (!_plLoaded || _plSource !== currentSource) {
+    _plLoaded = false;
+    _plSource = currentSource;
+    _activePlUri = '';
+    await loadPlaylists();
+  }
 }
 function closePlaylistPanel() {
   el('playlist-panel').classList.remove('open');
 }
 async function loadPlaylists() {
   el('plp-grid').innerHTML = '<div style="padding:48px;text-align:center;color:var(--dim);font-size:13px;">Loading…</div>';
-  const result = await window.IKANDY.getPlaylists();
+  const result = (currentSource === 'foobar')
+    ? await window.IKANDY.getFoobarPlaylists()
+    : await window.IKANDY.getPlaylists();
   if (!result.ok) {
     el('plp-grid').innerHTML = `<div style="padding:48px;text-align:center;color:var(--red);">${esc(result.error || 'Failed')}</div>`;
     return;
@@ -2107,6 +2249,14 @@ function plpFilter(q) {
 
 /* ── PLAY PLAYLIST ── */
 async function playPlaylist(uri, id) {
+  if (currentSource === 'foobar') {
+    _activePlUri = uri;
+    buildPlpGrid(_playlists);
+    closePlaylistPanel();
+    const result = await window.IKANDY.playFoobarPlaylist(id);
+    if (result && result.ok === false) toast('Could not start playlist — is foobar2000 running?');
+    return;
+  }
   if (currentSource === 'vlc') {
     await window.IKANDY.setSource('spotify');
     currentSource = 'spotify';
@@ -2163,6 +2313,8 @@ function seekTrack(e) {
   _pollAnchorTime = performance.now();
   if (currentSource === 'vlc') {
     window.IKANDY.vlcAction({ type: 'seek', position: Math.round(posMs / 1000) });
+  } else if (currentSource === 'foobar') {
+    window.IKANDY.foobarAction({ type: 'seek', position: Math.round(posMs / 1000) });
   } else {
     window.IKANDY.action({ type: 'seek', position_ms: posMs });
   }
@@ -2187,17 +2339,22 @@ async function initSource() {
   currentSource = s.mode || 'spotify';
   if (s.vlcPort)     el('vlc-port-input').value = s.vlcPort;
   if (s.vlcPassword) el('vlc-pass-input').value  = s.vlcPassword;
+  if (s.foobarPort && el('foobar-port-input')) el('foobar-port-input').value = s.foobarPort;
+  if (s.foobarPassword && el('foobar-pass-input')) el('foobar-pass-input').value = s.foobarPassword;
   applySourceUI(currentSource);
 }
 function applySourceUI(mode) {
   const isVlc    = mode === 'vlc';
   const isLocal  = mode === 'local';
+  const isFoobar = mode === 'foobar';
   const isSpotify= mode === 'spotify';
-  el('src-spotify-panel').style.display = (isVlc || isLocal) ? 'none' : '';
-  el('src-vlc-panel').style.display     = isVlc   ? '' : 'none';
-  el('src-local-info') && (el('src-local-info').style.display = isLocal ? '' : 'none');
+  el('src-spotify-panel').style.display = isSpotify ? '' : 'none';
+  el('src-vlc-panel').style.display     = isVlc    ? '' : 'none';
+  el('src-foobar-panel') && (el('src-foobar-panel').style.display = isFoobar ? '' : 'none');
+  el('src-local-info')   && (el('src-local-info').style.display   = isLocal  ? '' : 'none');
   el('src-spotify-btn').className = isSpotify ? 'btn primary' : 'btn';
   el('src-vlc-btn').className     = isVlc     ? 'btn primary' : 'btn';
+  el('src-foobar-btn') && (el('src-foobar-btn').className = isFoobar ? 'btn primary' : 'btn');
   el('src-local-btn').className   = isLocal   ? 'btn primary' : 'btn';
 }
 let _isPremium = false; // track premium state across source switches
@@ -2207,7 +2364,7 @@ async function setSourceMode(mode) {
   if (mode === 'spotify') {
     const id = await window.IKANDY.getClientId();
     if (!id) {
-      if (sidebarOpen) toggleSidebar();
+      if (sidebarOpen || leftSidebarOpen) toggleBothSidebars();
       el('setup').style.display = 'flex';
       el('login').style.display = 'none';
       el('client-id-input').value = '';
@@ -2238,8 +2395,27 @@ async function setSourceMode(mode) {
     updateBadge(_vlcConnected, _vlcConnected ? 'VLC' : 'VLC — click Connect');
     el('vlc-status').textContent = _vlcConnected ? '✓ Connected to VLC' : 'Switched to VLC — click Connect VLC';
     el('vlc-status').style.color = _vlcConnected ? 'var(--sp)' : 'var(--dim)';
+  } else if (mode === 'foobar') {
+    // foobar2000 always shows full HUD and controls — unlocked
+    el('hud').style.display      = '';
+    el('controls').style.display = '';
+    el('free-note').style.display = 'none';
+    document.querySelectorAll('#controls .cb, #vol-row').forEach(b => {
+      b.disabled = false; b.style.opacity = '1'; b.style.pointerEvents = '';
+    });
+    const volSl = el('vol-sl');
+    if (volSl) { volSl.disabled = false; volSl.style.opacity = '1'; }
+    el('fb-playlists-btn') && (el('fb-playlists-btn').style.display = _foobarConnected ? '' : 'none');
+    updateBadge(_foobarConnected, _foobarConnected ? 'foobar2000' : 'foobar2000 — click Connect');
+    if (el('foobar-status')) {
+      el('foobar-status').textContent = _foobarConnected ? '✓ Connected to foobar2000' : 'Switched to foobar2000 — click Connect';
+      el('foobar-status').style.color = _foobarConnected ? 'var(--sp)' : 'var(--dim)';
+    }
   } else if (mode === 'spotify') {
-    // Re-apply premium state and update badge
+    // Re-query live state from main — _isPremium can be stale if /me ever failed
+    const auth = await window.IKANDY.isAuthed();
+    const live = (auth && auth.product === 'premium');
+    if (live) _isPremium = true;
     setSpotifyControls(_isPremium);
     updateBadge(_isPremium, _isPremium ? 'Spotify Premium' : 'Spotify Free');
   }
@@ -2266,6 +2442,32 @@ async function vlcConnect() {
     el('vlc-status').textContent = '✗ ' + (result.error || 'Failed');
     el('vlc-status').style.color = 'var(--red)';
     _vlcConnected = false;
+  }
+}
+let _foobarConnected = false;
+async function foobarConnect() {
+  const port = parseInt(el('foobar-port-input').value) || 8880;
+  const pass = el('foobar-pass-input')?.value || '';
+  await window.IKANDY.setFoobarConfig({ port, password: pass });
+  el('foobar-status').textContent = 'Testing connection…';
+  el('foobar-status').style.color = 'var(--dim)';
+  const result = await window.IKANDY.foobarTest();
+  if (result.ok) {
+    el('foobar-status').textContent = '✓ Connected to foobar2000';
+    el('foobar-status').style.color = 'var(--sp)';
+    _foobarConnected = true;
+    await window.IKANDY.setSource('foobar');
+    currentSource = 'foobar';
+    el('hud').style.display      = '';
+    el('controls').style.display = '';
+    el('free-note').style.display = 'none';
+    el('fb-playlists-btn') && (el('fb-playlists-btn').style.display = '');
+    updateBadge(true, 'foobar2000');
+  } else {
+    el('foobar-status').textContent = '✗ ' + (result.error || 'Failed');
+    el('foobar-status').style.color = 'var(--red)';
+    _foobarConnected = false;
+    el('fb-playlists-btn') && (el('fb-playlists-btn').style.display = 'none');
   }
 }
 
@@ -2756,17 +2958,62 @@ function ppCat(cat) {
 function ppFilter(q) { ppSearchStr = q.toLowerCase(); buildGrid(); }
 
 /* ── SIDEBAR / TOAST / ACCORDION ── */
-let sidebarOpen = false;
-function toggleSidebar() {
-  ensureAudioRunning();
-  sidebarOpen = !sidebarOpen;
-  window.sidebarOpen = sidebarOpen; // keep window in sync for tour
-  el('sb').classList.toggle('open', sidebarOpen);
-  el('ptab').classList.toggle('open', sidebarOpen);
-  el('ptab').classList.toggle('shifted', sidebarOpen);
+let sidebarOpen = false;      // right (FX) panel
+let leftSidebarOpen = false;  // left (Source) panel
+let panelsSync = true;        // default: synced
+
+function toggleSync() {
+  panelsSync = !panelsSync;
+  const btn = el('sync-btn');
+  if (panelsSync) {
+    btn.style.background = 'var(--acc-dim)';
+    btn.style.borderColor = 'var(--acc)';
+    btn.style.color = 'var(--acc-txt)';
+  } else {
+    btn.style.background = 'transparent';
+    btn.style.borderColor = 'var(--bdr)';
+    btn.style.color = 'var(--dim)';
+  }
 }
+
+function _applyLeft(open) {
+  leftSidebarOpen = open;
+  el('sb-left').classList.toggle('open', open);
+  el('ltab').classList.toggle('open', open);
+  el('ltab').classList.toggle('shifted', open);
+}
+function _applyRight(open) {
+  sidebarOpen = open;
+  window.sidebarOpen = open;
+  el('sb').classList.toggle('open', open);
+  el('ptab').classList.toggle('open', open);
+  el('ptab').classList.toggle('shifted', open);
+}
+
+function handleLeftTab() {
+  const open = !leftSidebarOpen;
+  _applyLeft(open);
+  if (panelsSync) _applyRight(open);
+}
+function handleRightTab() {
+  ensureAudioRunning();
+  const open = !sidebarOpen;
+  _applyRight(open);
+  if (panelsSync) _applyLeft(open);
+}
+// Legacy alias used elsewhere in the code
+function toggleSidebar() { handleRightTab(); }
+function toggleLeftSidebar() { handleLeftTab(); }
+function toggleBothSidebars() {
+  const open = !sidebarOpen;
+  _applyLeft(open);
+  _applyRight(open);
+}
+
 window.sidebarOpen = false;
 window.toggleSidebar = toggleSidebar;
+window.toggleLeftSidebar = toggleLeftSidebar;
+window.toggleBothSidebars = toggleBothSidebars;
 function accToggle(hd) {
   hd.classList.toggle('open');
   const bd = hd.nextElementSibling;
@@ -2778,8 +3025,7 @@ window.accToggle = accToggle;
 window.accOpen  = accOpen;
 window.accClose = accClose;
 function accToggleAll() {
-  const headers = document.querySelectorAll('#sbi .acc-hd');
-  // Decide based on majority — if more are open, collapse all, else expand all
+  const headers = document.querySelectorAll('#sbi .acc-hd, #sb-left-i .acc-hd');
   const openCount = [...headers].filter(h => h.classList.contains('open')).length;
   const shouldOpen = openCount < headers.length / 2;
   headers.forEach(h => {
@@ -2788,7 +3034,19 @@ function accToggleAll() {
     else if (!shouldOpen && isOpen) accToggle(h);
   });
   const btn = el('acc-all-btn');
-  if (btn) btn.textContent = shouldOpen ? '⊟ All' : '⊞ All';
+  if (btn) {
+    if (shouldOpen) {
+      btn.textContent = '⊟ All';
+      btn.style.borderColor = 'var(--acc)';
+      btn.style.color = 'var(--acc-txt)';
+      btn.style.background = 'var(--acc-dim)';
+    } else {
+      btn.textContent = '⊞ All';
+      btn.style.borderColor = 'var(--bdr)';
+      btn.style.color = 'var(--dim)';
+      btn.style.background = 'none';
+    }
+  }
 }
 let _toastTimer = null;
 function toast(msg, dur = 3500) {
@@ -2893,6 +3151,1655 @@ async function waitForButterchurn() {
 function lp(pct) { const f = el('ld-fill'); if (f) f.style.width = pct + '%'; }
 
 /* ═══════════════════════════════════════════════════════════════════
+   SCENES — audio-reactive fullscreen GLSL layers
+   Aurora: curtains of light driven by bass/mid/treble
+   ═══════════════════════════════════════════════════════════════════ */
+
+const auroraCanvas = document.getElementById('aurora-canvas');
+const auroraGl     = auroraCanvas.getContext('webgl');
+let _auroraRAF       = null;
+let _auroraTime      = 0;
+let _auroraActive    = false;
+let _sceneIntensity  = 1.0;
+let _currentScene    = 'none';
+
+// Smoothed audio values for Aurora
+let _aBass   = 0, _aMid = 0, _aTreble = 0;
+
+const AURORA_VERT = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const AURORA_FRAG = `
+  precision highp float;
+  uniform float u_time;
+  uniform float u_bass;
+  uniform float u_mid;
+  uniform float u_treble;
+  uniform float u_intensity;
+  uniform vec2  u_res;
+  varying vec2  v_uv;
+
+  // ── Smooth noise helpers ──
+  float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x),
+      mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x),
+      f.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) {
+      v += a * vnoise(p); p = p * 2.1 + vec2(1.7, 9.2); a *= 0.5;
+    }
+    return v;
+  }
+
+  // ── Aurora curtain height field ──
+  // Slow domain-warped fbm gives the organic curtain drape
+  float curtainHeight(vec2 uv, float t) {
+    float speed = t * 0.08;
+    // Primary warp — large slow undulation
+    vec2 q = vec2(
+      fbm(uv * 1.2 + vec2(speed * 0.7, speed * 0.4)),
+      fbm(uv * 1.2 + vec2(3.1, 1.7) + speed * 0.3)
+    );
+    // Secondary — tighter folds
+    vec2 r = vec2(
+      fbm(uv * 2.5 + 3.0 * q + vec2(1.7, 9.2) + speed * 0.5),
+      fbm(uv * 2.5 + 3.0 * q + vec2(8.3, 2.8) + speed * 0.4)
+    );
+    return fbm(uv * 1.8 + 2.0 * r + speed * 0.6);
+  }
+
+  // ── Color palette — aurora greens, cyans, magentas, purples ──
+  vec3 auroraColor(float h, float mid) {
+    // Base hue cycles slowly with time and mid energy
+    // Band 0: deep teal-green
+    // Band 1: cyan-aqua
+    // Band 2: blue-violet
+    // Band 3: magenta
+    vec3 c0 = vec3(0.05, 0.85, 0.55);  // teal green
+    vec3 c1 = vec3(0.10, 0.70, 0.95);  // cyan
+    vec3 c2 = vec3(0.35, 0.20, 0.95);  // blue-violet
+    vec3 c3 = vec3(0.90, 0.10, 0.75);  // magenta
+    float t = fract(h + mid * 0.3);
+    // Smooth palette interpolation
+    float s = t * 3.0;
+    if (s < 1.0) return mix(c0, c1, s);
+    if (s < 2.0) return mix(c1, c2, s - 1.0);
+    return mix(c2, c3, s - 2.0);
+  }
+
+  void main() {
+    vec2  uv = v_uv;
+    float t  = u_time;
+    float I  = u_intensity;
+
+    // Aspect-correct UVs for curtain shape
+    float AR = u_res.x / u_res.y;
+    vec2  suv = vec2(uv.x * AR, uv.y);
+
+    // ── Curtain field — bass lifts the curtains higher ──
+    float bassLift = u_bass * 0.35 * I;
+    float h = curtainHeight(suv * 0.6 + vec2(0.0, t * 0.04), t);
+
+    // Vertical mask — aurora starts above screen, flows down into view
+    // Bass pushes it further down
+    float vertCenter = 0.92 + bassLift;
+    float vertSpread = 0.55 + u_bass * 0.25 * I;
+    float vMask = smoothstep(0.0, vertSpread, vertCenter - uv.y)
+                * smoothstep(0.0, 0.05, uv.y + 0.1);
+
+    // ── Curtain bands — multiple overlapping sheets ──
+    float band1 = smoothstep(0.30, 0.70, h);
+    float band2 = smoothstep(0.42, 0.68, h + fbm(suv * 2.0 + t * 0.12) * 0.2);
+    float band3 = smoothstep(0.50, 0.65, h + fbm(suv * 3.5 - t * 0.08) * 0.15);
+
+    // ── Shimmer — treble drives fine sparkle on curtain edges ──
+    float shimmerNoise = vnoise(suv * 18.0 + t * 2.5) * vnoise(suv * 32.0 - t * 1.8);
+    float shimmer = shimmerNoise * u_treble * 1.8 * I;
+    // Shimmer lives at curtain edges (band gradient)
+    float edgeMask = abs(band1 - 0.5) * 2.0;
+    shimmer *= edgeMask;
+
+    // ── Color ──
+    // Hue position drifts slowly + mid energy shifts palette
+    float huePos = fbm(suv * 0.5 + t * 0.03) + u_mid * 0.4;
+    vec3 col1 = auroraColor(huePos,            u_mid);
+    vec3 col2 = auroraColor(huePos + 0.18,     u_mid);
+    vec3 col3 = auroraColor(huePos + 0.36,     u_mid);
+
+    // Compose curtain layers
+    vec3 aurora = vec3(0.0);
+    aurora += col1 * band1 * 0.7;
+    aurora += col2 * band2 * 0.5;
+    aurora += col3 * band3 * 0.35;
+
+    // ── Bass pulse — brighten whole curtain on kick ──
+    float pulse = 1.0 + u_bass * 1.2 * I;
+    aurora *= pulse;
+
+    // ── Shimmer highlights — near-white sparkle ──
+    aurora += vec3(0.7, 0.95, 1.0) * shimmer * 0.6;
+
+    // ── Bottom fade — aurora fades to black at horizon ──
+    float horizFade = smoothstep(0.0, 0.18, uv.y);
+    aurora *= horizFade;
+
+    // ── Stars — tiny fixed points, brighter with treble ──
+    // PATCH 10: sub-cell stars. Old version used step() on a per-cell hash, which
+    // lit the ENTIRE cell — producing visible rectangular blocks on widescreens.
+    // Now we hash to find winning cells, then draw a soft circular point at a
+    // randomized position INSIDE each cell with smoothstep falloff. No more blocks.
+    vec2  starCell  = floor(suv * vec2(120.0, 70.0));
+    vec2  starLocal = fract(suv * vec2(120.0, 70.0));
+    float starHash  = h21(starCell);
+    vec2  starPos   = vec2(h21(starCell + vec2(0.13, 0.71)),
+                           h21(starCell + vec2(0.57, 0.29)));
+    float starDist  = length(starLocal - starPos);
+    float starOn    = step(0.985, starHash);
+    float starShape = smoothstep(0.10, 0.0, starDist);
+    float star      = starOn * starShape * (0.3 + u_treble * 0.7 * I);
+    // Stars only above the main curtain
+    float starMask = smoothstep(0.6, 0.9, uv.y);
+    aurora += vec3(0.8, 0.9, 1.0) * star * starMask;
+
+    // Apply vertical mask and global intensity
+    aurora *= vMask * I;
+
+    // Screen blend-ready — pre-multiplied, clamped
+    gl_FragColor = vec4(clamp(aurora, 0.0, 1.0), 1.0);
+  }
+`;
+
+// ── Shared WebGL scene builder ──
+function buildSceneProgram(gl, vertSrc, fragSrc, label) {
+  if (!gl) return null;
+  function makeShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+      console.error('[IKANDY ' + label + '] Shader error:', gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, makeShader(gl.VERTEX_SHADER,   vertSrc));
+  gl.attachShader(prog, makeShader(gl.FRAGMENT_SHADER, fragSrc));
+  gl.linkProgram(prog);
+  // Upload quad once — never again
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'a_pos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  // Cache uniform locations
+  gl.useProgram(prog);
+  prog._u = {};
+  ['u_time','u_bass','u_mid','u_treble','u_intensity','u_res'].forEach(n => {
+    prog._u[n] = gl.getUniformLocation(prog, n);
+  });
+  return prog;
+}
+
+const _auroraProgram = buildSceneProgram(auroraGl, AURORA_VERT, AURORA_FRAG, 'Aurora');
+
+function renderAurora() {
+  const gl = auroraGl; if (!gl || !_auroraProgram) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  if (auroraCanvas.width !== W || auroraCanvas.height !== H) {
+    auroraCanvas.width = W; auroraCanvas.height = H;
+    gl.viewport(0, 0, W, H);
+  }
+  gl.useProgram(_auroraProgram);
+  const u = _auroraProgram._u;
+  gl.uniform1f(u.u_time,      _auroraTime);
+  gl.uniform1f(u.u_bass,      _aBass);
+  gl.uniform1f(u.u_mid,       _aMid);
+  gl.uniform1f(u.u_treble,    _aTreble);
+  gl.uniform1f(u.u_intensity, _sceneIntensity);
+  gl.uniform2f(u.u_res,       W, H);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  _auroraTime += 0.016;
+}
+
+function startAuroraLoop() {
+  if (_auroraRAF) return;
+  function loop() { renderAurora(); _auroraRAF = requestAnimationFrame(loop); }
+  loop();
+}
+function stopAuroraLoop() {
+  if (_auroraRAF) { cancelAnimationFrame(_auroraRAF); _auroraRAF = null; }
+  const gl = auroraGl; if (gl) gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PATCH 11: SINGULARITY — black hole scene (the million-dollar one)
+
+   Components:
+   • Pure black event horizon disk
+   • Bright photon ring just outside it (bass flares this)
+   • Tilted accretion disk with orbital fbm streamers, color-graded
+     hot-white→orange→cool-purple from inner to outer rim
+   • Doppler beaming — one side brighter than the other from approach
+   • Background starfield gravitationally lensed around the hole
+
+   Audio mapping:
+   • BASS  → photon ring brightness + lensing strength + disk extent pulse
+   • MID   → disk rotation speed + color temperature shift
+   • TREBLE→ shimmer on bright disk streamers + star brightness
+   ═══════════════════════════════════════════════════════════════════ */
+
+const singularityCanvas = document.getElementById('singularity-canvas');
+const singularityGl     = singularityCanvas.getContext('webgl');
+let _singularityRAF     = null;
+let _singularityTime    = 0;
+
+const SINGULARITY_FRAG = `
+  precision highp float;
+  uniform float u_time;
+  uniform float u_bass;
+  uniform float u_mid;
+  uniform float u_treble;
+  uniform float u_intensity;
+  uniform vec2  u_res;
+  varying vec2  v_uv;
+
+  // ── Hash + noise ──
+  float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x),
+               mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) {
+      v += a * vnoise(p);
+      p = p * 2.07 + vec2(1.7, 9.2);
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  // ── Sub-cell point star (same fix as Aurora — no rectangular blocks) ──
+  float starAt(vec2 uv, float density, float thresh) {
+    vec2  cell  = floor(uv * density);
+    vec2  local = fract(uv * density);
+    float h     = h21(cell);
+    if (h < thresh) return 0.0;
+    vec2  pos   = vec2(h21(cell + vec2(0.13, 0.71)),
+                       h21(cell + vec2(0.57, 0.29)));
+    float d     = length(local - pos);
+    return smoothstep(0.10, 0.0, d) * (h - thresh) / (1.0 - thresh);
+  }
+
+  // PATCH 13: Polar-aware star sampler — wraps angular cells via mod() so there's
+  // no seam at the atan(y,x) discontinuity on the negative x-axis. angCells must
+  // be an integer for clean wrapping.
+  float starAtPolar(float angRad, float vAxis, float angCells, float vScale, float thresh) {
+    float u    = mod((angRad + 3.14159265) / 6.2831853 * angCells, angCells);
+    float v    = vAxis * vScale;
+    vec2  cell  = vec2(floor(u), floor(v));
+    vec2  local = vec2(fract(u), fract(v));
+    float h     = h21(cell);
+    if (h < thresh) return 0.0;
+    vec2  pos   = vec2(h21(cell + vec2(0.13, 0.71)),
+                       h21(cell + vec2(0.57, 0.29)));
+    float d     = length(local - pos);
+    return smoothstep(0.10, 0.0, d) * (h - thresh) / (1.0 - thresh);
+  }
+
+  void main() {
+    vec2  uv = v_uv;
+    float t  = u_time;
+    float I  = u_intensity;
+    float AR = u_res.x / u_res.y;
+
+    // Aspect-corrected, centered coordinates (origin = hole center)
+    vec2  p = vec2((uv.x - 0.5) * AR, uv.y - 0.5);
+    float r = length(p);
+
+    // ── Event horizon geometry ──
+    float bhR     = 0.105 + u_bass * 0.012 * I;   // event horizon radius (slight pulse)
+    float photonR = bhR * 1.05;                    // photon ring orbits here
+
+    // ── Disk-plane (tilted) coords ──
+    float tilt = 0.32;
+    vec2  dp   = vec2(p.x, p.y / cos(tilt));
+    float dr   = length(dp);
+    float ang  = atan(dp.y, dp.x);
+
+    // ── Gravitational lensing of background ──
+    // Schwarzschild deflection: angle ∝ 1/r  →  sample warped UV for stars
+    // Bass amplifies the warp ("matter falling in" feel)
+    float lensStrength = bhR * bhR * 1.6 * (1.0 + u_bass * 0.6 * I);
+    float deflect      = lensStrength / max(r * r, bhR * bhR * 0.15);
+    vec2  lensP        = p - normalize(p + 0.0001) * min(deflect, r * 0.75);
+
+    // ── PATCH 12: TUNNEL polar coordinates with radial inflow ──
+    // log(r) maps "near vs far" smoothly. Advecting it over time = matter
+    // visibly streaming inward. This fills the whole screen — no outer rim.
+    // Bass ramps speed so big kicks accelerate your fall into the hole.
+    float speed = 0.55 + u_mid * 1.4 * I + u_bass * 0.50 * I;
+    float logR  = log(max(dr, 0.01));
+    float vAdv  = logR - t * speed;
+
+    // Multi-layer gas vortex in polar tunnel space — feels volumetric.
+    // PATCH 13: angular component uses (cos·N, sin·N) basis instead of ang·N.
+    // cos/sin are inherently periodic so there's no seam at the atan
+    // discontinuity. Each basis traces the unit circle N times per revolution,
+    // preserving the same visual angular frequency as the previous version.
+    vec2 ab3  = vec2(cos(ang *  3.0), sin(ang *  3.0)) * 3.0;
+    vec2 ab6  = vec2(cos(ang *  6.0), sin(ang *  6.0)) * 2.0;
+    vec2 ab11 = vec2(cos(ang * 11.0), sin(ang * 11.0)) * 1.5;
+    float gas = fbm(ab3  + vec2(vAdv * 1.5,  vAdv * 2.5)) * 0.55
+              + fbm(ab6  + vec2(-vAdv * 2.5, vAdv * 5.0)) * 0.30
+              + fbm(ab11 + vec2(vAdv * 4.0,  vAdv * 8.0)) * 0.15;
+    gas = smoothstep(0.32, 0.95, gas);
+
+    // Soft edge falloff so corners don't blow out — but no hard rim
+    gas *= 1.0 - smoothstep(0.55, 1.40, dr) * 0.45;
+    // Carve out the event horizon — no gas inside the hole
+    gas *= smoothstep(bhR * 1.05, bhR * 1.30, dr);
+
+    // ── Color: log-radius gradient (hot inner → cool outer → deep edges) ──
+    float radT  = clamp((logR + 3.0) / 3.5, 0.0, 1.0);
+    vec3  cHot  = vec3(1.00, 0.96, 0.78);   // hot inner
+    vec3  cWarm = vec3(1.00, 0.55, 0.18);   // orange
+    vec3  cCool = vec3(0.55, 0.18, 0.42);   // outer cool
+    vec3  cDeep = vec3(0.20, 0.08, 0.25);   // deep periphery (was empty space before)
+    vec3  gasC  = mix(cHot,  cWarm, smoothstep(0.0,  0.40, radT));
+          gasC  = mix(gasC,  cCool, smoothstep(0.40, 0.70, radT));
+          gasC  = mix(gasC,  cDeep, smoothstep(0.70, 1.00, radT));
+    gasC = mix(gasC, vec3(1.0), u_mid * 0.22 * I);
+
+    // Doppler beaming — Keplerian v ~ sqrt(bhR/dr); approach side = +x (CCW spin)
+    float vKep    = sqrt(bhR / max(dr, bhR * 0.5));
+    float doppler = 1.0 + cos(ang) * vKep * 0.55 * I;
+    gasC *= doppler;
+
+    // Treble shimmer at bright streamers
+    gasC += vec3(0.5, 0.7, 1.0) * u_treble * 0.40 * I * step(0.70, gas);
+
+    vec3 disk = gasC * gas * 1.4;
+
+    // ── PATCH 12: Stars in polar tunnel space — auto-streak as they advect ──
+    // Each star sits at a fixed (angle, log-r) cell. As log-r advects with t,
+    // the star's screen position spirals inward — natural radial streaks.
+    // Using lensP for the angle/radius preserves gravitational warping.
+    // PATCH 13: starAtPolar() wraps angular cells via mod() — no atan seam.
+    float lensR   = length(lensP);
+    float lensAng = atan(lensP.y, lensP.x);
+    float lensV   = log(max(lensR, 0.01)) - t * speed * 0.45;
+    float stars   = starAtPolar(lensAng, lensV,  12.0,  6.0, 0.970) * 0.95
+                  + starAtPolar(lensAng, lensV,  48.0, 20.0, 0.984) * 0.65
+                  + starAtPolar(lensAng, lensV, 120.0, 48.0, 0.992) * 0.45;
+    stars *= 0.7 + u_treble * 0.6 * I;
+
+    // ── Photon ring — bright thin halo just outside event horizon ──
+    float ringD = abs(r - photonR);
+    float ringW = 0.010 + u_bass * 0.010 * I;
+    float ring  = smoothstep(ringW, 0.0, ringD);
+    vec3  ringC = vec3(1.00, 0.93, 0.65) * ring * (0.85 + u_bass * 1.6 * I);
+
+    // ── Compose ──
+    vec3 col = vec3(0.0);
+    col += vec3(0.85, 0.92, 1.0) * stars;
+    col += disk;
+    col += ringC;
+
+    // ── Event horizon — pure black inside, sub-pixel anti-aliased edge ──
+    float horizon = smoothstep(bhR - 0.003, bhR + 0.001, r);
+    col *= horizon;
+
+    // PATCH 12: outer vignette removed — disk fills the screen tunnel-style.
+
+    gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+  }
+`;
+
+const _singularityProgram = buildSceneProgram(singularityGl, AURORA_VERT, SINGULARITY_FRAG, 'Singularity');
+
+function renderSingularity() {
+  const gl = singularityGl; if (!gl || !_singularityProgram) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  if (singularityCanvas.width !== W || singularityCanvas.height !== H) {
+    singularityCanvas.width = W; singularityCanvas.height = H;
+    gl.viewport(0, 0, W, H);
+  }
+  gl.useProgram(_singularityProgram);
+  const u = _singularityProgram._u;
+  gl.uniform1f(u.u_time,      _singularityTime);
+  gl.uniform1f(u.u_bass,      _aBass);
+  gl.uniform1f(u.u_mid,       _aMid);
+  gl.uniform1f(u.u_treble,    _aTreble);
+  gl.uniform1f(u.u_intensity, _sceneIntensity);
+  gl.uniform2f(u.u_res,       W, H);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  _singularityTime += 0.016;
+}
+
+function startSingularityLoop() {
+  if (_singularityRAF) return;
+  function loop() { renderSingularity(); _singularityRAF = requestAnimationFrame(loop); }
+  loop();
+}
+function stopSingularityLoop() {
+  if (_singularityRAF) { cancelAnimationFrame(_singularityRAF); _singularityRAF = null; }
+  const gl = singularityGl; if (gl) gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STARFIELD — warp speed star streaming
+   Stars spawn at center, accelerate outward. You are flying through.
+   Bass = warp burst + radial bloom. Mid = color temp. Treble = shimmer.
+   No edge bounce — stars fly off and respawn at center.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const pawCanvas = document.getElementById('pawrticles-canvas');
+const pawCtx    = pawCanvas.getContext('2d');
+let _pawRAF     = null;
+let _pawTime    = 0;
+let _pawBassRaw = 0;
+
+// Onset detector — compares instantaneous bass vs short-term average
+// This fires reliably on every kick even in sustained bass sections
+let _bassAvg      = 0;   // short-term average (slow decay)
+let _bassOnset    = 0;   // onset strength 0-1
+let _onsetCooldown= 0;   // prevents double-triggering on same hit
+
+const STAR_COUNT = 1200;
+
+// Typed arrays — zero GC
+const sx    = new Float32Array(STAR_COUNT); // x (relative to center, -1..1 range)
+const sy    = new Float32Array(STAR_COUNT); // y
+const sz    = new Float32Array(STAR_COUNT); // z depth — 0=far, 1=close
+const ssize = new Float32Array(STAR_COUNT); // base size
+const shue  = new Float32Array(STAR_COUNT); // color hue
+let   _starInitialized = false;
+
+// Warp state
+let _warpSpeed    = 0;
+let _warpTarget   = 0.08;
+let _bloomAlpha   = 0;
+let _bloomHue     = 220;
+let _planetGlow   = 0;
+let _burstCooldown= 0;
+let _bassSmoothed = 0;
+let _bassPeak     = 0;
+let isBurst       = false;
+let bassJump      = 0;
+// PATCH 2: camera roll — converts "stars moving" into "I am moving"
+let _starRoll     = 0;
+let _starRollT    = 0;
+
+// Safe speed cap — prevents seizure-inducing strobe
+const WARP_MAX    = 0.055; // max z-advance per frame at full intensity
+
+function sRand() { return Math.random(); }
+
+function initStar(i, scattered) {
+  // Spawn at center in 3D — random angle, random depth
+  const angle = sRand() * Math.PI * 2;
+  const dist  = scattered ? sRand() * 0.9 : sRand() * 0.15; // scattered = fill screen on init
+  sx[i]    = Math.cos(angle) * dist;
+  sy[i]    = Math.sin(angle) * dist;
+  sz[i]    = scattered ? sRand() : 0.01 + sRand() * 0.1; // z=0 far, z=1 close
+  ssize[i] = 0.8 + sRand() * 1.8;
+  // PATCH 3: occasional warm giant / red dwarf among blue-white field — galactic variance
+  const _ts = sRand();
+  if      (_ts < 0.01) shue[i] = 0;                      // 1% red dwarf
+  else if (_ts < 0.06) shue[i] = 30 + sRand() * 25;      // 5% warm giants
+  else                 shue[i] = 200 + sRand() * 40;     // 94% blue-white
+}
+
+function initAllStars() {
+  const W = window.innerWidth, H = window.innerHeight;
+  pawCanvas.width = W; pawCanvas.height = H;
+  for (let i = 0; i < STAR_COUNT; i++) initStar(i, true); // scattered = fill on boot
+  _starInitialized = true;
+}
+
+function renderStarfield() {
+  const W = window.innerWidth, H = window.innerHeight;
+  if (pawCanvas.width !== W || pawCanvas.height !== H) {
+    pawCanvas.width = W; pawCanvas.height = H;
+  }
+
+  const ctx  = pawCtx;
+  const cx   = W * 0.5, cy = H * 0.5;
+  const I    = _sceneIntensity;
+  const t    = _pawTime;
+
+  // Warp speed — smoothed bass drives it continuously
+  _warpTarget = 0.008 + _bassSmoothed * 0.045 * I;
+  _warpSpeed += (_warpTarget - _warpSpeed) * 0.10;
+  const zStep = Math.min(WARP_MAX * I, _warpSpeed);
+
+  // PATCH 1: bloom now driven by smoothed bass (was dead code, hardcoded to 0)
+  // Hue subtly drifts with mids — same color flow as the rest of the scene.
+  _bloomAlpha = Math.min(0.55, _bassSmoothed * 0.50 * I);
+  _bloomHue   = (200 + _aMid * 80) % 360;
+
+  // ── Background — deep space, slightly tinted by mids ──
+  // Soft fade trail — longer at high warp (streaks), shorter at idle (dots)
+  const trailFade = Math.max(0.25, 0.6 - zStep * 18);
+  ctx.fillStyle = `rgba(0,0,0,${trailFade})`;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Bass bloom — radial color wash from center ──
+  if (_bloomAlpha > 0.004) {
+    const bloomR = Math.max(W, H) * 0.85;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, bloomR);
+    grad.addColorStop(0,   `hsla(${_bloomHue},70%,40%,${_bloomAlpha})`);
+    grad.addColorStop(0.4, `hsla(${_bloomHue},60%,25%,${_bloomAlpha * 0.4})`);
+    grad.addColorStop(1,   `hsla(${_bloomHue},50%,10%,0)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Stars stay white/blue-white — no color shift
+  const tempShift = 0;
+
+  _pawTime += 0.016;
+
+  // PATCH 2: subtle camera roll on bass — stars rotate, planet stays fixed
+  _starRollT += 0.008;
+  const _rollTarget = _bassSmoothed * 0.035 * Math.sin(_starRollT) * I;
+  _starRoll += (_rollTarget - _starRoll) * 0.06;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(_starRoll);
+  ctx.translate(-cx, -cy);
+
+  // ── Render stars ──
+  for (let i = 0; i < STAR_COUNT; i++) {
+    // Advance z — star flies toward camera
+    sz[i] += zStep * (0.5 + sz[i] * 1.5); // deeper stars accelerate faster = parallax
+
+    // Respawn at center when it flies past camera
+    if (sz[i] >= 1.0) {
+      initStar(i, false);
+      continue;
+    }
+
+    // Project 3D → 2D screen coords
+    const perspective = 1 / (1 - sz[i] * 0.95);
+    const screenX = cx + sx[i] * W * 0.7 * perspective;
+    const screenY = cy + sy[i] * H * 0.7 * perspective;
+
+    // Off screen — respawn
+    if (screenX < -10 || screenX > W+10 || screenY < -10 || screenY > H+10) {
+      initStar(i, false);
+      continue;
+    }
+
+    // Size grows as star gets closer — streaks at high warp
+    const closeness = sz[i];           // 0=tiny far, 1=huge close
+    const baseSize  = ssize[i] * (0.3 + closeness * 2.5) * I;
+
+    // Streak length — proportional to warp speed and closeness
+    const streakLen = baseSize * (1 + zStep * 200 * closeness);
+
+    // Brightness — treble shimmer on close stars
+    const shimmer = 1 + _aTreble * 0.8 * closeness * I;
+    const alpha   = Math.min(1, closeness * 1.8) * shimmer * 0.9;
+
+    // PATCH 3: per-star hue (was hardcoded 210). Warm stars get more saturation.
+    const hue = shue[i];
+    const isWarm = hue < 80;
+    const sat = (isWarm ? 60 : 15) + closeness * 20;
+    const lum = 75 + closeness * 20;
+
+    if (alpha < 0.04) continue;
+
+    // Draw as streak line at high warp, dot at idle
+    if (streakLen > baseSize * 1.5) {
+      // Direction from center
+      const dx = screenX - cx, dy = screenY - cy;
+      const len = Math.sqrt(dx*dx + dy*dy) + 0.001;
+      const nx = dx / len, ny = dy / len;
+
+      ctx.beginPath();
+      ctx.moveTo(screenX - nx * streakLen, screenY - ny * streakLen);
+      ctx.lineTo(screenX + nx * baseSize * 0.3, screenY + ny * baseSize * 0.3);
+      ctx.strokeStyle = `hsla(${hue},${sat}%,${lum}%,${alpha})`;
+      ctx.lineWidth   = baseSize * 0.7;
+      ctx.lineCap     = 'round';
+      ctx.stroke();
+    } else {
+      // Soft glowing dot
+      const gr = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, baseSize * 2);
+      gr.addColorStop(0,   `hsla(${hue},${sat}%,${lum}%,${alpha})`);
+      gr.addColorStop(1,   `hsla(${hue},${sat}%,${lum}%,0)`);
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, baseSize * 2, 0, Math.PI * 2);
+      ctx.fillStyle = gr;
+      ctx.fill();
+    }
+  }
+
+  ctx.restore(); // PATCH 2: end camera roll — planet renders un-rotated
+
+  // ── PLANET — stars stream behind it ──
+  drawPlanet(ctx, cx, cy, W, H);
+
+  // No burst stars — planet glow handles bass hits
+}
+
+// ── Planet state ──
+let _planetHue = 200;
+
+function drawPlanet(ctx, cx, cy, W, H) {
+  const I  = _sceneIntensity;
+
+  // ── Same direct analyserNode read the spectrum scene uses — no smoothing, instant ──
+  let _dpBass = 0;
+  if (analyserNode) {
+    const _dpData    = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteFrequencyData(_dpData);
+    const _dpBassEnd = Math.floor(_dpData.length * 0.08);
+    let _dpSum = 0;
+    for (let i = 0; i < _dpBassEnd; i++) _dpSum += _dpData[i];
+    _dpBass = _dpSum / _dpBassEnd / 255; // 0..1, raw, same as spectrum bars
+  }
+  const r = Math.min(W, H) * 0.14 * (1.0 + _dpBass * I * 3.0);
+  const px = cx * 1.02;
+  const py = cy * 1.12;
+
+  _planetHue = (_planetHue + 0.04 + _aMid * 0.3) % 360;
+  const ph = _planetHue;
+  const t  = _pawTime;
+
+  // ── Atmospheric glow — scales directly with bass, big hits = huge glow ──
+  const g = _planetGlow; // 0 quiet → 1 loud
+  const glowR = r * (1.8 + g * 3.5);
+  const atmGrad = ctx.createRadialGradient(px, py, r * 0.9, px, py, glowR);
+  atmGrad.addColorStop(0,   `hsla(${ph},90%,80%,${Math.min(0.9, 0.15 + g * 0.75)})`);
+  atmGrad.addColorStop(0.25,`hsla(${ph},85%,60%,${Math.min(0.7, 0.08 + g * 0.55)})`);
+  atmGrad.addColorStop(0.6, `hsla(${ph},75%,40%,${Math.min(0.3, 0.02 + g * 0.22)})`);
+  atmGrad.addColorStop(1,   `hsla(${ph},65%,20%,0)`);
+  ctx.beginPath();
+  ctx.arc(px, py, glowR, 0, Math.PI * 2);
+  ctx.fillStyle = atmGrad;
+  ctx.fill();
+
+  // ── Planet body base ──
+  const bodyGrad = ctx.createRadialGradient(
+    px - r * 0.28, py - r * 0.28, r * 0.04,
+    px + r * 0.1,  py + r * 0.1,  r * 1.05
+  );
+  bodyGrad.addColorStop(0,    `hsla(${ph},50%,76%,1)`);
+  bodyGrad.addColorStop(0.25, `hsla(${ph},62%,55%,1)`);
+  bodyGrad.addColorStop(0.55, `hsla(${(ph+15)%360},68%,36%,1)`);
+  bodyGrad.addColorStop(0.8,  `hsla(${(ph+28)%360},72%,22%,1)`);
+  bodyGrad.addColorStop(1,    `hsla(${(ph+38)%360},65%,10%,1)`);
+
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  // ── Surface bands — clipped to planet ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.clip();
+
+  // 12 bands with varying width, opacity, hue offset — Jupiter style
+  const bands = [
+    { y: -0.95, h: 0.12, hOff:  0,  sat: 55, lum: 75, alpha: 0.08 },
+    { y: -0.83, h: 0.08, hOff: 12,  sat: 65, lum: 45, alpha: 0.18 },
+    { y: -0.75, h: 0.14, hOff: -8,  sat: 60, lum: 68, alpha: 0.10 },
+    { y: -0.61, h: 0.10, hOff: 22,  sat: 70, lum: 38, alpha: 0.22 },
+    { y: -0.51, h: 0.16, hOff:  5,  sat: 55, lum: 72, alpha: 0.09 },
+    { y: -0.35, h: 0.09, hOff: 30,  sat: 72, lum: 32, alpha: 0.25 },
+    { y: -0.26, h: 0.18, hOff: -5,  sat: 58, lum: 65, alpha: 0.12 },
+    { y:  0.08, h: 0.11, hOff: 18,  sat: 68, lum: 40, alpha: 0.20 },
+    { y:  0.19, h: 0.15, hOff:  2,  sat: 52, lum: 70, alpha: 0.08 },
+    { y:  0.34, h: 0.10, hOff: 35,  sat: 75, lum: 35, alpha: 0.23 },
+    { y:  0.44, h: 0.18, hOff: -12, sat: 60, lum: 60, alpha: 0.11 },
+    { y:  0.62, h: 0.38, hOff: 25,  sat: 65, lum: 28, alpha: 0.19 },
+  ];
+  bands.forEach(b => {
+    const by2 = py + b.y * r;
+    const bh2 = b.h * r * 2;
+    ctx.fillStyle = `hsla(${(ph + b.hOff) % 360},${b.sat}%,${b.lum}%,${b.alpha})`;
+    ctx.fillRect(px - r, by2, r * 2, bh2);
+  });
+
+  // PATCH 4: ring shadow cast on planet body — drawn inside the body clip,
+  // tilted to match the rings (rotate 0.20). This is the detail that turns
+  // "planet with rings" into "Saturn."
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(0.20);
+  const _shGrad = ctx.createLinearGradient(0, -r * 0.10, 0, r * 0.08);
+  _shGrad.addColorStop(0,    'rgba(0,0,0,0)');
+  _shGrad.addColorStop(0.45, 'rgba(0,0,0,0.42)');
+  _shGrad.addColorStop(0.55, 'rgba(0,0,0,0.42)');
+  _shGrad.addColorStop(1,    'rgba(0,0,0,0)');
+  ctx.fillStyle = _shGrad;
+  ctx.fillRect(-r * 1.05, -r * 0.10, r * 2.1, r * 0.18);
+  ctx.restore();
+
+  // ── Storm spot — Great Red Spot style, slow rotation ──
+  const spotAngle = t * 0.04;
+  const spotX = px + Math.cos(spotAngle) * r * 0.28;
+  const spotY = py + r * 0.08;
+  const spotRx = r * 0.18, spotRy = r * 0.10;
+  const spotGrad = ctx.createRadialGradient(spotX, spotY, 0, spotX, spotY, spotRx);
+  spotGrad.addColorStop(0,   `hsla(${(ph + 160) % 360},80%,55%,0.55)`);
+  spotGrad.addColorStop(0.5, `hsla(${(ph + 140) % 360},75%,40%,0.35)`);
+  spotGrad.addColorStop(1,   `hsla(${(ph + 120) % 360},65%,30%,0)`);
+  ctx.save();
+  ctx.translate(spotX, spotY);
+  ctx.scale(1, spotRy / spotRx);
+  ctx.beginPath();
+  ctx.arc(0, 0, spotRx, 0, Math.PI * 2);
+  ctx.fillStyle = spotGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // ── Specular highlight — upper left ──
+  const specGrad = ctx.createRadialGradient(
+    px - r * 0.40, py - r * 0.40, 0,
+    px - r * 0.40, py - r * 0.40, r * 0.62
+  );
+  specGrad.addColorStop(0,   'rgba(255,255,255,0.30)');
+  specGrad.addColorStop(0.4, 'rgba(255,255,255,0.10)');
+  specGrad.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.fillStyle = specGrad;
+  ctx.fillRect(px - r, py - r, r * 2, r * 2);
+
+  // ── Terminator — dark limb on right edge ──
+  const termGrad = ctx.createRadialGradient(px + r * 0.5, py, 0, px + r * 0.5, py, r * 0.9);
+  termGrad.addColorStop(0,   'rgba(0,0,0,0.45)');
+  termGrad.addColorStop(0.6, 'rgba(0,0,0,0.15)');
+  termGrad.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = termGrad;
+  ctx.fillRect(px - r, py - r, r * 2, r * 2);
+
+  ctx.restore();
+
+  // ── Rings — back half (3 lanes) ──
+  const ringInner = r * 1.30, ringMid = r * 1.70, ringOuter = r * 2.4;
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.scale(1, 0.26);
+  ctx.rotate(0.20);
+
+  // Lane 1 — inner faint
+  ctx.beginPath();
+  ctx.arc(0, 0, ringMid,   Math.PI, Math.PI * 2);
+  ctx.arc(0, 0, ringInner, Math.PI * 2, Math.PI, true);
+  ctx.closePath();
+  const rg1b = ctx.createRadialGradient(0,0,ringInner, 0,0,ringMid);
+  rg1b.addColorStop(0,   `hsla(${ph},45%,55%,0.10)`);
+  rg1b.addColorStop(0.5, `hsla(${(ph+30)%360},55%,60%,0.25)`);
+  rg1b.addColorStop(1,   `hsla(${ph},40%,40%,0.08)`);
+  ctx.fillStyle = rg1b; ctx.fill();
+
+  // Lane 2 — outer brighter
+  ctx.beginPath();
+  ctx.arc(0, 0, ringOuter, Math.PI, Math.PI * 2);
+  ctx.arc(0, 0, ringMid,   Math.PI * 2, Math.PI, true);
+  ctx.closePath();
+  const rg2b = ctx.createRadialGradient(0,0,ringMid, 0,0,ringOuter);
+  rg2b.addColorStop(0,   `hsla(${(ph+20)%360},55%,62%,0.28)`);
+  rg2b.addColorStop(0.6, `hsla(${(ph+45)%360},60%,50%,0.18)`);
+  rg2b.addColorStop(1,   `hsla(${ph},40%,30%,0.03)`);
+  ctx.fillStyle = rg2b; ctx.fill();
+  ctx.restore();
+
+  // ── Planet body again — occludes back ring ──
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  // Re-draw specular on top (lost when we redrew body)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(px, py, r, 0, Math.PI * 2);
+  ctx.clip();
+  const spec2 = ctx.createRadialGradient(px - r*0.40, py - r*0.40, 0, px - r*0.40, py - r*0.40, r*0.62);
+  spec2.addColorStop(0,   'rgba(255,255,255,0.28)');
+  spec2.addColorStop(0.4, 'rgba(255,255,255,0.08)');
+  spec2.addColorStop(1,   'rgba(255,255,255,0)');
+  ctx.fillStyle = spec2;
+  ctx.fillRect(px - r, py - r, r * 2, r * 2);
+  ctx.restore();
+
+  // ── Rings — front half (3 lanes) ──
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.scale(1, 0.26);
+  ctx.rotate(0.20);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, ringMid,   0, Math.PI);
+  ctx.arc(0, 0, ringInner, Math.PI, 0, true);
+  ctx.closePath();
+  const rg1f = ctx.createRadialGradient(0,0,ringInner, 0,0,ringMid);
+  rg1f.addColorStop(0,   `hsla(${ph},50%,60%,0.14)`);
+  rg1f.addColorStop(0.5, `hsla(${(ph+30)%360},58%,65%,0.32)`);
+  rg1f.addColorStop(1,   `hsla(${ph},42%,45%,0.10)`);
+  ctx.fillStyle = rg1f; ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(0, 0, ringOuter, 0, Math.PI);
+  ctx.arc(0, 0, ringMid,   Math.PI, 0, true);
+  ctx.closePath();
+  const rg2f = ctx.createRadialGradient(0,0,ringMid, 0,0,ringOuter);
+  rg2f.addColorStop(0,   `hsla(${(ph+20)%360},58%,68%,0.36)`);
+  rg2f.addColorStop(0.6, `hsla(${(ph+45)%360},62%,52%,0.20)`);
+  rg2f.addColorStop(1,   `hsla(${ph},42%,32%,0.04)`);
+  ctx.fillStyle = rg2f; ctx.fill();
+  ctx.restore();
+}
+
+// ── Bass burst stars ──
+const BURST_MAX = 80;
+const bx    = new Float32Array(BURST_MAX);
+const by    = new Float32Array(BURST_MAX);
+const bvx   = new Float32Array(BURST_MAX);
+const bvy   = new Float32Array(BURST_MAX);
+const blife = new Float32Array(BURST_MAX);
+const bhue  = new Float32Array(BURST_MAX);
+const bsz   = new Float32Array(BURST_MAX);
+let _burstCount = 0;
+
+function spawnBurst(cx, cy, strength) {
+  const count = Math.floor(18 + strength * 40);
+  for (let i = 0; i < count; i++) {
+    if (_burstCount >= BURST_MAX) { _burstCount = 0; }
+    const idx   = _burstCount++;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (8 + Math.random() * 18) * strength; // much faster
+    bx[idx]    = cx + (Math.random() - 0.5) * 30;
+    by[idx]    = cy + (Math.random() - 0.5) * 30;
+    bvx[idx]   = Math.cos(angle) * speed;
+    bvy[idx]   = Math.sin(angle) * speed;
+    blife[idx] = 1.0;
+    bhue[idx]  = Math.random() * 360;
+    bsz[idx]   = 8 + Math.random() * 14; // was 2-6, now 8-22
+  }
+}
+
+function drawBurstStars(ctx, cx, cy) {
+  const I = _sceneIntensity;
+  for (let i = 0; i < _burstCount; i++) {
+    if (blife[i] <= 0) continue;
+    blife[i] -= 0.016; // slightly slower fade = longer life
+    bvx[i]   *= 0.94;
+    bvy[i]   *= 0.94;
+    bx[i]    += bvx[i];
+    by[i]    += bvy[i];
+    const l = blife[i];
+    if (l <= 0) continue;
+    const size  = bsz[i] * l * (1 + _aTreble * 2.5) * I;
+    const alpha = Math.min(1, l * 1.4) * 0.95;
+    const hue   = bhue[i];
+    // Hard bright core + big soft bloom
+    const gr = ctx.createRadialGradient(bx[i], by[i], 0, bx[i], by[i], size * 4);
+    gr.addColorStop(0,   `hsla(${hue},100%,95%,${alpha})`);
+    gr.addColorStop(0.2, `hsla(${hue},100%,80%,${alpha * 0.85})`);
+    gr.addColorStop(0.5, `hsla(${hue},90%,60%,${alpha * 0.5})`);
+    gr.addColorStop(1,   `hsla(${hue},80%,45%,0)`);
+    ctx.beginPath();
+    ctx.arc(bx[i], by[i], size * 4, 0, Math.PI * 2);
+    ctx.fillStyle = gr;
+    ctx.fill();
+  }
+}
+
+function startPawrticlesLoop() {
+  if (_pawRAF) return;
+  if (!_starInitialized) initAllStars();
+  function loop() { renderStarfield(); _pawRAF = requestAnimationFrame(loop); }
+  loop();
+}
+function stopPawrticlesLoop() {
+  if (_pawRAF) { cancelAnimationFrame(_pawRAF); _pawRAF = null; }
+  pawCtx.clearRect(0, 0, pawCanvas.width, pawCanvas.height);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   SPECTRUM — full frequency equalizer, rainbow bars + reflection
+   Reads all FFT bins directly. Bass=left, treble=right.
+   Each bar is a frequency bucket, colored across the rainbow.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const rippleCanvas = document.getElementById('ripple-canvas');
+const rippleCtx    = rippleCanvas.getContext('2d');
+let _sceneRippleRAF = null;
+
+// Peak hold per bar — classic VU meter bounce
+const BAR_COUNT  = 80;
+const peakHold   = new Float32Array(BAR_COUNT);
+const peakDecay  = new Float32Array(BAR_COUNT);
+
+function renderSpectrum() {
+  const W = window.innerWidth, H = window.innerHeight;
+  if (rippleCanvas.width !== W || rippleCanvas.height !== H) {
+    rippleCanvas.width = W; rippleCanvas.height = H;
+  }
+
+  const ctx = rippleCtx;
+  const I   = _sceneIntensity;
+
+  // Black background
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, W, H);
+
+  // PATCH 5: Tron grid floor — perspective receding from horizon to bottom.
+  // Replaces the abrupt black void below the reflection. Bars draw on top.
+  const _horizonY = H * 0.62; // matches midY below
+  for (let _gi = 1; _gi <= 8; _gi++) {
+    const _t = _gi / 8;
+    const _yLine = _horizonY + (H - _horizonY) * Math.pow(_t, 2.0);
+    ctx.strokeStyle = `rgba(120,180,255,${0.18 * (1 - _t * 0.55)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, _yLine);
+    ctx.lineTo(W, _yLine);
+    ctx.stroke();
+  }
+  const _vpX = W * 0.5;
+  ctx.strokeStyle = 'rgba(120,180,255,0.10)';
+  ctx.lineWidth = 1;
+  for (let _vi = 0; _vi <= 14; _vi++) {
+    const _xBase = (_vi / 14) * W;
+    ctx.beginPath();
+    ctx.moveTo(_xBase, H);
+    ctx.lineTo(_vpX + (_xBase - _vpX) * 0.35, _horizonY);
+    ctx.stroke();
+  }
+
+  // Need raw frequency data — pull directly from analyserNode
+  if (!analyserNode) return;
+  const bufLen = analyserNode.frequencyBinCount;
+  const freqData = new Uint8Array(bufLen);
+  analyserNode.getByteFrequencyData(freqData);
+
+  const barW   = W / BAR_COUNT;
+  const gap    = Math.max(1, barW * 0.15);
+  const midY   = H * 0.62; // bars grow up from here, reflection below
+
+  for (let i = 0; i < BAR_COUNT; i++) {
+    // Map bar index to frequency bin — log scale feels more musical
+    const t      = i / BAR_COUNT;
+    const binIdx = Math.floor(Math.pow(t, 1.8) * bufLen * 0.75);
+    const raw    = freqData[Math.min(binIdx, bufLen - 1)] / 255;
+    const val    = Math.pow(raw, 0.7) * I; // gamma for better visual range
+
+    // Bar height
+    const maxH   = midY * 0.95;
+    const barH   = val * maxH;
+
+    // Peak hold — rises instantly, decays slowly
+    if (barH > peakHold[i]) {
+      peakHold[i]  = barH;
+      peakDecay[i] = 0;
+    } else {
+      peakDecay[i] += 0.18;
+      peakHold[i]   = Math.max(0, peakHold[i] - peakDecay[i]);
+    }
+
+    const x = i * barW;
+    const w = barW - gap;
+
+    // Rainbow hue — left=green, center=blue/purple, right=red/orange
+    const hue = (t * 300 + 120) % 360;
+    const sat = 90 + val * 10;
+    const lum = 45 + val * 20;
+
+    // ── Main bar — segmented look ──
+    const segH  = 6;
+    const segGap= 2;
+    const segs  = Math.floor(barH / (segH + segGap));
+
+    for (let s = 0; s < segs; s++) {
+      const sy     = midY - (s + 1) * (segH + segGap);
+      const segPct = s / Math.max(1, segs);
+      // Brighten toward top of bar
+      const sl = Math.min(80, lum + segPct * 30);
+      const sa = 0.7 + segPct * 0.3;
+      ctx.fillStyle = `hsla(${hue},${sat}%,${sl}%,${sa})`;
+      ctx.fillRect(x, sy, w, segH);
+    }
+
+    // ── Glow on top segment ──
+    if (barH > 4) {
+      ctx.shadowBlur  = 12;
+      ctx.shadowColor = `hsl(${hue},100%,70%)`;
+      ctx.fillStyle   = `hsl(${hue},100%,80%)`;
+      ctx.fillRect(x, midY - barH, w, Math.min(barH, 4));
+      ctx.shadowBlur  = 0;
+    }
+
+    // ── Peak dot ──
+    if (peakHold[i] > 6) {
+      ctx.fillStyle = `hsl(${hue},100%,90%)`;
+      ctx.fillRect(x, midY - peakHold[i] - 3, w, 3);
+    }
+
+    // PATCH 5b: 3D edge highlight on left side of bar — classic VU depth trick
+    if (barH > 4) {
+      ctx.fillStyle = `hsla(${hue},100%,90%,0.40)`;
+      ctx.fillRect(x, midY - barH, 1, barH);
+    }
+
+    // ── Reflection — mirrored below midY, fading ──
+    const refGrad = ctx.createLinearGradient(0, midY, 0, midY + barH * 0.6);
+    refGrad.addColorStop(0,   `hsla(${hue},${sat}%,${lum}%,0.35)`);
+    refGrad.addColorStop(1,   `hsla(${hue},${sat}%,${lum}%,0)`);
+    ctx.fillStyle = refGrad;
+    ctx.fillRect(x, midY, w, barH * 0.6);
+  }
+
+  // ── Horizontal glow line at base ──
+  const lineGrad = ctx.createLinearGradient(0, 0, W, 0);
+  for (let i = 0; i < BAR_COUNT; i++) {
+    const t   = i / BAR_COUNT;
+    const hue = (t * 300 + 120) % 360;
+    lineGrad.addColorStop(t, `hsl(${hue},100%,65%)`);
+  }
+  ctx.shadowBlur  = 18;
+  ctx.shadowColor = 'rgba(255,255,255,0.5)';
+  ctx.fillStyle   = lineGrad;
+  ctx.fillRect(0, midY - 1, W, 2);
+  ctx.shadowBlur  = 0;
+}
+
+function startSceneRippleLoop() {
+  if (_sceneRippleRAF) return;
+  rippleCanvas.width  = window.innerWidth;
+  rippleCanvas.height = window.innerHeight;
+  function loop() { renderSpectrum(); _sceneRippleRAF = requestAnimationFrame(loop); }
+  loop();
+}
+function stopSceneRippleLoop() {
+  if (_sceneRippleRAF) { cancelAnimationFrame(_sceneRippleRAF); _sceneRippleRAF = null; }
+  rippleCtx.clearRect(0, 0, rippleCanvas.width, rippleCanvas.height);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   WAVERAY — time-domain waveform + GLSL light rays, cycling colors
+   GLSL handles the radial ray burst. Canvas 2D draws the waveform.
+   Bass = ray intensity. Hue cycles continuously over time.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const waverayCanvas = document.getElementById('waveray-canvas');
+const waverayCtx    = waverayCanvas.getContext('2d');
+let   _waverayRAF      = null;
+let   _waverayTime     = 0;
+let   _waveHue         = 120; // cycles over time
+let   _wrBassSmoothed  = 0;
+
+function renderWaveray() {
+  const W = window.innerWidth, H = window.innerHeight;
+  if (waverayCanvas.width !== W || waverayCanvas.height !== H) {
+    waverayCanvas.width = W; waverayCanvas.height = H;
+  }
+
+  const ctx = waverayCtx;
+  const I   = _sceneIntensity;
+  const cx  = W * 0.5, cy = H * 0.5;
+  const hue = _waveHue % 360;
+  const hue2= (_waveHue + 50) % 360;
+
+  // ── Dark background with slow hue tint ──
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = 'rgb(0,0,0)';
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Direct bass read — same pattern as Spectrum/FireEQ ──
+  let _wrBassRaw = 0;
+  if (analyserNode) {
+    const _wrData    = new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteFrequencyData(_wrData);
+    const _wrBassEnd = Math.floor(_wrData.length * 0.08);
+    let _wrSum = 0;
+    for (let i = 0; i < _wrBassEnd; i++) _wrSum += _wrData[i];
+    _wrBassRaw = _wrSum / _wrBassEnd / 255;
+  }
+  // Light smoothing — fast attack, gentle release to avoid jitter without lag
+  _wrBassSmoothed = Math.max(_wrBassRaw, _wrBassSmoothed * 0.80);
+  const _wrBass = _wrBassSmoothed;
+
+  // ── SEARCHLIGHTS — independent sweeping beams, club style ──
+  const beamCount = 7; // reduced from 10 — each beam draws 2 gradient paths, keep it lean
+  const beamLen   = Math.max(W, H) * 1.1;
+  const bassFlare = 1 + _wrBass * 2.0 * I;
+
+  for (let i = 0; i < beamCount; i++) {
+    // Each beam has its own speed, phase, and hue offset
+    const speed   = (0.3 + (i % 3) * 0.22 + (i * 0.07)) * (i % 2 === 0 ? 1 : -1);
+    const phase   = (i / beamCount) * Math.PI * 2;
+    const angle   = phase + _waverayTime * speed;
+
+    // Beam color — evenly spaced around hue wheel
+    const beamHue = (hue + (i / beamCount) * 300) % 360;
+
+    // Beam brightness pulses with bass, each beam independently
+    const pulse   = 0.5 + 0.5 * Math.sin(_waverayTime * (1.1 + i * 0.3) + i);
+    const alpha   = (0.25 + pulse * 0.35 + _wrBass * 0.4 * I) * I;
+    const width   = (3 + pulse * 4 + _wrBass * 8 * I) * bassFlare;
+
+    const endX = cx + Math.cos(angle) * beamLen;
+    const endY = cy + Math.sin(angle) * beamLen;
+
+    const grad = ctx.createLinearGradient(cx, cy, endX, endY);
+    grad.addColorStop(0,    `hsla(${beamHue},100%,90%,${Math.min(0.95, alpha * 1.8)})`);
+    grad.addColorStop(0.08, `hsla(${beamHue},95%,70%,${alpha})`);
+    grad.addColorStop(0.5,  `hsla(${beamHue},85%,50%,${alpha * 0.4})`);
+    grad.addColorStop(1,    `hsla(${beamHue},80%,35%,0)`);
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth   = width;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    // Mirror beam — opposite direction, thinner
+    const endX2 = cx + Math.cos(angle + Math.PI) * beamLen * 0.85;
+    const endY2 = cy + Math.sin(angle + Math.PI) * beamLen * 0.85;
+    const grad2 = ctx.createLinearGradient(cx, cy, endX2, endY2);
+    grad2.addColorStop(0,   `hsla(${beamHue},100%,80%,${alpha * 0.6})`);
+    grad2.addColorStop(0.4, `hsla(${beamHue},90%,55%,${alpha * 0.2})`);
+    grad2.addColorStop(1,   `hsla(${beamHue},80%,35%,0)`);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(endX2, endY2);
+    ctx.strokeStyle = grad2;
+    ctx.lineWidth   = width * 0.5;
+    ctx.stroke();
+  }
+
+  // ── Center core glow ──
+  const coreR = 80 + _wrBass * 120 * I;
+  const coreG = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
+  coreG.addColorStop(0,   `hsla(${hue},100%,90%,${0.5 + _wrBass * 0.4})`);
+  coreG.addColorStop(0.3, `hsla(${hue},90%,65%,${0.2 + _wrBass * 0.2})`);
+  coreG.addColorStop(1,   `hsla(${hue},80%,40%,0)`);
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+  ctx.fillStyle = coreG;
+  ctx.fill();
+
+  // PATCH 6: anamorphic lens flare — only kicks in on real bass hits.
+  // Horizontal streak through the core, gated above 0.5 to keep ambient frames clean.
+  if (_wrBass > 0.5) {
+    const _flareW   = W * (0.40 + _wrBass * 0.50);
+    const _flareH   = 4 + _wrBass * 8;
+    const _flareInt = (_wrBass - 0.5) * 1.6 * I;
+    const _fGrad = ctx.createLinearGradient(cx - _flareW, cy, cx + _flareW, cy);
+    _fGrad.addColorStop(0,    `hsla(${hue},100%,80%,0)`);
+    _fGrad.addColorStop(0.5,  `hsla(${hue},100%,92%,${_flareInt})`);
+    _fGrad.addColorStop(1,    `hsla(${hue},100%,80%,0)`);
+    ctx.fillStyle = _fGrad;
+    ctx.fillRect(cx - _flareW, cy - _flareH * 0.5, _flareW * 2, _flareH);
+  }
+
+  // ── WAVEFORM — time domain, full width, centered ──
+  if (analyserNode) {
+    const bufLen   = analyserNode.fftSize;
+    const timeData = new Uint8Array(bufLen);
+    analyserNode.getByteTimeDomainData(timeData);
+
+    const amp  = H * 0.38 * (0.7 + _wrBass * 1.0 * I);
+    const step = 3; // sample every 3px — visually identical, 3x fewer points
+
+    // Pre-build point array once, reuse across passes
+    const pts = [];
+    for (let x = 0; x < W; x += step) {
+      const idx = Math.floor((x / W) * bufLen);
+      const v   = (timeData[Math.min(idx, bufLen - 1)] / 128.0 - 1.0) * amp;
+      pts.push(x, cy + v);
+    }
+
+    // 2 passes: soft glow + bright core — no shadowBlur (expensive)
+    const passes = [
+      { lw: 8,   alpha: 0.18, lum: 60 },
+      { lw: 1.5, alpha: 0.95, lum: 95 },
+    ];
+
+    passes.forEach(({ lw, alpha, lum }) => {
+      ctx.beginPath();
+      ctx.lineWidth   = lw;
+      ctx.strokeStyle = `hsla(${hue},95%,${lum}%,${alpha})`;
+      ctx.lineJoin    = 'round';
+      ctx.moveTo(pts[0], pts[1]);
+      for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i+1]);
+      ctx.stroke();
+    });
+  }
+
+  // ── Edge fade — top and bottom fade to black, waveform floats in space ──
+  const fadeH = H * 0.32;
+  const topGrad = ctx.createLinearGradient(0, 0, 0, fadeH);
+  topGrad.addColorStop(0,   'rgba(0,0,0,1)');
+  topGrad.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(0, 0, W, fadeH);
+
+  const botGrad = ctx.createLinearGradient(0, H - fadeH, 0, H);
+  botGrad.addColorStop(0,   'rgba(0,0,0,0)');
+  botGrad.addColorStop(1,   'rgba(0,0,0,1)');
+  ctx.fillStyle = botGrad;
+  ctx.fillRect(0, H - fadeH, W, fadeH);
+
+  _waverayTime += 0.016;
+  _waveHue     += 0.15 + _aMid * 0.4;
+}
+
+function startWaverayLoop() {
+  if (_waverayRAF) return;
+  waverayCanvas.width  = window.innerWidth;
+  waverayCanvas.height = window.innerHeight;
+  function loop() { renderWaveray(); _waverayRAF = requestAnimationFrame(loop); }
+  loop();
+}
+function stopWaverayLoop() {
+  if (_waverayRAF) { cancelAnimationFrame(_waverayRAF); _waverayRAF = null; }
+  waverayCtx.clearRect(0, 0, waverayCanvas.width, waverayCanvas.height);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   FIRE EQ — spectrum analyzer styled as fire
+   Bars rise from bottom, colored black→red→orange→yellow→white.
+   Embers float upward. Bass = taller flames, more embers.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const fireCanvas = document.getElementById('fire-canvas');
+const fireCtx    = fireCanvas.getContext('2d');
+let   _fireRAF   = null;
+let   _fireTime  = 0;
+
+const FIRE_BARS  = 80;
+const firePeak   = new Float32Array(FIRE_BARS);
+const fireDecay  = new Float32Array(FIRE_BARS);
+const fireFlicker= new Float32Array(FIRE_BARS); // per-bar flicker offset
+
+// Ember particle pool
+const EMBER_MAX  = 180;
+const ex   = new Float32Array(EMBER_MAX);
+const ey   = new Float32Array(EMBER_MAX);
+const evx  = new Float32Array(EMBER_MAX);
+const evy  = new Float32Array(EMBER_MAX);
+const elife= new Float32Array(EMBER_MAX);
+const esize= new Float32Array(EMBER_MAX);
+const ehue = new Float32Array(EMBER_MAX); // 0=red 30=orange 60=yellow
+let   _emberHead = 0;
+
+// Init flicker offsets — each bar flickers independently
+for (let i = 0; i < FIRE_BARS; i++) fireFlicker[i] = Math.random() * Math.PI * 2;
+
+function spawnEmber(x, y, strength) {
+  const i    = _emberHead % EMBER_MAX;
+  _emberHead++;
+  ex[i]    = x + (Math.random() - 0.5) * 20;
+  ey[i]    = y;
+  evx[i]   = (Math.random() - 0.5) * 1.5;
+  evy[i]   = -(1.5 + Math.random() * 3.5 + strength * 3);
+  elife[i] = 0.6 + Math.random() * 0.4;
+  esize[i] = 1.5 + Math.random() * 3 * strength;
+  ehue[i]  = Math.random() * 55; // red to yellow
+}
+
+function renderFireEQ() {
+  const W = window.innerWidth, H = window.innerHeight;
+  if (fireCanvas.width !== W || fireCanvas.height !== H) {
+    fireCanvas.width = W; fireCanvas.height = H;
+  }
+
+  const ctx = fireCtx;
+  const I   = _sceneIntensity;
+
+  // Pure black background
+  ctx.fillStyle = 'rgba(0,0,0,0.88)';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!analyserNode) return;
+  const bufLen  = analyserNode.frequencyBinCount;
+  const freqData= new Uint8Array(bufLen);
+  analyserNode.getByteFrequencyData(freqData);
+
+  const barW    = W / FIRE_BARS;
+  const gap     = Math.max(1, barW * 0.12);
+  const baseY   = H * 0.75; // flames rise from 75% down
+  const maxBarH = H * 0.68;
+
+  _fireTime += 0.016;
+
+  for (let i = 0; i < FIRE_BARS; i++) {
+    const t      = i / FIRE_BARS;
+    const binIdx = Math.floor(Math.pow(t, 1.8) * bufLen * 0.75);
+    const raw    = freqData[Math.min(binIdx, bufLen-1)] / 255;
+    const val    = Math.pow(raw, 0.65) * I;
+
+    // Per-bar flicker — each bar breathes independently
+    fireFlicker[i] += 0.08 + Math.random() * 0.04;
+    const flick  = 0.88 + 0.12 * Math.sin(fireFlicker[i]);
+    const barH   = val * maxBarH * flick;
+
+    // Peak hold
+    if (barH > firePeak[i]) { firePeak[i] = barH; fireDecay[i] = 0; }
+    else { fireDecay[i] += 0.25; firePeak[i] = Math.max(0, firePeak[i] - fireDecay[i]); }
+
+    const x  = i * barW;
+    const bw = barW - gap;
+    const x0 = x + gap * 0.5;
+
+    if (barH < 2) continue;
+
+    // ── Fire gradient — black base → deep red → orange → yellow → white tip ──
+    const grad = ctx.createLinearGradient(x0, baseY, x0, baseY - barH);
+    grad.addColorStop(0,    'rgba(0,0,0,1)');
+    grad.addColorStop(0.05, `hsla(0,100%,8%,1)`);
+    grad.addColorStop(0.2,  `hsla(5,100%,22%,1)`);
+    grad.addColorStop(0.45, `hsla(15,100%,38%,1)`);
+    grad.addColorStop(0.65, `hsla(28,100%,52%,1)`);
+    grad.addColorStop(0.82, `hsla(42,100%,65%,1)`);
+    grad.addColorStop(0.93, `hsla(55,100%,80%,1)`);
+    grad.addColorStop(1,    'rgba(255,255,240,1)');
+
+    // ── Flame shape — taper toward tip using clip path trick ──
+    ctx.save();
+    ctx.beginPath();
+    // Flame silhouette: wider at base, tapers to point at top
+    const tipX  = x0 + bw * 0.5;
+    const tipY  = baseY - barH;
+    const baseL = x0;
+    const baseR = x0 + bw;
+    const midH  = barH * 0.5;
+    // Bezier flame shape
+    ctx.moveTo(baseL, baseY);
+    ctx.quadraticCurveTo(baseL - bw * 0.1, baseY - midH, tipX, tipY);
+    ctx.quadraticCurveTo(baseR + bw * 0.1, baseY - midH, baseR, baseY);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // ── Inner bright core — hotter center ──
+    const coreW  = bw * 0.35;
+    const coreGrad = ctx.createLinearGradient(tipX, baseY, tipX, tipY);
+    coreGrad.addColorStop(0,   'rgba(255,200,80,0)');
+    coreGrad.addColorStop(0.4, 'rgba(255,220,120,0.35)');
+    coreGrad.addColorStop(0.8, 'rgba(255,245,200,0.55)');
+    coreGrad.addColorStop(1,   'rgba(255,255,255,0.7)');
+    ctx.fillStyle = coreGrad;
+    ctx.fillRect(tipX - coreW*0.5, tipY, coreW, barH * 0.85);
+    ctx.restore();
+
+    // ── Glow bloom at tip ──
+    ctx.shadowBlur  = 18 + val * 20;
+    ctx.shadowColor = `hsl(${30 + val * 30},100%,60%)`;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY + 4, 2 + val * 3, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(50,100%,85%,${0.4 + val * 0.5})`;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // ── Spawn embers from tall bars ──
+    if (val > 0.3 && Math.random() < val * 0.35 * I) {
+      spawnEmber(tipX, tipY, val);
+    }
+
+    // ── Ground glow — hot base ──
+    const glowR = barW * 1.8;
+    const gGrad = ctx.createRadialGradient(tipX, baseY, 0, tipX, baseY, glowR);
+    gGrad.addColorStop(0,   `hsla(20,100%,40%,${0.18 + val * 0.22})`);
+    gGrad.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = gGrad;
+    ctx.fillRect(tipX - glowR, baseY - glowR * 0.3, glowR * 2, glowR * 0.3);
+  }
+
+  // ── Draw and advance embers ──
+  for (let i = 0; i < EMBER_MAX; i++) {
+    if (elife[i] <= 0) continue;
+    elife[i] -= 0.018;
+    // PATCH 7: convection swirl — embers spiral instead of drift in a straight line.
+    // Each ember's horizontal velocity is a fn of time + its own position, so
+    // they don't move in lockstep. Tiny random kick keeps it from looking mechanical.
+    evx[i]   = Math.sin(_fireTime * 1.2 + ey[i] * 0.008 + ex[i] * 0.003) * 0.9
+             + (Math.random() - 0.5) * 0.15;
+    evy[i]   *= 0.98; // slow rise
+    ex[i]    += evx[i];
+    ey[i]    += evy[i];
+    if (elife[i] <= 0) continue;
+    const l    = elife[i];
+    const size = esize[i] * l;
+    const hue  = ehue[i];
+    const alpha= Math.min(1, l * 2) * 0.9;
+    ctx.beginPath();
+    ctx.arc(ex[i], ey[i], size, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue},100%,${60 + l * 30}%,${alpha})`;
+    ctx.shadowBlur  = 6;
+    ctx.shadowColor = `hsl(${hue},100%,70%)`;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // ── Hot floor line ──
+  const floorGrad = ctx.createLinearGradient(0, 0, W, 0);
+  for (let i = 0; i < FIRE_BARS; i++) {
+    const t   = i / FIRE_BARS;
+    const val = Math.pow(freqData[Math.min(Math.floor(Math.pow(t,1.8)*bufLen*0.75),bufLen-1)] / 255, 0.65);
+    const hue = 10 + val * 40;
+    floorGrad.addColorStop(t, `hsl(${hue},100%,${30 + val * 40}%)`);
+  }
+  ctx.shadowBlur  = 20;
+  ctx.shadowColor = 'rgba(255,100,0,0.8)';
+  ctx.fillStyle   = floorGrad;
+  ctx.fillRect(0, baseY - 2, W, 3);
+  ctx.shadowBlur  = 0;
+
+  // ── Top fade to black ──
+  const fadeH = H * 0.25;
+  const tg = ctx.createLinearGradient(0, 0, 0, fadeH);
+  tg.addColorStop(0, 'rgba(0,0,0,1)');
+  tg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = tg;
+  ctx.fillRect(0, 0, W, fadeH);
+}
+
+function startFireLoop() {
+  if (_fireRAF) return;
+  fireCanvas.width  = window.innerWidth;
+  fireCanvas.height = window.innerHeight;
+  function loop() { renderFireEQ(); _fireRAF = requestAnimationFrame(loop); }
+  loop();
+}
+function stopFireLoop() {
+  if (_fireRAF) { cancelAnimationFrame(_fireRAF); _fireRAF = null; }
+  fireCtx.clearRect(0, 0, fireCanvas.width, fireCanvas.height);
+}
+
+// Called from render loop — feed smoothed audio to Aurora
+function updateAuroraAudio(bassRaw, midRaw, trebleRaw) {
+  if (_currentScene === 'none') return;
+  // Smoothed values — fast attack, slow release
+  _aBass   = Math.max(bassRaw,   _aBass   * 0.80);
+  _aMid    = Math.max(midRaw,    _aMid    * 0.85);
+  _aTreble = Math.max(trebleRaw, _aTreble * 0.78);
+  _pawBassRaw = bassRaw;
+
+  // Bass burst detection — runs for ALL scenes
+  _bassSmoothed = Math.max(_pawBassRaw, _bassSmoothed * 0.82);
+  bassJump = _pawBassRaw - (_bassSmoothed * 0.6);
+  isBurst  = bassJump > 0.06 && _burstCooldown <= 0;
+  if (isBurst) _burstCooldown = 10;
+  if (_burstCooldown > 0) _burstCooldown--;
+  // Planet glow
+  _planetGlow = Math.max(_bassSmoothed * _sceneIntensity, _planetGlow * 0.75);
+}
+
+// ── Scene control ──
+let _sceneEnabled = false;
+let _lastScene = 'fire'; // remembered scene when toggling back on
+
+function toggleScene() {
+  _sceneEnabled = !_sceneEnabled;
+  const btn = el('scene-toggle-btn');
+  if (_sceneEnabled) {
+    setScene(_lastScene);
+    btn.textContent = '● On';
+    btn.classList.add('active');
+  } else {
+    setScene('none');
+    btn.textContent = '○ Off';
+    btn.classList.remove('active');
+  }
+}
+
+function selectScene(name) {
+  _lastScene = name;
+  if (!_sceneEnabled) {
+    _sceneEnabled = true;
+    const btn = el('scene-toggle-btn');
+    if (btn) { btn.textContent = '● On'; btn.classList.add('active'); }
+  }
+  // Turn off waveform — scenes work best on their own
+  if (_vizEnabled) toggleViz();
+  setScene(name);
+}
+
+const _sceneStopTimers = [];
+function _clearSceneStopTimers() {
+  while (_sceneStopTimers.length) clearTimeout(_sceneStopTimers.pop());
+}
+function _deferStop(fn) {
+  _sceneStopTimers.push(setTimeout(fn, 650));
+}
+
+function setScene(name) {
+  _clearSceneStopTimers(); // cancel any pending stops from previous click
+  _currentScene = name;
+  // Update scene selection buttons only (exclude toggle btn)
+  document.querySelectorAll('[id^="scene-"]:not(#scene-toggle-btn)').forEach(b => b.classList.remove('active'));
+  const btn = el('scene-' + name);
+  if (btn) btn.classList.add('active');
+  // Always sync toggle button
+  const toggleBtn = el('scene-toggle-btn');
+  if (toggleBtn) {
+    if (name === 'none') {
+      _sceneEnabled = false;
+      toggleBtn.textContent = '○ Off';
+      toggleBtn.classList.remove('active');
+    } else {
+      _sceneEnabled = true;
+      _lastScene = name;
+      toggleBtn.textContent = '● On';
+      toggleBtn.classList.add('active');
+    }
+  }
+
+  if (name === 'aurora') {
+    _auroraActive = true;
+    auroraCanvas.style.opacity = '1';
+    startAuroraLoop();
+    fireCanvas.style.opacity = '0';  _deferStop(() => stopFireLoop());
+    pawCanvas.style.opacity = '0';   _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0'; _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
+    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+  } else if (name === 'pawrticles') {
+    _auroraActive = false;
+    auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '1';
+    startPawrticlesLoop();
+    fireCanvas.style.opacity = '0';  _deferStop(() => stopFireLoop());
+    rippleCanvas.style.opacity = '0'; _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
+    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+  } else if (name === 'ripple') {
+    _auroraActive = false;
+    auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';    _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '1';
+    startSceneRippleLoop();
+    fireCanvas.style.opacity = '0';  _deferStop(() => stopFireLoop());
+    waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
+    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+  } else if (name === 'waveray') {
+    _auroraActive = false;
+    auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';    _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0'; _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '1';
+    startWaverayLoop();
+    fireCanvas.style.opacity = '0';  _deferStop(() => stopFireLoop());
+    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+  } else if (name === 'fire') {
+    _auroraActive = false;
+    auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';      _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0';   _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0';  _deferStop(() => stopWaverayLoop());
+    fireCanvas.style.opacity = '1';     startFireLoop();
+    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+  } else if (name === 'singularity') {
+    // PATCH 11: black hole scene — turn off all others, fire up the singularity
+    _auroraActive = false;
+    auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';      _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0';   _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0';  _deferStop(() => stopWaverayLoop());
+    fireCanvas.style.opacity = '0';     _deferStop(() => stopFireLoop());
+    singularityCanvas.style.opacity = '1';
+    startSingularityLoop();
+  } else {
+    _auroraActive = false;
+    auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';      _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0';   _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0';  _deferStop(() => stopWaverayLoop());
+    fireCanvas.style.opacity = '0';     _deferStop(() => stopFireLoop());
+    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+  }
+  localStorage.setItem('IKANDY-scene', name);
+}
+
+function setSceneIntensity(v) {
+  _sceneIntensity = v;
+  el('scene-intensity-v').textContent = v.toFixed(1);
+  localStorage.setItem('IKANDY-scene-intensity', v);
+}
+
+function initScenes() {
+  const savedScene     = localStorage.getItem('IKANDY-scene') || 'none';
+  const savedIntensity = parseFloat(localStorage.getItem('IKANDY-scene-intensity') || '1');
+  const sl = el('scene-intensity-sl');
+  if (sl) sl.value = savedIntensity;
+  setSceneIntensity(savedIntensity);
+  setScene(savedScene);
+  // Sync toggle button
+  const btn = el('scene-toggle-btn');
+  if (btn && savedScene !== 'none') {
+    _sceneEnabled = true;
+    _lastScene = savedScene;
+    btn.textContent = '● On';
+    btn.classList.add('active');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    VIBE SYSTEM — grain, scanlines, bg image, ripple, color tint
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -2980,6 +4887,31 @@ function setVizOpacity(v) {
   el('viz').style.opacity = v;
 }
 
+// ── Viz on/off toggle ──────────────────────────────────────────────
+let _vizEnabled = true;
+function toggleViz() {
+  _vizEnabled = !_vizEnabled;
+  const v = el('viz');
+  const btn = el('viz-toggle-btn');
+  if (_vizEnabled) {
+    // Disable FX mode if active
+    if (_fxModeEnabled) {
+      _fxModeEnabled = false;
+      setFxMode('viz');
+      const fxbtn = el('fx-toggle-btn');
+      if (fxbtn) { fxbtn.textContent = '○ Off'; fxbtn.classList.remove('active'); }
+    }
+    v.style.display = 'block';
+    setVizOpacity(parseFloat(el('viz-opacity-sl').value));
+    btn.textContent = '● On';
+    btn.classList.add('active');
+  } else {
+    v.style.display = 'none';
+    btn.textContent = '○ Off';
+    btn.classList.remove('active');
+  }
+}
+
 // ── Color tint via CSS filter ──────────────────────────────────────
 /* ── FX MODE ── */
 let _currentFxMode = 'viz'; // 'viz' or any shader key
@@ -2993,7 +4925,7 @@ function setFxMode(mode) {
   hideRainVideo();
   const hasImg = !!_bgTexture;
   el('viz').style.display = 'block';
-  if (hasImg) stopRippleLoop();
+  if (hasImg) stopSceneRippleLoop();
   // Restore viz opacity
   el('viz-opacity-sl').value = 1; setVizOpacity(1);
   localStorage.setItem('IKANDY-fxmode', 'viz');
@@ -4047,6 +5979,11 @@ const FRAG = {
       vec4  col= texture2D(u_tex, uv);
       float glow=0.;
 
+      /* PATCH 8: synchronized strike — on big bass + lucky hash, ALL bolts fire
+         together. floor(t*4.) makes the gate change ~4×/sec so it doesn't
+         constantly trigger. Goes from "ambient lightning" to "Tesla coil". */
+      float sync = step(0.7, u_amp) * step(0.5, hash1(floor(t*4.0)));
+
       /* 5 arc bolts — each fires independently */
       for(int i=0;i<5;i++){
         float fi   = float(i);
@@ -4055,6 +5992,7 @@ const FRAG = {
         /* on/off envelope — crisp rise, slow decay */
         float env  = smoothstep(0.,0.08,phase)*smoothstep(1.,0.55,phase);
         env *= (0.4 + u_amp*0.6*s);
+        env  = max(env, sync * (0.6 + u_amp*0.5) * s); /* PATCH 8: sync override */
 
         /* random endpoints per firing cycle */
         float cyc  = floor(t*rate+hash1(fi*3.3));
@@ -4102,6 +6040,12 @@ const FRAG = {
       vec2  uv = v_uv;
       float s  = u_strength;
       float t  = u_time;
+
+      /* PATCH 9: barrel distortion — CRT curvature, sells the analog hologram fantasy.
+         dot(cc,cc) is squared distance from center, so curve is gentle near center
+         and pronounced at corners. */
+      vec2 cc = uv - 0.5;
+      uv = uv + cc * dot(cc,cc) * 0.10 * s;
 
       /* ---- RGB ghost desync ---- */
       float desynk  = (0.006+u_amp*0.009)*s;
@@ -4346,6 +6290,7 @@ function setImgFx(fx) {
   const wasActive = (_currentFx === fx && _currentFxMode !== 'viz');
   if (wasActive) { setFxMode('viz'); return; }
 
+  _lastFx = fx;
   _currentFx     = fx;
   _currentFxMode = fx;
 
@@ -4355,6 +6300,12 @@ function setImgFx(fx) {
 
   // Set viz opacity to 0 — image FX takes over
   el('viz-opacity-sl').value = 0; setVizOpacity(0);
+
+  // Turn off waveform
+  if (_vizEnabled) toggleViz();
+
+  // Turn off scenes
+  if (_sceneEnabled) toggleScene();
 
   // Rain video overlay — show/hide
   if (fx === 'raindrops') { showRainVideo(); }
@@ -4408,6 +6359,16 @@ function onBgFileChange(input) {
     el('bg-filename').textContent = file.name;
     el('bg-filename').style.display = 'block';
     el('bg-clear-btn').style.display = '';
+    setVibeFxLock(false);
+    // Auto-enable FX mode with Rain, disable Waveform
+    _fxModeEnabled = true;
+    _lastFx = 'raindrops';
+    const fxbtn = el('fx-toggle-btn');
+    if (fxbtn) { fxbtn.textContent = '● On'; fxbtn.classList.add('active'); }
+    _vizEnabled = false;
+    el('viz').style.display = 'none';
+    const vbtn = el('viz-toggle-btn');
+    if (vbtn) { vbtn.textContent = '○ Off'; vbtn.classList.remove('active'); }
     // Auto-select Rain when image is loaded
     setImgFx('raindrops');
     };
@@ -4426,6 +6387,16 @@ async function pickBgFolder() {
   el('bg-filename').style.display = 'block';
   el('bg-cycle-row').style.display = 'flex';
   el('bg-clear-btn').style.display = '';
+  setVibeFxLock(false);
+  // Auto-enable FX mode with Rain, disable Waveform
+  _fxModeEnabled = true;
+  _lastFx = 'raindrops';
+  const fxbtn = el('fx-toggle-btn');
+  if (fxbtn) { fxbtn.textContent = '● On'; fxbtn.classList.add('active'); }
+  _vizEnabled = false;
+  el('viz').style.display = 'none';
+  const vbtn = el('viz-toggle-btn');
+  if (vbtn) { vbtn.textContent = '○ Off'; vbtn.classList.remove('active'); }
   // Auto-select Rain when folder is loaded
   setImgFx('raindrops');
   loadBgFile(_bgFiles[0]);
@@ -4451,6 +6422,58 @@ function setBgCycleTime(s) {
   if (_bgFiles.length) startBgCycle();
 }
 
+let _fxModeEnabled = false;
+let _lastFx = 'raindrops';
+
+function toggleFxMode() {
+  _fxModeEnabled = !_fxModeEnabled;
+  const btn = el('fx-toggle-btn');
+  if (_fxModeEnabled) {
+    // Disable Waveform
+    _vizEnabled = false;
+    el('viz').style.display = 'none';
+    const vbtn = el('viz-toggle-btn');
+    if (vbtn) { vbtn.textContent = '○ Off'; vbtn.classList.remove('active'); }
+    // Enable FX
+    btn.textContent = '● On';
+    btn.classList.add('active');
+    setImgFx(_lastFx);
+  } else {
+    btn.textContent = '○ Off';
+    btn.classList.remove('active');
+    setFxMode('viz');
+    // Re-enable Waveform
+    _vizEnabled = true;
+    el('viz').style.display = 'block';
+    setVizOpacity(parseFloat(el('viz-opacity-sl').value));
+    const vbtn = el('viz-toggle-btn');
+    if (vbtn) { vbtn.textContent = '● On'; vbtn.classList.add('active'); }
+  }
+}
+
+function setVibeFxLock(locked) {
+  const row = el('imgfx-row');
+  const note = el('imgfx-lock-note');
+  const fxbtn = el('fx-toggle-btn');
+  if (!row) return;
+  if (locked) {
+    row.style.opacity = '.35';
+    row.style.pointerEvents = 'none';
+    if (note) note.style.display = 'block';
+    if (fxbtn) { fxbtn.style.opacity = '.35'; fxbtn.style.pointerEvents = 'none'; }
+    // Also turn off FX mode if active
+    if (_fxModeEnabled) {
+      _fxModeEnabled = false;
+      if (fxbtn) { fxbtn.textContent = '○ Off'; fxbtn.classList.remove('active'); }
+    }
+  } else {
+    row.style.opacity = '1';
+    row.style.pointerEvents = '';
+    if (note) note.style.display = 'none';
+    if (fxbtn) { fxbtn.style.opacity = '1'; fxbtn.style.pointerEvents = ''; }
+  }
+}
+
 function clearBgImage() {
   _bgImage = null; _bgTexture = null; _bgFiles = [];
   if (_bgCycleTimer) { clearInterval(_bgCycleTimer); _bgCycleTimer = null; }
@@ -4460,6 +6483,15 @@ function clearBgImage() {
   el('bg-cycle-row').style.display = 'none';
   el('bg-clear-btn').style.display = 'none';
   stopRippleLoop();
+  setVibeFxLock(true);
+  // Reset FX mode state
+  _fxModeEnabled = false;
+  // Restore Waveform
+  _vizEnabled = true;
+  el('viz').style.display = 'block';
+  setVizOpacity(parseFloat(el('viz-opacity-sl').value));
+  const vbtn = el('viz-toggle-btn');
+  if (vbtn) { vbtn.textContent = '● On'; vbtn.classList.add('active'); }
   // Return to visualizer
   setFxMode('viz');
 }
@@ -4470,6 +6502,8 @@ function initVibeSettings() {
   el('fxmode-viz')?.classList.add('active');
   el('viz').style.display = 'block';
   _allFxKeys.forEach(k => el('ifx-'+k)?.classList.remove('active'));
+  // FX buttons locked until image loaded
+  setVibeFxLock(true);
 
   const savedPalette = localStorage.getItem('IKANDY-palette') || 'none';
   setPalette(savedPalette);
@@ -4505,15 +6539,30 @@ function initTheme() {
   setTheme(localStorage.getItem('IKANDY-theme') || 'gold');
 }
 
+/* ── Seizure warning ── */
+const SEIZURE_KEY = 'ikandy-seizure-ok';
+function seizureAccept() {
+  localStorage.setItem(SEIZURE_KEY, '1');
+  el('seizure-warning').style.display = 'none';
+  bootApp().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error: ' + e.message); });
+}
+function seizureDecline() { window.close(); }
+
 async function boot() {
-  // Wait for Bebas Neue to load before showing the logo — prevents trail/jump
-  document.fonts.load('60px "Bebas Neue"').then(() => {
-    const logo = el('ld-logo');
-    if (logo) logo.classList.add('ready');
-  }).catch(() => {
-    const logo = el('ld-logo');
-    if (logo) logo.classList.add('ready'); // show anyway on error
-  });
+  if (localStorage.getItem(SEIZURE_KEY) !== '1') {
+    el('seizure-warning').style.display = 'flex';
+    return; // wait for user to accept
+  }
+  bootApp();
+}
+
+async function bootApp() {
+  // Wait for Bebas Neue to load before revealing the loading screen — prevents trail/jump
+  const revealLoading = () => {
+    el('ld-logo')?.classList.add('ready');
+    el('loading')?.classList.add('ready');
+  };
+  document.fonts.load('60px "Bebas Neue"').then(revealLoading).catch(revealLoading);
 
   lp(10);
   await waitForButterchurn();
@@ -4577,6 +6626,7 @@ async function boot() {
   await initSource();
   initVibeSettings();
   initTheme();
+  initScenes();
 }
 
 
@@ -4598,11 +6648,11 @@ async function boot() {
     { sel:'#ptab',            place:'left',  title:'Settings Sidebar',   body:'Click this tab to open the sidebar at any time. It holds all app settings.', sbOpen: true },
     { sel:'#app-brand',       place:'left',  title:'Theme',              body:'Pick an accent colour from the swatches to change the whole app\'s colour scheme.', sbOpen: true },
     { sel:'#acc-all-btn',     place:'left',  title:'Expand / Collapse',  body:'Instantly expand or collapse all sidebar sections at once.', sbOpen: true },
-    { sel:'#src-spotify-btn', place:'left',  title:'Audio Source',       body:'Switch between Spotify, VLC, and Local audio. Spotify and VLC show track info and lyrics. Local reacts to system audio.', sbOpen: true },
+    { sel:'#src-spotify-btn', place:'left',  title:'Audio Source',       body:'Switch between Spotify, VLC, foobar2000, and Local audio. Spotify, VLC, and foobar2000 show track info, lyrics, and full controls. Local reacts to system audio.', sbOpen: true },
     { sel:'#recapture-btn',   place:'left',  title:'System Audio',       body:'If visuals stop reacting to music, click this to reconnect the audio capture.', sbOpen: true },
     { sel:'#acc-presets',     place:'left',  title:'Presets (Sidebar)',  body:'Set auto-cycle interval and blend time. Browse all presets from here too.', sbOpen: true },
-    { sel:'#acc-visuals', place:'left', title:'Visuals',   body:'Speed, Reactivity, and Smoothness control how the visualizer moves and responds to your music.', sbOpen: true,
-      onEnter: () => window.accOpen('acc-visuals'), onLeave: () => window.accClose('acc-visuals') },
+    { sel:'#acc-master', place:'left', title:'Master Controls',   body:'Reactivity and Smoothness affect everything in the app — presets, scenes, and lyrics all respond to these.', sbOpen: true,
+      onEnter: () => window.accOpen('acc-master'), onLeave: () => window.accClose('acc-master') },
     { sel:'#acc-vibe',    place:'left', title:'FX & Vibe', body:'Apply real-time GLSL shaders over a background image. Add grain or scanlines for a lo-fi feel.', sbOpen: true,
       onEnter: () => window.accOpen('acc-vibe'),    onLeave: () => window.accClose('acc-vibe') },
     { sel:'#acc-lyrics',  place:'left', title:'Lyrics',    body:'Lyrics auto-fetch from LRCLIB. Classic mode shows one line; Physics mode lets words float around the screen.', sbOpen: true, last: true,

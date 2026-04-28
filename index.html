@@ -549,6 +549,81 @@
   }
   .btn-primary.pulse { animation: pulse-ring 2s infinite; }
 
+  /* ── TESTIMONIALS ── */
+  .testimonials {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 24px;
+    margin-top: 56px;
+  }
+
+  .quote-card {
+    position: relative;
+    padding: 56px 48px 40px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.02);
+    overflow: hidden;
+    transition: border-color .25s, background .25s;
+  }
+
+  .quote-card:hover {
+    border-color: rgba(212,168,67,.3);
+    background: rgba(255,255,255,.04);
+  }
+
+  .quote-card::before {
+    content: '"';
+    position: absolute;
+    top: -30px;
+    left: 24px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 180px;
+    line-height: 1;
+    color: var(--gold);
+    opacity: .35;
+    pointer-events: none;
+  }
+
+  .quote-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(20px, 2.4vw, 28px);
+    line-height: 1.45;
+    font-weight: 300;
+    color: var(--txt);
+    letter-spacing: .005em;
+    position: relative;
+  }
+
+  .quote-attr {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+
+  .quote-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: .12em;
+    color: var(--gold);
+  }
+
+  .quote-source {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+
+  .quote-source::before {
+    content: '·';
+    margin-right: 14px;
+    color: rgba(255,255,255,.2);
+  }
+
   /* ── THEME DOT ROW ── */
   .theme-dots {
     display: flex;
@@ -766,11 +841,35 @@
   </div>
 </section>
 
+<!-- TESTIMONIALS -->
+<section id="reviews" style="max-width:1200px;">
+  <p class="section-tag">06 — Word On The Street</p>
+  <h2>What People<br>Are Saying</h2>
+  <p class="lead">Real reactions from real humans who fired it up and let it rip.</p>
+
+  <div class="testimonials">
+    <div class="quote-card">
+      <p class="quote-text">Ohh man this app is making me happy!!! In a world that demands constant attention, this just lets me chill and vibe out! Love it — take me to your leader!</p>
+      <div class="quote-attr">
+        <span class="quote-name">Salt Monkey (Zak)</span>
+        <span class="quote-source">Discord</span>
+      </div>
+    </div>
+    <div class="quote-card">
+      <p class="quote-text">Okay, this thing is f*^&amp;ing awesome. 49 inch curved monitor, just damn.</p>
+      <div class="quote-attr">
+        <span class="quote-name">y0himba</span>
+        <span class="quote-source">Reddit</span>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- DOWNLOAD -->
 <div class="download-section" id="download">
   <div class="download-title">Get IKANDY</div>
   <p class="download-sub">Windows 10/11 · No Subscription</p>
-  <a href="https://github.com/IKANDYapp/IKANDY/releases/latest" class="btn-primary pulse" style="display:inline-flex;font-size:22px;padding:20px 56px;position:relative;">
+  <a href="https://github.com/IKANDYapp/IKANDY/releases/latest/download/IKANDY.Setup.exe" class="btn-primary pulse" style="display:inline-flex;font-size:22px;padding:20px 56px;position:relative;">
     ↓ &nbsp;Download for Windows
   </a>
   <p class="download-note">

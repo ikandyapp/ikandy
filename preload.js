@@ -32,6 +32,11 @@ contextBridge.exposeInMainWorld('IKANDY', {
   setVlcConfig: (cfg)  => ipcRenderer.invoke('set-vlc-config', cfg),
   vlcTest:      ()     => ipcRenderer.invoke('vlc-test'),
   vlcAction:    (cmd)  => ipcRenderer.invoke('vlc-action', cmd),
+  setFoobarConfig: (cfg) => ipcRenderer.invoke('set-foobar-config', cfg),
+  foobarTest:      ()    => ipcRenderer.invoke('foobar-test'),
+  foobarAction:    (cmd) => ipcRenderer.invoke('foobar-action', cmd),
+  getFoobarPlaylists: () => ipcRenderer.invoke('get-foobar-playlists'),
+  playFoobarPlaylist: (id) => ipcRenderer.invoke('play-foobar-playlist', id),
 
   // Playback action - string or object
   action: (cmd) => {

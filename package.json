@@ -1,6 +1,6 @@
 {
   "name": "IKANDY",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "IKANDY — Music visualizer (Butterchurn / MilkDrop)",
   "main": "main.js",
   "author": "Felix Bag of Tricks",
@@ -53,6 +53,9 @@
           ]
         }
       ]
+    },
+    "nsis": {
+      "artifactName": "${productName} Setup.${ext}"
     },
     "linux": {
       "icon": "icon.png",
