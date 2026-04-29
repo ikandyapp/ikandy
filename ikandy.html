@@ -486,6 +486,66 @@ html, body {
   transform: translateY(0);
 }
 
+/* ─── DEBUG PANEL ─── */
+#debug-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 80px;
+  transform: translateX(-50%);
+  width: min(720px, 90vw);
+  max-height: 140px;
+  z-index: 25;
+  background: rgba(15,15,20,.92);
+  border: 0.5px solid rgba(255,255,255,.18);
+  border-radius: 10px;
+  backdrop-filter: blur(12px);
+  font-family: var(--ui);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  transition: opacity .2s ease, transform .2s ease;
+}
+#debug-panel.closed { display: none; }
+#debug-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: rgba(255,255,255,.7);
+  border-bottom: 0.5px solid rgba(255,255,255,.1);
+  letter-spacing: .04em;
+}
+#debug-count {
+  background: rgba(255,80,80,.25); color: #ff8a8a;
+  padding: 1px 6px; border-radius: 8px; font-size: 10px; margin-left: 6px;
+}
+#debug-actions button {
+  background: rgba(255,255,255,.08);
+  border: 0.5px solid rgba(255,255,255,.15);
+  color: rgba(255,255,255,.85);
+  font-size: 11px; padding: 3px 9px; border-radius: 6px;
+  cursor: pointer; margin-left: 4px;
+  font-family: var(--ui);
+}
+#debug-actions button:hover { background: rgba(255,255,255,.14); }
+#debug-body {
+  flex: 1; overflow-y: auto;
+  margin: 0; padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px; line-height: 1.45;
+  color: rgba(255,255,255,.82);
+  white-space: pre-wrap; word-break: break-word;
+  pointer-events: auto;
+}
+#debug-bug-btn #debug-bug-badge {
+  background: rgba(255,80,80,.5); color: #fff; font-size: 9px;
+  padding: 0 5px; border-radius: 7px; margin-left: 4px;
+  display: none;
+}
+#debug-bug-btn.has-entries { color: #ff8a8a; }
+body.ui-hidden #debug-panel,
+body.ui-hidden #debug-bug-btn { opacity: 0; pointer-events: none; }
+
 /* ─── UI HIDE MODE ─── */
 /* When .ui-hidden is on body, everything except the canvas fades out */
 body.ui-hidden #pnav,
@@ -1314,6 +1374,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <button class="nvb" id="fs-btn" onclick="toggleFullscreen()" title="Fullscreen (F)">⛶</button>
     <button class="nvb" id="hide-btn" onclick="toggleUI()" title="Hide UI (H)">◎</button>
   </span>
+  <button class="nvb" id="debug-bug-btn" onclick="debugToggle()" title="Debug log">BUG<span id="debug-bug-badge">0</span></button>
   <button class="nvb" id="tour-btn" onclick="tkRestart()" title="Restart tour">?</button>
 </div>
 
@@ -1342,6 +1403,19 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <!-- LYRIC OVERLAY -->
 <div id="lyric-wrap"><div id="lyric-line" class="blank"></div></div>
 <div id="physics-wrap"></div>
+
+<!-- DEBUG PANEL — sits below lyrics, auto-opens on errors -->
+<div id="debug-panel" class="closed">
+  <div id="debug-header">
+    <span id="debug-title">🐞 Debug log <span id="debug-count">0</span></span>
+    <span id="debug-actions">
+      <button id="debug-copy" onclick="debugCopy()" title="Copy all to clipboard">Copy</button>
+      <button id="debug-clear" onclick="debugClear()" title="Clear log">Clear</button>
+      <button id="debug-close" onclick="debugToggle(false)" title="Hide">×</button>
+    </span>
+  </div>
+  <pre id="debug-body"></pre>
+</div>
 
 <!-- 5-BUTTON CONTROLS -->
 <div id="controls">
@@ -1373,8 +1447,8 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <!-- Volume (controls Spotify directly via API) -->
   <div id="vol-row" class="smtc-locked" title="Volume control isn&rsquo;t available in iKandy &mdash; use the source app or your system mixer">
     <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-    <input type="range" id="vol-sl" min="0" max="100" value="80" disabled
-      oninput="setVolume(+this.value)" title="Volume control isn&rsquo;t available in iKandy">
+    <input type="range" id="vol-sl" min="0" max="100" value="80"
+      oninput="setVolume(+this.value)" title="Volume">
   </div>
 </div>
 
@@ -1460,6 +1534,12 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div id="app-name">IKANDY <span class="beta-pill" title="iKandy is in beta — code signing certificate is pending verification, so Windows may show a SmartScreen warning on first launch">BETA</span></div>
       <div id="app-buttons" style="display:flex;gap:6px;align-items:center;">
+        <button id="sb-debug-btn" onclick="debugToggle()" title="Open debug log"
+          style="background:none;border:1px solid var(--bdr);border-radius:4px;color:var(--dim);
+          font-family:var(--ui);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+          padding:3px 8px;cursor:pointer;transition:all .15s;white-space:nowrap;">
+          BUG<span id="sb-debug-badge" style="display:none;background:rgba(255,80,80,.5);color:#fff;font-size:9px;padding:0 5px;border-radius:7px;margin-left:4px;">0</span>
+        </button>
         <button id="sync-btn" title="Sync panels — both open together"
           onclick="toggleSync()"
           style="background:var(--acc-dim);border:1px solid var(--acc);border-radius:4px;color:var(--acc-txt);
@@ -1476,7 +1556,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
         </button>
       </div>
     </div>
-    <div id="app-tagline">Visual music &nbsp;·&nbsp; v1.0.3</div>
+    <div id="app-tagline">Visual music &nbsp;·&nbsp; v1.0.4</div>
     <a href="https://spotify.com" target="_blank" style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;text-decoration:none;opacity:0.7;transition:opacity .2s;"
       onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="#1DB954" xmlns="http://www.w3.org/2000/svg">
@@ -1839,7 +1919,7 @@ let _systemAudioStream = null, _systemAudioSrc = null;
 /* ── PLAYBACK STATE (fed by main.js via IPC) ── */
 let trackId = null, trackProgress = 0, trackDuration = 0;
 let trackPlaying = false;
-let _pollAnchorProgress = 0, _pollAnchorTime = 0;
+let _pollAnchorProgress = 0, _pollAnchorTime = 0, _wasPlaying = false;
 const LYRIC_LOOKAHEAD = 100;
 let lyrics = [], lyricsSync = false, lyricsOn = true, lastLyricIdx = -1;
 let ppCatFilter = 'all', ppSearchStr = '';
@@ -2766,6 +2846,185 @@ async function startSystemAudioCapture() {
   }
 }
 
+/* ── Debug log panel — visible bug-report tool for end users ── */
+const _debugEntries = [];
+function debugLog(label, body) {
+  const ts = new Date().toLocaleTimeString();
+  const text = (body || '').toString();
+  _debugEntries.push('[' + ts + '] ' + label + (text ? '\n' + text : ''));
+  if (_debugEntries.length > 80) _debugEntries.splice(0, _debugEntries.length - 80);
+  const bodyEl = document.getElementById('debug-body');
+  const countEl = document.getElementById('debug-count');
+  const badgeEl = document.getElementById('debug-bug-badge');
+  if (bodyEl) bodyEl.textContent = _debugEntries.join('\n\n');
+  if (countEl) countEl.textContent = _debugEntries.length;
+  if (badgeEl) {
+    badgeEl.textContent = _debugEntries.length;
+    badgeEl.style.display = _debugEntries.length ? '' : 'none';
+  }
+  const sbBadge = document.getElementById('sb-debug-badge');
+  if (sbBadge) {
+    sbBadge.textContent = _debugEntries.length;
+    sbBadge.style.display = _debugEntries.length ? '' : 'none';
+  }
+  const sbBtn = document.getElementById('sb-debug-btn');
+  if (sbBtn) sbBtn.style.color = _debugEntries.length ? '#ff8a8a' : '';
+  const btnEl = document.getElementById('debug-bug-btn');
+  if (btnEl) btnEl.classList.toggle('has-entries', _debugEntries.length > 0);
+  if (bodyEl) bodyEl.scrollTop = bodyEl.scrollHeight;
+}
+function debugToggle(force) {
+  const p = document.getElementById('debug-panel');
+  if (!p) return;
+  const open = (force === undefined) ? p.classList.contains('closed') : force;
+  if (open) p.classList.remove('closed');
+  else      p.classList.add('closed');
+}
+async function debugCopy() {
+  const text = _debugEntries.join('\n\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    const b = document.getElementById('debug-copy');
+    const orig = b.textContent;
+    b.textContent = '✓ Copied';
+    setTimeout(() => b.textContent = orig, 1200);
+  } catch(e) {
+    // Fallback: select the text in the body so user can Ctrl+C
+    const bodyEl = document.getElementById('debug-body');
+    const r = document.createRange(); r.selectNodeContents(bodyEl);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  }
+}
+function debugClear() {
+  _debugEntries.length = 0;
+  document.getElementById('debug-body').textContent = '';
+  document.getElementById('debug-count').textContent = '0';
+  const badgeEl = document.getElementById('debug-bug-badge');
+  if (badgeEl) { badgeEl.textContent = '0'; badgeEl.style.display = 'none'; }
+  const btnEl = document.getElementById('debug-bug-btn');
+  if (btnEl) btnEl.classList.remove('has-entries');
+  const sbBadge = document.getElementById('sb-debug-badge');
+  if (sbBadge) { sbBadge.textContent = '0'; sbBadge.style.display = 'none'; }
+  const sbBtn = document.getElementById('sb-debug-btn');
+  if (sbBtn) sbBtn.style.color = '';
+}
+window.addEventListener('error', e => {
+  debugLog('JS ERROR: ' + (e.message || 'unknown'),
+    (e.filename ? e.filename + ':' + e.lineno + ':' + e.colno : '') +
+    (e.error && e.error.stack ? '\n' + e.error.stack : ''));
+});
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason;
+  debugLog('PROMISE REJECTION', (r && r.stack) ? r.stack : (r && r.message) || String(r));
+});
+// Mirror console.error/warn into the panel so visible browser-side issues
+// land in the user-copyable log without changing existing logging.
+(function(){
+  const _err = console.error, _warn = console.warn;
+  console.error = function(...args) {
+    try { debugLog('console.error', args.map(a => (a && a.stack) ? a.stack : (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')); } catch(e) {}
+    _err.apply(console, args);
+  };
+  console.warn = function(...args) {
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+    // Skip noisy debug stream relays — they're not bugs
+    if (!/AUDIO DIAGNOSTICS/i.test(msg)) {
+      try { debugLog('console.warn', msg); } catch(e) {}
+    }
+    _warn.apply(console, args);
+  };
+})();
+
+/* ── Audio diagnostics — surface routing info on silent capture ── */
+async function captureAudioDiagnostics(stream, reason = 'manual') {
+  const lines = [];
+  const push = (k, v) => lines.push(k + ': ' + (v === undefined ? '?' : v));
+  push('reason', reason);
+  push('time', new Date().toISOString());
+  push('ua', navigator.userAgent);
+  // AudioContext state
+  if (audioCtx) {
+    push('ctx.state', audioCtx.state);
+    push('ctx.sampleRate', audioCtx.sampleRate);
+    push('ctx.dest.channelCount', audioCtx.destination.channelCount);
+    push('ctx.dest.maxChannelCount', audioCtx.destination.maxChannelCount);
+  } else push('ctx', 'null');
+  // Track info
+  try {
+    const t = stream && stream.getAudioTracks()[0];
+    if (t) {
+      push('track.label', JSON.stringify(t.label || ''));
+      push('track.readyState', t.readyState);
+      push('track.muted', t.muted);
+      push('track.enabled', t.enabled);
+      const s = t.getSettings ? t.getSettings() : {};
+      push('track.settings.sampleRate', s.sampleRate);
+      push('track.settings.channelCount', s.channelCount);
+      push('track.settings.deviceId', s.deviceId);
+      const c = t.getCapabilities ? t.getCapabilities() : {};
+      push('track.caps.channelCount', JSON.stringify(c.channelCount));
+      push('track.caps.sampleRate', JSON.stringify(c.sampleRate));
+    } else push('track', 'none');
+  } catch(e) { push('track.error', e.message); }
+  // Boost/source node info
+  try {
+    if (window._boostGainNode) {
+      push('boost.channelCount', window._boostGainNode.channelCount);
+      push('boost.channelCountMode', window._boostGainNode.channelCountMode);
+      push('boost.channelInterpretation', window._boostGainNode.channelInterpretation);
+      push('boost.gain', window._boostGainNode.gain.value);
+    }
+    if (_systemAudioSrc) {
+      push('src.channelCount', _systemAudioSrc.channelCount);
+      push('src.channelCountMode', _systemAudioSrc.channelCountMode);
+      push('src.numberOfOutputs', _systemAudioSrc.numberOfOutputs);
+    }
+  } catch(e) { push('node.error', e.message); }
+  // Live signal probe — sample the analyser repeatedly for 500ms,
+  // record peak / RMS / nonzero-bin count to distinguish "true silence"
+  // from "wrong channel routing" (low energy in only some bins).
+  try {
+    if (analyserNode) {
+      const freqBuf = new Uint8Array(analyserNode.frequencyBinCount);
+      const timeBuf = new Uint8Array(analyserNode.fftSize);
+      let peakF = 0, peakT = 0, sumSq = 0, samples = 0, nonzeroBins = 0;
+      const start = performance.now();
+      while (performance.now() - start < 500) {
+        analyserNode.getByteFrequencyData(freqBuf);
+        analyserNode.getByteTimeDomainData(timeBuf);
+        for (let i=0; i<freqBuf.length; i++) {
+          if (freqBuf[i] > peakF) peakF = freqBuf[i];
+          if (freqBuf[i] > 2) nonzeroBins++;
+        }
+        for (let i=0; i<timeBuf.length; i++) {
+          const d = timeBuf[i] - 128;
+          if (Math.abs(d) > peakT) peakT = Math.abs(d);
+          sumSq += d*d; samples++;
+        }
+        await new Promise(r => setTimeout(r, 16));
+      }
+      push('probe.peakFreq(0-255)', peakF);
+      push('probe.peakTimePk(0-128)', peakT);
+      push('probe.rmsTime', Math.sqrt(sumSq/samples).toFixed(3));
+      push('probe.nonzeroBinHits', nonzeroBins);
+    } else push('analyser', 'null');
+  } catch(e) { push('probe.error', e.message); }
+  // Output devices the OS exposes (labels only if mic perm granted, but
+  // device kinds + counts are still informative for routing diagnosis)
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const outs = devs.filter(d => d.kind === 'audiooutput');
+    push('audiooutput.count', outs.length);
+    outs.forEach((d, i) => push('audiooutput[' + i + ']', JSON.stringify(d.label || '(no label)')));
+  } catch(e) { push('devices.error', e.message); }
+  const report = lines.join('\n');
+  console.warn('[IKANDY] === AUDIO DIAGNOSTICS ===\n' + report + '\n=========================');
+  debugLog('AUDIO DIAGNOSTICS — ' + reason, report);
+  debugToggle(true);
+  return report;
+}
+window.ikandyDiag = () => captureAudioDiagnostics(_systemAudioStream, 'manual');
+
 async function connectAudioStream(stream, label, silent = false, _isRetry = false) {
   // ─── Realtek non-default-format fix ─────────────────────────────────────
   // If the captured track's sample rate doesn't match audioCtx, Chromium's
@@ -2869,11 +3128,15 @@ async function connectAudioStream(stream, label, silent = false, _isRetry = fals
               await connectAudioStream(stream, label, silent, true);
             } catch(e) {
               console.error('[IKANDY] Self-heal failed:', e);
-              toast('⚠ No audio signal detected. Make sure music is playing.');
+              await captureAudioDiagnostics(stream, 'silent-after-self-heal-error');
+              toast('⚠ No audio signal — click the BUG button (top nav or sidebar header), hit Copy, paste in chat.');
             }
           })();
         } else {
-          toast('⚠ No audio signal detected. Make sure music is playing.');
+          (async () => {
+            await captureAudioDiagnostics(stream, 'silent-after-self-heal-retry');
+            toast('⚠ No audio signal — click the BUG button (top nav or sidebar header), hit Copy, paste in chat.');
+          })();
         }
       } else {
         toast('✓ Audio signal active — visuals reacting to music');
@@ -2953,7 +3216,7 @@ function setupSpotifyIPC() {
 
   window.IKANDY.onSpotifyState(state => {
     if (state.type === 'debug') {
-      console.warn(state.message);
+      console.debug(state.message);
       return;
     }
     if (state.type === 'local') {
@@ -2963,6 +3226,7 @@ function setupSpotifyIPC() {
       return;
     }
     if (state.type === 'volume') {
+      if (Date.now() - _lastVolumeUserAt < 1500) return;
       const sl = el('vol-sl');
       if (sl && Math.abs(+sl.value - state.volume) > 1) {
         sl.value = state.volume;
@@ -3004,12 +3268,26 @@ function setupSpotifyIPC() {
       }
       if (!state.title) return; // partial update (e.g. play state sync only)
       trackDuration    = state.duration;
-      _pollAnchorProgress = state.progress;
-      _pollAnchorTime     = performance.now();
-      trackProgress       = state.progress;
+      // Only re-anchor on a real change. Polled progress carries HTTP
+      // roundtrip latency (and lower precision on foobar/Beefweb), so
+      // re-anchoring every poll yanks lyrics around. Trust interpolation
+      // unless track changed, play-state flipped, or drift exceeds 1.5s
+      // (i.e. user actually seeked).
+      const _interp = (trackPlaying && _pollAnchorTime > 0)
+        ? _pollAnchorProgress + (performance.now() - _pollAnchorTime)
+        : _pollAnchorProgress;
+      const _drift = Math.abs(state.progress - _interp);
+      const _trackChanged = state.id !== trackId;
+      const _playFlipped  = state.playing !== _wasPlaying;
+      if (_trackChanged || _playFlipped || _drift > 1500 || _pollAnchorTime === 0) {
+        _pollAnchorProgress = state.progress;
+        _pollAnchorTime     = performance.now();
+        trackProgress       = state.progress;
+      }
+      _wasPlaying = state.playing;
       updateHUD(state.title, state.artist, state.album, state.art, trackProgress, state.duration);
       // Sync volume slider if volume changed externally
-      if (state.volume != null) {
+      if (state.volume != null && Date.now() - _lastVolumeUserAt >= 1500) {
         const sl = el('vol-sl');
         if (sl && Math.abs(+sl.value - state.volume) > 1) {
           sl.value = state.volume;
@@ -3089,15 +3367,6 @@ function setupSpotifyIPC() {
 }
 
 /* ── HUD ── */
-function setControlsLocked(locked) {
-  ['cb-prev','cb-pp','cb-next'].forEach(id => {
-    const btn = el(id);
-    if (btn) { btn.disabled = locked; btn.style.opacity = locked ? '0.3' : '1'; }
-  });
-  const vol = el('vol-sl');
-  if (vol) { vol.disabled = locked; vol.style.opacity = locked ? '0.3' : '1'; }
-}
-
 function updateHUD(title, artist, album, art, progress, duration) {
   const hTitle = el('hud-title'), hArtist = el('hud-artist');
   const hArt = el('hud-art');
@@ -3423,8 +3692,10 @@ async function spAction(cmd) {
 
 let _volDebounce = null;
 let _lastVolumeSent = -1;
+let _lastVolumeUserAt = 0;
 function setVolume(val) {
   _lastVolumeSent = val;
+  _lastVolumeUserAt = Date.now();
   clearTimeout(_volDebounce);
   _volDebounce = setTimeout(() => {
     if (currentSource === 'vlc') {
@@ -3485,13 +3756,13 @@ let _activeFoobarTrackIdx = -1; // for highlighting the now-playing row
 
 async function openPlaylistPanel() {
   el('playlist-panel').classList.add('open');
-  if (!_plLoaded || _plSource !== currentSource) {
-    _plLoaded = false;
-    _plSource = currentSource;
-    _activePlUri = '';
-    _trackCache = {};
-    await loadPlaylists();
-  }
+  // Always re-fetch on open so playlist edits in Spotify/foobar show up
+  // without an app restart. Cache only persists during a single open session.
+  _plLoaded = false;
+  _plSource = currentSource;
+  _activePlUri = '';
+  _trackCache = {};
+  await loadPlaylists();
 }
 function closePlaylistPanel() {
   el('playlist-panel').classList.remove('open');
@@ -4586,8 +4857,8 @@ async function showPreview(name, idx, cardEl) {
       if (_flyoutName) _flyoutName.textContent = getLabel(name);
       _flyoutEl.classList.add('show');
 
-      _flyoutViz.setRendererSize(FW, FH);
       _flyoutViz.loadPreset(window.butterchurnPresets.getPresets()[name], 0.5);
+      _flyoutViz.setRendererSize(FW, FH);
       if (_flyoutRaf) cancelAnimationFrame(_flyoutRaf);
       const startTime = Date.now();
       function loop() {
@@ -4616,8 +4887,8 @@ async function showPreview(name, idx, cardEl) {
       border:1px solid var(--acc);
       display:block; opacity:1;
     `;
-    _liveViz.setRendererSize(w, h);
     _liveViz.loadPreset(window.butterchurnPresets.getPresets()[name], 0.5);
+    _liveViz.setRendererSize(w, h);
     if (_liveRaf) cancelAnimationFrame(_liveRaf);
     const startTime = Date.now();
     function loop() {
@@ -8197,6 +8468,7 @@ function clearBgImage() {
   el('bg-filename').textContent = '';
   el('bg-cycle-row').style.display = 'none';
   el('bg-clear-btn').style.display = 'none';
+  el('bg-file-input').value = '';
   stopRippleLoop();
   setVibeFxLock(true);
   // Reset FX mode state
