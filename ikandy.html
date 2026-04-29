@@ -43,8 +43,22 @@ html, body {
 }
 #grain-canvas {
   position: fixed; inset: 0; width: 100%; height: 100%;
-  z-index: 2; pointer-events: none; opacity: 0; transition: opacity .4s;
+  z-index: 17; pointer-events: none; opacity: 0; transition: opacity .4s;
   mix-blend-mode: overlay;
+}
+#fx-canvas {
+  /* FX Layer — chromatic aberration post-process.
+     Reads #viz as a texture each frame, applies CA, displays here.
+     Sits above viz at z=2 (no blend-mode — replaces what's shown when on).
+     Scene overlays at z=3+ still composite normally on top. */
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 2; pointer-events: none; opacity: 0; transition: opacity .25s;
+}
+#pb-canvas {
+  /* FX Layer — beat-reactive particle burst (Canvas 2D).
+     Sits above scenes at z=15 so bursts read as a top-level effect. */
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 15; pointer-events: none; opacity: 0; transition: opacity .25s;
 }
 #vignette-canvas {
   position: fixed; inset: 0; width: 100%; height: 100%;
@@ -52,7 +66,7 @@ html, body {
 }
 #scanline-canvas {
   position: fixed; inset: 0; width: 100%; height: 100%;
-  z-index: 2; pointer-events: none; opacity: 0; transition: opacity .4s;
+  z-index: 17; pointer-events: none; opacity: 0; transition: opacity .4s;
   mix-blend-mode: overlay;
 }
 #aurora-canvas {
@@ -87,6 +101,30 @@ html, body {
   mix-blend-mode: screen;
 }
 #viz { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
+
+/* ─── FPS OVERLAY (toggled from Performance panel) ─── */
+#fps-overlay {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 5px 11px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: var(--sp);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  user-select: none;
+  display: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  /* Stable width so digits don't reflow as numbers change */
+  min-width: 84px;
+  text-align: center;
+}
 
 /* ─── LOADING ─── */
 /* ─── SEIZURE WARNING ─── */
@@ -1239,6 +1277,8 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <div id="color-bg" style="position:fixed;inset:0;z-index:0;background:transparent;transition:background .4s;"></div>
 <canvas id="bg-canvas"></canvas>
 <canvas id="viz"></canvas>
+<canvas id="fx-canvas"></canvas>
+<canvas id="pb-canvas"></canvas>
 
 <canvas id="vignette-canvas"></canvas>
 <canvas id="grain-canvas"></canvas>
@@ -1270,8 +1310,10 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <button class="nvb nav-arrow" onclick="nextPreset()" title="Next preset">›</button>
   <button class="nvb" id="auto-btn" onclick="toggleAuto()" title="Auto-cycle">AUTO</button>
   <button class="nvb" id="presets-btn" onclick="openPresetPanel()" title="Browse presets">PRESETS</button>
-  <button class="nvb" id="fs-btn" onclick="toggleFullscreen()" title="Fullscreen (F)">⛶</button>
-  <button class="nvb" id="hide-btn" onclick="toggleUI()" title="Hide UI (H)">◎</button>
+  <span id="view-controls" style="display:inline-flex;gap:0;">
+    <button class="nvb" id="fs-btn" onclick="toggleFullscreen()" title="Fullscreen (F)">⛶</button>
+    <button class="nvb" id="hide-btn" onclick="toggleUI()" title="Hide UI (H)">◎</button>
+  </span>
   <button class="nvb" id="tour-btn" onclick="tkRestart()" title="Restart tour">?</button>
 </div>
 
@@ -1390,6 +1432,14 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <button class="pp-pill" data-cat="unchained" onclick="ppCat('unchained')">Unchained</button>
     <button class="pp-pill" data-cat="other"     onclick="ppCat('other')">Other</button>
   </div>
+  <div id="pp-folder-bar" style="padding:8px 16px;border-top:0.5px solid var(--bdr2);border-bottom:0.5px solid var(--bdr2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:11px;color:var(--dim);"><span style="color:var(--acc);">📂 Custom Presets</span> — load community .json files</span>
+    <div id="preset-folder-row" style="display:none;align-items:center;gap:8px;flex:1;min-width:200px;">
+      <span id="preset-folder-name" style="font-size:11px;color:var(--sp);word-break:break-all;flex:1;"></span>
+      <button class="btn" onclick="clearPresetFolder()" style="font-size:11px;padding:4px 10px;margin:0;">✕ Remove</button>
+    </div>
+    <button class="btn" id="preset-folder-btn" onclick="pickPresetFolder()" style="font-size:11px;padding:5px 12px;margin:0 0 0 auto;">📂 Load Preset Folder</button>
+  </div>
   <div id="pp-body">
     <div id="pp-grid-wrap">
       <div id="pp-grid"></div>
@@ -1409,7 +1459,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <div id="app-brand">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div id="app-name">IKANDY <span class="beta-pill" title="iKandy is in beta — code signing certificate is pending verification, so Windows may show a SmartScreen warning on first launch">BETA</span></div>
-      <div style="display:flex;gap:6px;align-items:center;">
+      <div id="app-buttons" style="display:flex;gap:6px;align-items:center;">
         <button id="sync-btn" title="Sync panels — both open together"
           onclick="toggleSync()"
           style="background:var(--acc-dim);border:1px solid var(--acc);border-radius:4px;color:var(--acc-txt);
@@ -1426,7 +1476,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
         </button>
       </div>
     </div>
-    <div id="app-tagline">Visual music &nbsp;·&nbsp; v1.0</div>
+    <div id="app-tagline">Visual music &nbsp;·&nbsp; v1.0.3</div>
     <a href="https://spotify.com" target="_blank" style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;text-decoration:none;opacity:0.7;transition:opacity .2s;"
       onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="#1DB954" xmlns="http://www.w3.org/2000/svg">
@@ -1576,6 +1626,18 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <input type="range" id="scan-sl" min="0" max=".8" step=".05" value="0" oninput="setScanlines(+this.value)">
       <span class="svv" id="scan-v">0</span>
     </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--bdr2);">
+      <div style="font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Particle Burst</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <button id="pb-toggle-btn" class="vibe-btn" onclick="togglePb()" style="width:auto;padding:5px 14px;">○ Off</button>
+        <span style="font-size:11px;color:var(--dim);">Spawns on bass kicks</span>
+      </div>
+      <span class="lbl">Density</span>
+      <div class="svr">
+        <input type="range" id="pb-density-sl" min="0" max="2" step="0.05" value="1" oninput="setPbDensity(+this.value)">
+        <span class="svv" id="pb-density-v">1.0</span>
+      </div>
+    </div>
   </div>
 
   <!-- WAVEFORM -->
@@ -1613,12 +1675,21 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       </div>
     </div>
     <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--bdr2);">
-      <div style="font-size:11px;color:var(--dim);margin-bottom:6px;line-height:1.5;"><span style="color:var(--acc);">📂 Custom Presets</span> — load community .json preset files.</div>
-      <div id="preset-folder-row" style="display:none;margin-bottom:6px;">
-        <div id="preset-folder-name" style="font-size:11px;color:var(--sp);margin-bottom:5px;word-break:break-all;"></div>
-        <button class="btn" onclick="clearPresetFolder()" style="width:100%;font-size:11px;padding:5px;">✕ Remove Folder</button>
+      <div style="font-size:9px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Chromatic Aberration</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <button id="fxl-toggle-btn" class="vibe-btn" onclick="toggleFxLayer()" style="width:auto;padding:5px 14px;">○ Off</button>
+        <span style="font-size:11px;color:var(--dim);">RGB split + beat pulse</span>
       </div>
-      <button class="btn" id="preset-folder-btn" onclick="pickPresetFolder()" style="width:100%;font-size:11px;padding:6px;">📂 Load Preset Folder</button>
+      <span class="lbl">Amount</span>
+      <div class="svr" style="margin-bottom:6px;">
+        <input type="range" id="fxl-amount-sl" min="0" max="2" step="0.05" value="1" oninput="setFxLayerAmount(+this.value)">
+        <span class="svv" id="fxl-amount-v">1.0</span>
+      </div>
+      <span class="lbl">Beat React</span>
+      <div class="svr">
+        <input type="range" id="fxl-beat-sl" min="0" max="2" step="0.05" value="1" oninput="setFxLayerBeat(+this.value)">
+        <span class="svv" id="fxl-beat-v">1.0</span>
+      </div>
     </div>
   </div>
 
@@ -1696,9 +1767,34 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     </div>
   </div>
 
+  <!-- PERFORMANCE -->
+  <div class="acc-hd" id="acc-performance" onclick="accToggle(this)">
+    <span>Performance</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd">
+    <span class="lbl">Render Scale</span>
+    <select id="render-scale-sl" style="width:100%;padding:6px 8px;background:rgba(255,255,255,.05);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-family:var(--ui);font-size:12px;outline:none;cursor:pointer;margin-bottom:6px;">
+      <option value="0.5"  style="background:#1a1a1a;color:#fff;">50% — Performance</option>
+      <option value="0.75" style="background:#1a1a1a;color:#fff;">75% — Balanced</option>
+      <option value="1"    style="background:#1a1a1a;color:#fff;" selected>100% — Native</option>
+      <option value="1.25" style="background:#1a1a1a;color:#fff;">125% — Supersample</option>
+      <option value="1.5"  style="background:#1a1a1a;color:#fff;">150% — Max</option>
+    </select>
+    <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:10px;">
+      Internal: <span id="render-scale-info">—</span><br>
+      Lower = smoother on weaker GPUs. Higher = sharper at cost of FPS.
+    </div>
+    <span class="lbl">FPS Overlay</span>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <button id="fps-toggle-btn" class="vibe-btn" onclick="toggleFpsOverlay()" style="width:auto;padding:5px 14px;">○ Off</button>
+      <span style="font-size:11px;color:var(--dim);">Live frame counter</span>
+    </div>
+  </div>
+
 </div></div><!-- /sb right -->
 
 <div id="toast"></div>
+<div id="fps-overlay">FPS —</div>
 
 
 
@@ -1748,17 +1844,513 @@ const LYRIC_LOOKAHEAD = 100;
 let lyrics = [], lyricsSync = false, lyricsOn = true, lastLyricIdx = -1;
 let ppCatFilter = 'all', ppSearchStr = '';
 
+/* ── RENDER SCALE ──
+   _renderScale multiplies the *backing buffer* dimensions of vizCanvas.
+   CSS keeps the canvas at 100% of window (#viz rule), so the browser/GPU
+   handles upscale/downscale for free. Lets weaker GPUs render at 50–75%
+   internal while keeping a crisp display, and lets strong GPUs supersample. */
+let _renderScale = parseFloat(localStorage.getItem('IKANDY-render-scale')) || 1.0;
+
+function _clampRenderScale(s) {
+  return Math.max(0.25, Math.min(2.0, +s || 1.0));
+}
+
 /* ── RESIZE ── */
 function resize() {
-  W = vizCanvas.width = window.innerWidth;
-  H = vizCanvas.height = window.innerHeight;
+  // CSS handles display sizing (width:100%; height:100% in #viz rule).
+  // The buffer dimensions below = what the GPU actually renders.
+  const cssW = window.innerWidth;
+  const cssH = window.innerHeight;
+  W = vizCanvas.width  = Math.max(1, Math.round(cssW * _renderScale));
+  H = vizCanvas.height = Math.max(1, Math.round(cssH * _renderScale));
   if (visualizer) visualizer.setRendererSize(W, H);
-  grainCanvas.style.width  = W + 'px';
-  grainCanvas.style.height = H + 'px';
+  // FX Layer canvas tracks viz buffer dims so texture sampling is 1:1
+  if (typeof resizeFxLayer === 'function') resizeFxLayer();
+  // Particle burst canvas tracks viewport (CSS pixels)
+  if (typeof resizePb === 'function') resizePb();
+  // Overlay canvases stay at native window size — they're cheap CSS overlays.
+  grainCanvas.style.width  = cssW + 'px';
+  grainCanvas.style.height = cssH + 'px';
   resizeScan();
   resizeVig();
+  // Update info readout if the panel is mounted
+  const info = document.getElementById('render-scale-info');
+  if (info) info.textContent = `${W}×${H}`;
 }
 window.addEventListener('resize', resize);
+
+function applyRenderScale(scale) {
+  _renderScale = _clampRenderScale(scale);
+  localStorage.setItem('IKANDY-render-scale', _renderScale);
+  resize();
+  console.log(`[iKandy] Render scale: ${(_renderScale*100).toFixed(0)}% → ${W}×${H}`);
+}
+
+function initRenderScale() {
+  const sel = document.getElementById('render-scale-sl');
+  if (!sel) return;
+  sel.value = _renderScale.toString();
+  sel.addEventListener('change', e => applyRenderScale(parseFloat(e.target.value)));
+  // Initial readout — resize() has already run by this point in bootApp
+  const info = document.getElementById('render-scale-info');
+  if (info) info.textContent = `${W}×${H}`;
+}
+
+/* ── FPS OVERLAY ──
+   Toggleable live frame counter, displayed top-left. Counts requestAnimationFrame
+   callbacks (true display rate, before any speed-skip in the render loop) and
+   updates the readout once per second. Counter logic is dirt cheap — two ints
+   and a clock check per frame — so it's fine to call from renderLoop every
+   frame and gate by the enabled flag. */
+let _fpsOverlayEnabled    = localStorage.getItem('IKANDY-fps-overlay') === '1';
+let _fpsCounterFrames     = 0;
+let _fpsCounterLastSec    = performance.now();
+let _fpsOverlayEl         = null;  // cached element ref
+
+function tickFpsCounter() {
+  if (!_fpsOverlayEnabled) return;
+  _fpsCounterFrames++;
+  const now = performance.now();
+  const dt = now - _fpsCounterLastSec;
+  if (dt >= 1000) {
+    // Scale to exactly 1s so partial seconds give an accurate read
+    const fps = Math.round(_fpsCounterFrames * 1000 / dt);
+    if (_fpsOverlayEl) _fpsOverlayEl.textContent = `FPS ${fps}`;
+    _fpsCounterFrames = 0;
+    _fpsCounterLastSec = now;
+  }
+}
+
+function setFpsOverlayEnabled(on) {
+  _fpsOverlayEnabled = !!on;
+  if (!_fpsOverlayEl) _fpsOverlayEl = document.getElementById('fps-overlay');
+  if (_fpsOverlayEl) {
+    _fpsOverlayEl.style.display = _fpsOverlayEnabled ? 'block' : 'none';
+    if (!_fpsOverlayEnabled) _fpsOverlayEl.textContent = 'FPS —';
+  }
+  // Reset counter so the first reading after enable is clean
+  _fpsCounterFrames = 0;
+  _fpsCounterLastSec = performance.now();
+  localStorage.setItem('IKANDY-fps-overlay', _fpsOverlayEnabled ? '1' : '0');
+  const btn = document.getElementById('fps-toggle-btn');
+  if (btn) {
+    btn.textContent = _fpsOverlayEnabled ? '● On' : '○ Off';
+    btn.style.color = _fpsOverlayEnabled ? 'var(--sp)' : '';
+    btn.style.borderColor = _fpsOverlayEnabled ? 'var(--sp)' : '';
+  }
+}
+
+function toggleFpsOverlay() { setFpsOverlayEnabled(!_fpsOverlayEnabled); }
+
+function initFpsOverlay() {
+  _fpsOverlayEl = document.getElementById('fps-overlay');
+  setFpsOverlayEnabled(_fpsOverlayEnabled); // restores saved state into UI
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FX LAYER — Chromatic Aberration (post-process)
+   ───────────────────────────────────────────────────────────────────
+   Isolated module. Owns its own GL context on #fx-canvas. Each frame:
+     1. Reads vizCanvas as a texture
+     2. Runs CA fragment shader (RGB channel offset, edge-falloff, beat-modulated)
+     3. Writes to fx-canvas, which sits over viz at z-index 2
+   Toggle off → fx-canvas hidden, render loop skips this entirely.
+   ═══════════════════════════════════════════════════════════════════ */
+const fxLayerCanvas = document.getElementById('fx-canvas');
+const fxLayerGl = fxLayerCanvas
+  ? (fxLayerCanvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false }))
+  : null;
+
+let _fxLayerEnabled  = localStorage.getItem('IKANDY-fxlayer-enabled') === '1';
+let _fxLayerAmount   = parseFloat(localStorage.getItem('IKANDY-fxlayer-amount'));
+let _fxLayerBeat     = parseFloat(localStorage.getItem('IKANDY-fxlayer-beat'));
+if (!isFinite(_fxLayerAmount)) _fxLayerAmount = 1.0;
+if (!isFinite(_fxLayerBeat))   _fxLayerBeat   = 1.0;
+
+let _fxLayerProgram = null;
+let _fxLayerVbo     = null;
+let _fxLayerTex     = null;
+let _fxLayerLoc     = null;       // cached uniform/attrib locations
+let _fxLayerAmpSmooth = 0;        // smoothed beat amplitude (fast attack, slow release)
+// Intermediate 2D canvas — copied from vizCanvas right after butterchurn renders
+// (synchronously within the same rAF tick, before the compositor clears). This
+// avoids the captureStream/video throttling problem where the video pauses when
+// offscreen, leaving fx-canvas with stale/empty frames.
+let _fxLayerSrcCanvas = null;
+let _fxLayerSrcCtx    = null;
+
+const FXLAYER_VERT = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() {
+    // Map clip space [-1,1] to UV [0,1], flip Y so canvas-as-texture orients right
+    v_uv = vec2((a_pos.x + 1.0) * 0.5, 1.0 - (a_pos.y + 1.0) * 0.5);
+    gl_Position = vec4(a_pos, 0.0, 1.0);
+  }
+`;
+
+const FXLAYER_FRAG = `
+  precision highp float;
+  uniform sampler2D u_tex;
+  uniform float     u_amount;   // user-controlled CA strength (0–2)
+  uniform float     u_amp;      // beat amplitude (0–1) × user beat-react slider
+  varying vec2      v_uv;
+
+  void main() {
+    vec2 uv     = v_uv;
+    vec2 center = vec2(0.5);
+    vec2 dir    = uv - center;
+    float dist  = length(dir);
+
+    // Edge falloff — barely any CA in center, strong at corners.
+    // Beat amp pulses the whole effect briefly on each kick.
+    float edge   = 0.4 + dist * 1.6;
+    float pulse  = 1.0 + u_amp * 1.8;
+    float scale  = u_amount * edge * pulse * 0.035;
+
+    // R offsets outward, B inward, G stays centered (classic CA look)
+    vec2 rOff =  dir * scale;
+    vec2 bOff = -dir * scale;
+
+    float r = texture2D(u_tex, clamp(uv + rOff, 0.0, 1.0)).r;
+    float g = texture2D(u_tex, uv).g;
+    float b = texture2D(u_tex, clamp(uv + bOff, 0.0, 1.0)).b;
+
+    gl_FragColor = vec4(r, g, b, 1.0);
+  }
+`;
+
+function initFxLayer() {
+  const gl = fxLayerGl;
+  if (!gl) {
+    console.warn('[iKandy] FX Layer: WebGL unavailable — feature disabled');
+    return;
+  }
+
+  // Compile + link
+  function shader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error('[iKandy] FX Layer shader error:', gl.getShaderInfoLog(s));
+      return null;
+    }
+    return s;
+  }
+  const vs = shader(gl.VERTEX_SHADER,   FXLAYER_VERT);
+  const fs = shader(gl.FRAGMENT_SHADER, FXLAYER_FRAG);
+  if (!vs || !fs) return;
+
+  _fxLayerProgram = gl.createProgram();
+  gl.attachShader(_fxLayerProgram, vs);
+  gl.attachShader(_fxLayerProgram, fs);
+  gl.linkProgram(_fxLayerProgram);
+  if (!gl.getProgramParameter(_fxLayerProgram, gl.LINK_STATUS)) {
+    console.error('[iKandy] FX Layer program link error:', gl.getProgramInfoLog(_fxLayerProgram));
+    _fxLayerProgram = null;
+    return;
+  }
+
+  // Fullscreen quad
+  _fxLayerVbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, _fxLayerVbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+
+  // Texture for sampling vizCanvas
+  _fxLayerTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, _fxLayerTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+  // Cache locations once — saves a getUniformLocation call every frame
+  _fxLayerLoc = {
+    pos:    gl.getAttribLocation(_fxLayerProgram, 'a_pos'),
+    tex:    gl.getUniformLocation(_fxLayerProgram, 'u_tex'),
+    amount: gl.getUniformLocation(_fxLayerProgram, 'u_amount'),
+    amp:    gl.getUniformLocation(_fxLayerProgram, 'u_amp')
+  };
+
+  resizeFxLayer();
+  console.log('[iKandy] FX Layer initialized');
+}
+
+function resizeFxLayer() {
+  const gl = fxLayerGl;
+  if (!gl) return;
+  // Match viz canvas backing-buffer dims so the texture sample is 1:1
+  // (this also picks up changes from the render-scale slider).
+  const w = vizCanvas.width  || window.innerWidth;
+  const h = vizCanvas.height || window.innerHeight;
+  if (fxLayerCanvas.width !== w || fxLayerCanvas.height !== h) {
+    fxLayerCanvas.width  = w;
+    fxLayerCanvas.height = h;
+    gl.viewport(0, 0, w, h);
+  }
+}
+
+/* ── FX LAYER VIZ SOURCE ──
+   Intermediate 2D canvas mirrors vizCanvas. Updated once per render frame
+   (synchronously after butterchurn.render(), before the compositor clears
+   the WebGL drawing buffer). The FX layer's GL context samples THIS canvas,
+   not the WebGL canvas directly — sidesteps preserveDrawingBuffer issues
+   and captureStream throttling. */
+function setupFxLayerSrcCanvas() {
+  if (_fxLayerSrcCanvas) return; // idempotent
+  _fxLayerSrcCanvas = document.createElement('canvas');
+  _fxLayerSrcCanvas.width  = vizCanvas.width  || window.innerWidth;
+  _fxLayerSrcCanvas.height = vizCanvas.height || window.innerHeight;
+  _fxLayerSrcCtx = _fxLayerSrcCanvas.getContext('2d', { alpha: false, willReadFrequently: false });
+  console.log(`[iKandy] FX Layer source canvas ready: ${_fxLayerSrcCanvas.width}×${_fxLayerSrcCanvas.height}`);
+}
+
+// Called from the render loop right after visualizer.render() — copies the
+// freshly rendered viz pixels into our intermediate canvas. Must run in the
+// same JS task as butterchurn.render() so the WebGL drawing buffer is still
+// populated. The drawImage call here works regardless of preserveDrawingBuffer.
+function captureVizFrame() {
+  if (!_fxLayerEnabled || !_fxLayerSrcCanvas || !_fxLayerSrcCtx) return;
+  // Resize if viz dims changed (render-scale slider, window resize, etc.)
+  if (_fxLayerSrcCanvas.width !== vizCanvas.width || _fxLayerSrcCanvas.height !== vizCanvas.height) {
+    if (vizCanvas.width > 0 && vizCanvas.height > 0) {
+      _fxLayerSrcCanvas.width  = vizCanvas.width;
+      _fxLayerSrcCanvas.height = vizCanvas.height;
+    }
+  }
+  try {
+    _fxLayerSrcCtx.drawImage(vizCanvas, 0, 0);
+  } catch (e) { /* canvas may be in odd state during transitions; skip frame */ }
+}
+
+function renderFxLayer(bassRaw) {
+  if (!_fxLayerEnabled || !fxLayerGl || !_fxLayerProgram) return;
+  const gl = fxLayerGl;
+
+  // Keep dims in sync with viz (covers render-scale changes mid-session)
+  resizeFxLayer();
+
+  // Smooth bass: fast attack, slow release — gives kicks a snappy pulse without flicker
+  const target = Math.min(1, (bassRaw || 0) * _fxLayerBeat);
+  _fxLayerAmpSmooth = target > _fxLayerAmpSmooth
+    ? target
+    : _fxLayerAmpSmooth * 0.86 + target * 0.14;
+
+  // Snapshot intermediate canvas → texture. The intermediate canvas was
+  // populated synchronously after butterchurn rendered, so its pixels are
+  // current and reliable (no preserveDrawingBuffer issue).
+  const source = _fxLayerSrcCanvas || vizCanvas;
+  gl.bindTexture(gl.TEXTURE_2D, _fxLayerTex);
+  try {
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+  } catch (e) {
+    return; // Skip this frame, try again next
+  }
+
+  gl.useProgram(_fxLayerProgram);
+  gl.bindBuffer(gl.ARRAY_BUFFER, _fxLayerVbo);
+  gl.enableVertexAttribArray(_fxLayerLoc.pos);
+  gl.vertexAttribPointer(_fxLayerLoc.pos, 2, gl.FLOAT, false, 0, 0);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, _fxLayerTex);
+  gl.uniform1i(_fxLayerLoc.tex, 0);
+  gl.uniform1f(_fxLayerLoc.amount, _fxLayerAmount);
+  gl.uniform1f(_fxLayerLoc.amp, _fxLayerAmpSmooth);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function setFxLayerEnabled(on) {
+  _fxLayerEnabled = !!on;
+  syncFxLayerVisibility();
+  localStorage.setItem('IKANDY-fxlayer-enabled', _fxLayerEnabled ? '1' : '0');
+  // Lazy-init the intermediate source canvas on first enable
+  if (_fxLayerEnabled) setupFxLayerSrcCanvas();
+  const btn = document.getElementById('fxl-toggle-btn');
+  if (btn) {
+    btn.textContent = _fxLayerEnabled ? '● On' : '○ Off';
+    btn.style.color = _fxLayerEnabled ? 'var(--sp)' : '';
+    btn.style.borderColor = _fxLayerEnabled ? 'var(--sp)' : '';
+  }
+  // Render one frame immediately so toggle feels instant even when paused
+  if (_fxLayerEnabled) renderFxLayer(0);
+}
+
+/* CA is a post-process on viz pixels — when waveform is off there's nothing
+   to process. Hide fx-canvas in that case so users don't see "ghost waveform"
+   rendered from the last captureStream frame. */
+function syncFxLayerVisibility() {
+  if (!fxLayerCanvas) return;
+  const visible = _fxLayerEnabled && (typeof _vizEnabled === 'undefined' || _vizEnabled);
+  fxLayerCanvas.style.opacity = visible ? '1' : '0';
+}
+
+function toggleFxLayer() { setFxLayerEnabled(!_fxLayerEnabled); }
+
+function setFxLayerAmount(v) {
+  _fxLayerAmount = Math.max(0, Math.min(2, +v || 0));
+  localStorage.setItem('IKANDY-fxlayer-amount', _fxLayerAmount);
+  const lbl = document.getElementById('fxl-amount-v');
+  if (lbl) lbl.textContent = _fxLayerAmount.toFixed(2);
+}
+
+function setFxLayerBeat(v) {
+  _fxLayerBeat = Math.max(0, Math.min(2, +v || 0));
+  localStorage.setItem('IKANDY-fxlayer-beat', _fxLayerBeat);
+  const lbl = document.getElementById('fxl-beat-v');
+  if (lbl) lbl.textContent = _fxLayerBeat.toFixed(2);
+}
+
+function initFxLayerSettings() {
+  initFxLayer();
+  // Restore saved values into the UI controls
+  const aSl = document.getElementById('fxl-amount-sl');
+  const bSl = document.getElementById('fxl-beat-sl');
+  if (aSl) { aSl.value = _fxLayerAmount; setFxLayerAmount(_fxLayerAmount); }
+  if (bSl) { bSl.value = _fxLayerBeat;   setFxLayerBeat(_fxLayerBeat);     }
+  setFxLayerEnabled(_fxLayerEnabled);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FX LAYER — Particle Burst (Canvas 2D, beat-reactive)
+   ───────────────────────────────────────────────────────────────────
+   Spawns short-lived particles on bass kicks. Uses a rolling-average
+   bass threshold + cooldown so each kick fires once cleanly without
+   constant spam. Particles drift with light gravity and friction,
+   fade by alpha, render with 'lighter' compositing for energy-burst
+   look. Trail effect via destination-out keeps the canvas transparent.
+   ═══════════════════════════════════════════════════════════════════ */
+const pbCanvas = document.getElementById('pb-canvas');
+const pbCtx    = pbCanvas ? pbCanvas.getContext('2d') : null;
+
+let _pbEnabled = localStorage.getItem('IKANDY-pb-enabled') === '1';
+let _pbDensity = parseFloat(localStorage.getItem('IKANDY-pb-density'));
+if (!isFinite(_pbDensity)) _pbDensity = 1.0;
+
+let _pbParticles = [];
+let _pbPrevBass  = 0;        // last frame's bass — for rise detection
+let _pbBassPeak  = 0;        // fast-attack/slow-release envelope (peak tracker)
+let _pbCooldown  = 0;        // frames since last burst
+const PB_COOLDOWN = 4;       // min frames between bursts (~45ms at 95Hz)
+
+function resizePb() {
+  if (!pbCanvas) return;
+  pbCanvas.width  = window.innerWidth;
+  pbCanvas.height = window.innerHeight;
+}
+
+function spawnPbBurst(intensity) {
+  if (!pbCtx || !pbCanvas) return;
+  const w = pbCanvas.width, h = pbCanvas.height;
+  // Random spawn point — slight bias toward viewport center
+  const cx = w * (0.2 + Math.random() * 0.6);
+  const cy = h * (0.25 + Math.random() * 0.5);
+  // Pull current accent color from theme
+  const accent = (getComputedStyle(document.documentElement).getPropertyValue('--sp') || '#fff').trim();
+  const count = Math.floor(18 + 22 * intensity * _pbDensity);
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 3 + Math.random() * 7 * intensity;
+    _pbParticles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1.0,
+      decay: 0.012 + Math.random() * 0.02,
+      size: 1.5 + Math.random() * 3,
+      color: accent
+    });
+  }
+  // Soft cap — prevents runaway particle count on heavy density + dense kicks
+  if (_pbParticles.length > 800) _pbParticles.splice(0, _pbParticles.length - 800);
+}
+
+function renderPb(bassRaw) {
+  if (!_pbEnabled || !pbCtx || !pbCanvas) return;
+
+  // Beat detection: onset (rise) detection, NOT level threshold.
+  // Triggers on the moment bass JUMPS — catches kicks even when bassline is sustained.
+  const bass = bassRaw || 0;
+  const rise = bass - _pbPrevBass;
+  _pbPrevBass = bass;
+  // Fast-attack, slow-release peak follower — tracks "what was loud recently"
+  _pbBassPeak = Math.max(bass, _pbBassPeak * 0.92);
+  _pbCooldown++;
+  const RISE_MIN = 0.04;     // minimum jump magnitude to count as onset
+  const FLOOR    = 0.08;     // ignore quiet sections
+  const isOnset  = rise > RISE_MIN && bass > FLOOR && bass >= _pbBassPeak * 0.85;
+  if (isOnset && _pbCooldown >= PB_COOLDOWN) {
+    spawnPbBurst(Math.min(2, bass * 1.6 + rise * 2));
+    _pbCooldown = 0;
+    if (window._pbDebug) console.log(`[iKandy] PB burst: bass=${bass.toFixed(2)} rise=${rise.toFixed(2)} peak=${_pbBassPeak.toFixed(2)}`);
+  }
+
+  // Trail fade — destination-out preserves canvas transparency while fading existing pixels.
+  // If no particles are alive, do a hard clear instead — destination-out asymptotes
+  // and never fully erases at low alpha, leaving permanent ghost trails otherwise.
+  if (_pbParticles.length === 0) {
+    pbCtx.clearRect(0, 0, pbCanvas.width, pbCanvas.height);
+  } else {
+    pbCtx.globalCompositeOperation = 'destination-out';
+    pbCtx.fillStyle = 'rgba(0,0,0,0.32)';
+    pbCtx.fillRect(0, 0, pbCanvas.width, pbCanvas.height);
+  }
+
+  // Update + render particles (additive blend for energy-burst feel)
+  pbCtx.globalCompositeOperation = 'lighter';
+  for (let i = _pbParticles.length - 1; i >= 0; i--) {
+    const p = _pbParticles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.97;
+    p.vy *= 0.97;
+    p.vy += 0.06;       // slight gravity
+    p.life -= p.decay;
+    if (p.life <= 0 || p.x < -50 || p.x > pbCanvas.width + 50 || p.y > pbCanvas.height + 50) {
+      _pbParticles.splice(i, 1);
+      continue;
+    }
+    pbCtx.globalAlpha = p.life;
+    pbCtx.fillStyle = p.color;
+    pbCtx.beginPath();
+    pbCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    pbCtx.fill();
+  }
+  pbCtx.globalAlpha = 1.0;
+  pbCtx.globalCompositeOperation = 'source-over';
+}
+
+function setPbEnabled(on) {
+  _pbEnabled = !!on;
+  if (pbCanvas) pbCanvas.style.opacity = _pbEnabled ? '1' : '0';
+  localStorage.setItem('IKANDY-pb-enabled', _pbEnabled ? '1' : '0');
+  if (!_pbEnabled) {
+    _pbParticles = [];
+    if (pbCtx && pbCanvas) pbCtx.clearRect(0, 0, pbCanvas.width, pbCanvas.height);
+  }
+  const btn = document.getElementById('pb-toggle-btn');
+  if (btn) {
+    btn.textContent = _pbEnabled ? '● On' : '○ Off';
+    btn.style.color = _pbEnabled ? 'var(--sp)' : '';
+    btn.style.borderColor = _pbEnabled ? 'var(--sp)' : '';
+  }
+}
+function togglePb() { setPbEnabled(!_pbEnabled); }
+
+function setPbDensity(v) {
+  _pbDensity = Math.max(0, Math.min(2, +v || 0));
+  localStorage.setItem('IKANDY-pb-density', _pbDensity);
+  const lbl = document.getElementById('pb-density-v');
+  if (lbl) lbl.textContent = _pbDensity.toFixed(2);
+}
+
+function initPbSettings() {
+  resizePb();
+  const sl = document.getElementById('pb-density-sl');
+  if (sl) { sl.value = _pbDensity; setPbDensity(_pbDensity); }
+  setPbEnabled(_pbEnabled);
+}
 
 /* ── RENDER LOOP — speed-controlled ── */
 let _frameskip = 0;
@@ -1767,6 +2359,9 @@ let _skipCount = 0;
 let _speedSkip = 1;
 function renderLoop(ts) {
   requestAnimationFrame(renderLoop);
+  // FPS counter — counts true display rate (rAF callbacks per second).
+  // Cheap when disabled (single boolean check), so safe to call every frame.
+  if (_fpsOverlayEnabled) tickFpsCounter();
   // Always update progress and lyrics — never frameskip these
   if (trackPlaying && _pollAnchorTime > 0 && trackDuration > 0) {
     const elapsed = performance.now() - _pollAnchorTime;
@@ -1783,6 +2378,9 @@ function renderLoop(ts) {
   if (visualizer) {
     try {
       visualizer.render();
+      // Copy fresh viz pixels into intermediate canvas while WebGL drawing
+      // buffer is still populated (must be same JS task as render() above).
+      captureVizFrame();
     } catch (e) {
       // WASM runtime errors from butterchurn 3.0 (e.g. "float unrepresentable in integer range")
       // happen when a preset's equation produces NaN/Infinity. Mark this preset broken and skip.
@@ -1827,6 +2425,11 @@ function renderLoop(ts) {
 
     // Feed Aurora
     updateAuroraAudio(bassRaw, midRaw, trebleRaw);
+
+    // FX Layer — chromatic aberration post-process (no-op when disabled)
+    renderFxLayer(bassRaw);
+    // FX Layer — particle burst (no-op when disabled)
+    renderPb(bassRaw);
 
     // Overall peak for image FX shader
     const peak = Math.max(...d) / 255;
@@ -6020,6 +6623,8 @@ function toggleViz() {
     btn.textContent = '○ Off';
     btn.classList.remove('active');
   }
+  // Sync FX Layer canvas — hide it when viz is off (no source pixels)
+  if (typeof syncFxLayerVisibility === 'function') syncFxLayerVisibility();
 }
 
 // ── Color tint via CSS filter ──────────────────────────────────────
@@ -7743,6 +8348,10 @@ async function bootApp() {
   initVibeSettings();
   initTheme();
   initScenes();
+  initRenderScale();
+  initFpsOverlay();
+  initFxLayerSettings();
+  initPbSettings();
 }
 
 
@@ -7750,32 +8359,34 @@ async function bootApp() {
    TOOLTIP TOUR — starts after Spotify connected (tkStart called on success)
    ═══════════════════════════════════════════════════════════════════ */
 (function() {
-  const DONE_KEY = 'IKANDY-tour3-done';
+  const DONE_KEY = 'IKANDY-tour6-done';
   const g = id => document.getElementById(id);
 
   const STEPS = [
     { sel:'#pnav',            place:'below', title:'Preset Navigator',   body:'Use ‹ › to cycle 500+ MilkDrop presets. AUTO switches them per track automatically.' },
     { sel:'#presets-btn',     place:'below', title:'Preset Browser',     body:'Browse all presets with live previews in Grid, List, or Large view.' },
+    { sel:'#view-controls',   place:'below', title:'Fullscreen & Hide',  body:'⛶ goes fullscreen (or press F). ◎ hides all controls for a clean view (or press H). Click again to restore.' },
     { sel:'#status-badge',    place:'below', title:'Connection Status',  body:'Shows your active source. Click Disconnect to switch accounts or sources.' },
     { sel:'#hud-info',        place:'above',  title:'Now Playing',        body:'Track info, album art, and a progress bar. Click the bar to seek. Works with Spotify Premium and VLC.' },
     { sel:'#controls',        place:'above', title:'Playback Controls',  body:'Play, pause, skip, adjust volume. Works with Spotify Premium and VLC only.' },
-    { sel:'#hide-btn',        place:'below', title:'Hide UI',            body:'Click ◎ (or press H) to hide all controls for a clean full-screen view. Press F for fullscreen. Click ◎ again to restore.' },
     // Sidebar steps — sidebar opened once on entry, closed on leave
     // Left sidebar walkthrough (place:'right' so tooltips appear in the visualizer, not inside the panel)
     { sel:'#ltab',            place:'right', title:'Settings Sidebar',   body:'Click this tab to open the sidebar at any time. It holds all app settings.', sbOpen: true },
     { sel:'#app-brand',       place:'right', title:'Theme',              body:'Pick an accent colour from the swatches to change the whole app\'s colour scheme.', sbOpen: true },
-    { sel:'#acc-all-btn',     place:'right', title:'Expand / Collapse',  body:'Instantly expand or collapse all sidebar sections at once.', sbOpen: true },
+    { sel:'#app-buttons',     place:'right', title:'Panel Controls',     body:'⇔ Sync keeps both sidebars opening and closing together. ⊞ All instantly expands or collapses every section in the sidebar.', sbOpen: true },
     { sel:'#src-spotify-btn', place:'right', title:'Audio Source',       body:'Switch between Spotify, VLC, foobar2000, and Local audio. Spotify, VLC, and foobar2000 show track info, lyrics, and full controls. Local reacts to system audio.', sbOpen: true },
     { sel:'#recapture-btn',   place:'right', title:'System Audio',       body:'If visuals stop reacting to music, click this to reconnect the audio capture.', sbOpen: true },
     // Right sidebar walkthrough — natural top-to-bottom order, each section expanded for its step
-    { sel:'#acc-master',  place:'left', title:'Master Controls',  body:'Reactivity and Smoothness affect everything in the app — presets, scenes, and lyrics all respond to these. Grain and Scanlines add lo-fi texture.', sbOpen: true,
+    { sel:'#acc-master',  place:'left', title:'Master Controls',  body:'Reactivity and Smoothness drive how visuals respond to music. Grain and Scanlines add lo-fi texture. Particle Burst spawns audio-reactive sparks on every bass kick.', sbOpen: true,
       onEnter: () => window.accOpen('acc-master'),  onLeave: () => window.accClose('acc-master') },
-    { sel:'#acc-presets', place:'left', title:'Waveform',         body:'Browse and cycle MilkDrop presets. Set auto-cycle interval, blend time, animation speed, and load custom community preset folders.', sbOpen: true,
+    { sel:'#acc-presets', place:'left', title:'Waveform',         body:'Browse and cycle 350+ MilkDrop presets, set auto-cycle and blend timing, and load custom community .json folders from the Browse panel. Chromatic Aberration adds an RGB-split, beat-reactive post-process to the visualizer.', sbOpen: true,
       onEnter: () => window.accOpen('acc-presets'), onLeave: () => window.accClose('acc-presets') },
     { sel:'#acc-scenes',  place:'left', title:'Scenes',           body:'Toggle audio-reactive overlay scenes — Fire EQ, Spectrum, Waveray, Aurora, Starfield, and Singularity.', sbOpen: true,
       onEnter: () => window.accOpen('acc-scenes'),  onLeave: () => window.accClose('acc-scenes') },
-    { sel:'#acc-vibe',    place:'left', title:'FX & Vibe',        body:'Apply real-time GLSL shaders over a background image. Add grain or scanlines for a lo-fi feel.', sbOpen: true, last: true,
+    { sel:'#acc-vibe',    place:'left', title:'Vibe',             body:'Load a background image and apply real-time GLSL shaders — Lo-Fi looks like Rain, Ink, VHS, Paint, and Cyber styles like Holo, Plasma, Heat.', sbOpen: true,
       onEnter: () => window.accOpen('acc-vibe'),    onLeave: () => window.accClose('acc-vibe') },
+    { sel:'#acc-performance', place:'left', title:'Performance',  body:'Adjust how the visualizer renders. Lower scale runs smoother on weaker GPUs; higher scale supersamples for extra sharpness. Toggle the FPS overlay to monitor frame rate. Set once and forget.', sbOpen: true, last: true,
+      onEnter: () => window.accOpen('acc-performance'), onLeave: () => window.accClose('acc-performance') },
   ];
 
   let cur = 0;
