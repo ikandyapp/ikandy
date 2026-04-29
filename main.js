@@ -18,6 +18,7 @@ const http  = require('http');
 const https = require('https');
 const path  = require('path');
 const fs    = require('fs');
+const { spawn } = require('child_process');
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const CLIENT_ID_FILE = () => path.join(app.getPath("userData"), "IKANDY-client-id.txt");
@@ -45,8 +46,15 @@ let lastKnownProduct = null;  // 'premium' | 'free' | null — cached from /me, 
 let sourceMode   = 'spotify';
 let vlcPort      = 8080;
 let vlcPassword  = '';
+// Mirror of foobarConnected — gate VLC access until the user successfully
+// clicks Connect, even if the VLC HTTP interface happens to be reachable.
+let vlcConnected = false;
 let foobarPort   = 8880;  // Beefweb default
 let foobarPassword = '';
+// Beefweb often has no password by default — without this gate, switching
+// source to foobar would immediately start polling and "just work" before
+// the user clicks Connect. Mirrors VLC's perceived behavior.
+let foobarConnected = false;
 let foobarVolBounds = { min: -100, max: 0, type: 'db' }; // cached from last poll
 const SOURCE_FILE = () => path.join(app.getPath('userData'), 'IKANDY-source.json');
 function loadSource() {
@@ -184,7 +192,7 @@ function httpsRequest(method, url, body, headers = {}) {
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
     });
     req.on('error', reject);
-    req.setTimeout(8000, () => { req.destroy(); reject(new Error('timeout')); });
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('timeout')); });
     req.write(bodyStr);
     req.end();
   });
@@ -255,8 +263,11 @@ async function pollCurrentTrack() {
     return;
   }
   try {
+    // /me/player (full state) instead of /currently-playing because the
+    // latter omits shuffle_state and smart_shuffle. Same item shape, plus
+    // device/repeat_state/shuffle_state/smart_shuffle at the top level.
     const res = await httpsGet(
-      'https://api.spotify.com/v1/me/player/currently-playing',
+      'https://api.spotify.com/v1/me/player',
       { Authorization: 'Bearer ' + tokens.access_token }
     );
 
@@ -308,6 +319,11 @@ async function pollCurrentTrack() {
       progress:  (data.progress_ms || 0) + (data.is_playing ? latencyMs : 0),
       duration:  data.item.duration_ms || 0,
       playing:   data.is_playing,
+      // Either flag means "shuffle is on" from the user's perspective.
+      // smartShuffle is for the sparkle indicator only.
+      shuffle:      !!data.shuffle_state || !!data.smart_shuffle,
+      smartShuffle: !!data.smart_shuffle,
+      shuffleMode:  data.smart_shuffle ? 'smart' : (data.shuffle_state ? 'shuffle' : 'off'),
       timestamp: Date.now(),
     };
 
@@ -504,15 +520,28 @@ function startPolling() {
     return;
   }
   if (sourceMode === 'vlc') {
+    if (!vlcConnected) {
+      console.log('[IKANDY] VLC source selected but not connected — waiting for Connect');
+      return;
+    }
     pollVLC();
     pollTimer = setInterval(pollVLC, POLL_INTERVAL);
     console.log('[IKANDY] VLC polling started');
     return;
   }
   if (sourceMode === 'foobar') {
+    if (!foobarConnected) {
+      console.log('[IKANDY] Foobar source selected but not connected — waiting for Connect');
+      return;
+    }
     pollFoobar();
     pollTimer = setInterval(pollFoobar, POLL_INTERVAL);
     console.log('[IKANDY] Foobar polling started');
+    return;
+  }
+  if (sourceMode === 'smtc') {
+    // SMTC poller is a long-running PS child process; no setInterval needed.
+    startSMTCPoller();
     return;
   }
 
@@ -626,17 +655,32 @@ ipcMain.handle('clear-client-id', () => {
   return { ok: true };
 });
 
+// Safe shell-open — only allow https URLs that target our GitHub project
+ipcMain.handle('open-external', async (_e, url) => {
+  try {
+    if (typeof url !== 'string') return { ok: false };
+    if (!/^https:\/\/(github\.com\/IKANDYapp\/|objects\.githubusercontent\.com\/)/i.test(url)) return { ok: false };
+    await shell.openExternal(url);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('get-source',  () => ({ mode: sourceMode, vlcPort, vlcPassword, foobarPort, foobarPassword }));
 ipcMain.handle('set-source',  async (_e, mode) => {
-  if (!['spotify','vlc','local','foobar'].includes(mode)) return { ok: false, error: 'Invalid mode' };
+  if (!['spotify','vlc','local','foobar','smtc'].includes(mode)) return { ok: false, error: 'Invalid mode' };
   const prev = sourceMode;
   sourceMode = mode;
   saveSource();
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  // Always stop SMTC when switching away from it (it's a child process, not a setInterval)
+  if (prev === 'smtc' && mode !== 'smtc') stopSMTCPoller();
   lastTrackId = null;
   lastKnownPlaying = false;
   // Local mode — pause previous source then stop
-  if (mode === 'local') {
+  // Local & SMTC — pause whatever the previous source was, then settle.
+  // SMTC reads from the OS so we don't want lingering audio from the prev
+  // app stomping on whatever the user starts next.
+  if (mode === 'local' || mode === 'smtc') {
     try {
       const auth = Buffer.from(`:${vlcPassword}`).toString('base64');
       if (prev === 'spotify' && tokens.access_token) {
@@ -652,11 +696,16 @@ ipcMain.handle('set-source',  async (_e, mode) => {
               { Authorization: 'Basic ' + auth });
           }
         }
-      } else if (prev === 'foobar') {
+      } else if (prev === 'foobar' && foobarConnected) {
         await httpRequest('POST', `http://localhost:${foobarPort}/api/player/pause`, '', foobarAuthHeaders());
       }
     } catch(e) { /* best effort */ }
-    mainWindow?.webContents.send('spotify-state', { type: 'local' });
+    if (mode === 'local') {
+      mainWindow?.webContents.send('spotify-state', { type: 'local' });
+      return { ok: true };
+    }
+    // smtc: kick off the poller; track events flow from there
+    startPolling();
     return { ok: true };
   }
   try {
@@ -717,6 +766,7 @@ ipcMain.handle('set-vlc-config', (_e, { port, password }) => {
   const p = parseInt(port);
   vlcPort     = (p >= 1 && p <= 65535) ? p : 8080;
   vlcPassword = typeof password === 'string' ? password.slice(0, 256) : '';
+  vlcConnected = false; // config changed — force re-test
   saveSource();
   return { ok: true };
 });
@@ -725,12 +775,21 @@ ipcMain.handle('vlc-test', async () => {
     const auth = Buffer.from(`:${vlcPassword}`).toString('base64');
     const res  = await httpGet(`http://localhost:${vlcPort}/requests/status.json`,
       { Authorization: 'Basic ' + auth });
-    if (res.status === 200) return { ok: true };
+    if (res.status === 200) {
+      vlcConnected = true;
+      if (sourceMode === 'vlc' && !pollTimer) startPolling();
+      return { ok: true };
+    }
+    vlcConnected = false;
     if (res.status === 401) return { ok: false, error: 'Wrong password' };
     return { ok: false, error: `HTTP ${res.status}` };
-  } catch(e) { return { ok: false, error: 'VLC not reachable — is it running with Web interface enabled?' }; }
+  } catch(e) {
+    vlcConnected = false;
+    return { ok: false, error: 'VLC not reachable — is it running with Web interface enabled?' };
+  }
 });
 ipcMain.handle('vlc-action', async (_e, action) => {
+  if (!vlcConnected) return { ok: false, error: 'VLC not connected' };
   const allowedVlcActions = ['play','pause','playpause','next','prev','volume','seek','stop','restart'];
   if (!action?.type || !allowedVlcActions.includes(action.type)) return { ok: false, error: 'Invalid action' };
   try {
@@ -791,18 +850,31 @@ ipcMain.handle('set-foobar-config', (_e, { port, password }) => {
   const p = parseInt(port);
   foobarPort = (p >= 1 && p <= 65535) ? p : 8880;
   foobarPassword = typeof password === 'string' ? password.slice(0, 256) : '';
+  // Config changed — force a re-test before anything talks to foobar again.
+  foobarConnected = false;
   saveSource();
   return { ok: true };
 });
 ipcMain.handle('foobar-test', async () => {
   try {
     const res = await httpGet(`http://localhost:${foobarPort}/api/player`, foobarAuthHeaders());
-    if (res.status === 200) return { ok: true };
+    if (res.status === 200) {
+      foobarConnected = true;
+      // If the user is already on the foobar source, kick polling off now
+      // (startPolling was a no-op when they switched in pre-connect).
+      if (sourceMode === 'foobar' && !pollTimer) startPolling();
+      return { ok: true };
+    }
+    foobarConnected = false;
     if (res.status === 401) return { ok: false, error: 'Wrong password' };
     return { ok: false, error: `HTTP ${res.status}` };
-  } catch(e) { return { ok: false, error: 'foobar2000 not reachable — is it running with Beefweb installed?' }; }
+  } catch(e) {
+    foobarConnected = false;
+    return { ok: false, error: 'foobar2000 not reachable — is it running with Beefweb installed?' };
+  }
 });
 ipcMain.handle('foobar-action', async (_e, action) => {
+  if (!foobarConnected) return { ok: false, error: 'foobar not connected' };
   const allowed = ['play','pause','playpause','next','prev','volume','seek','stop','restart'];
   if (!action?.type || !allowed.includes(action.type)) return { ok: false, error: 'Invalid action' };
   try {
@@ -847,22 +919,34 @@ ipcMain.handle('foobar-action', async (_e, action) => {
 });
 
 ipcMain.handle('get-foobar-playlists', async () => {
+  if (!foobarConnected) return { ok: false, error: 'foobar not connected' };
   try {
     const res = await httpGet(`http://localhost:${foobarPort}/api/playlists`, foobarAuthHeaders());
     if (res.status !== 200) return { ok: false, error: `HTTP ${res.status}` };
     const data = JSON.parse(res.body);
-    const playlists = (data.playlists || []).map(p => ({
-      id:    p.id,
-      name:  p.title || p.name || '(untitled)',
-      uri:   `fb2k:${p.id}`,    // synthetic uri for renderer state tracking
-      image: null,              // fb2k has no playlist art
-      total: p.itemCount || 0,
-    }));
+    // Use the LAST track's embedded artwork for the playlist preview so
+    // track 0's row in the drill-in view doesn't visually collide with
+    // the playlist's preview thumb. Falls back to folder.jpg/cover.jpg.
+    // Empty playlists get null (renderer shows the ♪ noart placeholder).
+    const cred = foobarPassword ? `:${encodeURIComponent(foobarPassword)}@` : '';
+    const playlists = (data.playlists || []).map(p => {
+      const previewIdx = (p.itemCount > 0) ? p.itemCount - 1 : 0;
+      return {
+        id:    p.id,
+        name:  p.title || p.name || '(untitled)',
+        uri:   `fb2k:${p.id}`,    // synthetic uri for renderer state tracking
+        image: (p.itemCount > 0)
+          ? `http://${cred}localhost:${foobarPort}/api/artwork/${encodeURIComponent(p.id)}/${previewIdx}`
+          : null,
+        total: p.itemCount || 0,
+      };
+    });
     return { ok: true, playlists };
   } catch(e) { return { ok: false, error: 'foobar2000 not reachable' }; }
 });
 
 ipcMain.handle('play-foobar-playlist', async (_e, id) => {
+  if (!foobarConnected) return { ok: false, error: 'foobar not connected' };
   if (!id || typeof id !== 'string') return { ok: false, error: 'Invalid playlist id' };
   try {
     // POST /api/player/play/{playlistId}/{itemIndex} activates and plays
@@ -870,6 +954,65 @@ ipcMain.handle('play-foobar-playlist', async (_e, id) => {
     setTimeout(pollFoobar, 600);
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
+});
+
+// Fetch all tracks in a foobar playlist with metadata. beefweb columns are
+// title-formatting expressions — easy to extend with %composer%, %comment%,
+// %playcount%, %rating%, etc. if we want richer search later.
+ipcMain.handle('get-foobar-playlist-tracks', async (_e, playlistId) => {
+  if (!foobarConnected) return { ok: false, error: 'foobar not connected' };
+  if (!playlistId || typeof playlistId !== 'string') return { ok: false, error: 'Invalid playlist id' };
+  try {
+    const cols = encodeURIComponent('%title%,%artist%,%album%,%length_seconds%,%date%,%genre%,%tracknumber%,%path%');
+    const url  = `http://localhost:${foobarPort}/api/playlists/${encodeURIComponent(playlistId)}/items/0:5000?columns=${cols}`;
+    const res  = await httpGet(url, foobarAuthHeaders());
+    if (res.status !== 200) return { ok: false, error: `HTTP ${res.status}` };
+    const data = JSON.parse(res.body);
+    // beefweb wraps the items endpoint as { playlistItems: { items: [...] } }
+    // — different from /api/player which has them at top level.
+    const items = data.playlistItems?.items || data.items || [];
+    const cred  = foobarPassword ? `:${encodeURIComponent(foobarPassword)}@` : '';
+    // Foobar lets non-audio files live in playlists (folder.jpg, cover.jpg,
+    // AlbumArt_*.jpg, etc.) — skip anything that's clearly an image/document.
+    const skipExtRe = /\.(jpe?g|png|gif|bmp|webp|tiff?|heic|svg|ico|txt|nfo|m3u|cue|log|pdf)$/i;
+    const tracks = items
+      .map((it, i) => {
+        const c = it.columns || [];
+        return {
+          idx:      i,                 // original beefweb item index — used by play & art endpoints
+          title:    c[0] || '',
+          artist:   c[1] || '',
+          album:    c[2] || '',
+          duration: Number(c[3]) || 0, // seconds
+          year:     (c[4] || '').toString().slice(0, 4),
+          genre:    c[5] || '',
+          trackNum: c[6] || '',
+          path:     c[7] || '',
+          art:      `http://${cred}localhost:${foobarPort}/api/artwork/${encodeURIComponent(playlistId)}/${i}`,
+        };
+      })
+      .filter(t => !skipExtRe.test(t.path));
+    return { ok: true, tracks };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// Play a specific track within a foobar playlist by (playlistId, itemIndex).
+ipcMain.handle('play-foobar-track', async (_e, payload) => {
+  if (!foobarConnected) return { ok: false, error: 'foobar not connected' };
+  const { playlistId, index } = payload || {};
+  if (!playlistId || typeof playlistId !== 'string') return { ok: false, error: 'Invalid playlist id' };
+  if (typeof index !== 'number' || index < 0) return { ok: false, error: 'Invalid index' };
+  try {
+    await httpRequest('POST',
+      `http://localhost:${foobarPort}/api/player/play/${encodeURIComponent(playlistId)}/${index}`,
+      '', foobarAuthHeaders());
+    setTimeout(pollFoobar, 600);
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 ipcMain.handle('get-playlists', async () => {
@@ -910,11 +1053,100 @@ ipcMain.handle('play-playlist', async (_e, uri) => {
     } else {
       body = JSON.stringify({ context_uri: uri });
     }
-    await httpsRequest('PUT', 'https://api.spotify.com/v1/me/player/play', body,
+    const r = await httpsRequest('PUT', 'https://api.spotify.com/v1/me/player/play', body,
       { Authorization: 'Bearer ' + tokens.access_token, 'Content-Type': 'application/json' });
-    setTimeout(pollSpotify, 800);
-    return { ok: true };
-  } catch(e) { return { ok: false, error: e.message }; }
+    console.log('[IKANDY] play-playlist status:', r.status);
+    setTimeout(pollCurrentTrack, 800);
+    // 204 = playback started, 202 = accepted/transitioning. Anything else is a real failure.
+    if (r.status === 204 || r.status === 202 || r.status === 200) {
+      return { ok: true };
+    }
+    let detail = '';
+    try { const j = JSON.parse(r.body); detail = j.error?.message ? ` (${j.error.message})` : ''; } catch(_) {}
+    return { ok: false, error: `Spotify returned ${r.status}${detail}` };
+  } catch(e) {
+    console.warn('[IKANDY] play-playlist threw:', e.message);
+    // Network/timeout — Spotify may still have accepted the request.
+    // Give pollCurrentTrack a chance to confirm playback before the toast fires.
+    setTimeout(pollCurrentTrack, 800);
+    return { ok: false, error: e.message };
+  }
+});
+
+// Unified shuffle setter that routes to the active source.
+// Accepts a mode string interpreted per source:
+//   spotify: 'off' | 'shuffle'  (Smart Shuffle isn't settable via the public
+//            API — renderer handles that case directly with a help toast.)
+//   foobar:  'default' | 'repeat-playlist' | 'repeat-track' | 'random' |
+//            'shuffle-tracks' | 'shuffle-albums' | 'shuffle-folders'
+//   vlc:     'off' | 'on'
+ipcMain.handle('set-shuffle', async (_e, mode) => {
+  if (typeof mode !== 'string') return { ok: false, error: 'mode must be a string' };
+
+  try {
+    if (sourceMode === 'spotify') {
+      if (mode !== 'off' && mode !== 'shuffle') {
+        return { ok: false, error: `Spotify shuffle: unsupported mode "${mode}"` };
+      }
+      const valid = await ensureValidToken();
+      if (!valid) return { ok: false, error: 'Not authenticated' };
+      const state = mode === 'shuffle' ? 'true' : 'false';
+      const r = await httpsRequest('PUT',
+        `https://api.spotify.com/v1/me/player/shuffle?state=${state}`, '',
+        { Authorization: 'Bearer ' + tokens.access_token });
+      console.log('[IKANDY] set-shuffle (spotify) status:', r.status, 'mode:', mode);
+      setTimeout(pollCurrentTrack, 600);
+      if (r.status === 204 || r.status === 200) return { ok: true };
+      let detail = '';
+      try { const j = JSON.parse(r.body); detail = j.error?.message ? ` (${j.error.message})` : ''; } catch(_) {}
+      return { ok: false, error: `Spotify returned ${r.status}${detail}` };
+    }
+
+    if (sourceMode === 'vlc') {
+      if (!vlcConnected) return { ok: false, error: 'VLC not connected' };
+      if (mode !== 'off' && mode !== 'on') {
+        return { ok: false, error: `VLC shuffle: unsupported mode "${mode}"` };
+      }
+      const auth = Buffer.from(`:${vlcPassword}`).toString('base64');
+      // pl_random only toggles, no explicit set — read current then flip if needed.
+      const cur = await httpGet(`http://localhost:${vlcPort}/requests/status.json`,
+        { Authorization: 'Basic ' + auth });
+      if (cur.status !== 200) return { ok: false, error: `VLC HTTP ${cur.status}` };
+      const curRandom = !!JSON.parse(cur.body).random;
+      const desired   = mode === 'on';
+      if (curRandom !== desired) {
+        await httpGet(`http://localhost:${vlcPort}/requests/status.json?command=pl_random`,
+          { Authorization: 'Basic ' + auth });
+      }
+      setTimeout(pollVLC, 400);
+      return { ok: true };
+    }
+
+    if (sourceMode === 'foobar') {
+      if (!foobarConnected) return { ok: false, error: 'foobar not connected' };
+      const map = {
+        'default':         0,
+        'repeat-playlist': 1,
+        'repeat-track':    2,
+        'random':          3,
+        'shuffle-tracks':  4,
+        'shuffle-albums':  5,
+        'shuffle-folders': 6,
+      };
+      if (!(mode in map)) {
+        return { ok: false, error: `foobar shuffle: unsupported mode "${mode}"` };
+      }
+      await httpRequest('POST', `http://localhost:${foobarPort}/api/player`,
+        { playbackMode: map[mode] }, foobarAuthHeaders());
+      setTimeout(pollFoobar, 400);
+      return { ok: true };
+    }
+
+    return { ok: false, error: 'Shuffle not supported for this source' };
+  } catch(e) {
+    console.warn('[IKANDY] set-shuffle threw:', e.message);
+    return { ok: false, error: e.message };
+  }
 });
 
 ipcMain.handle('playback-action', async (_e, action) => {
@@ -926,7 +1158,7 @@ ipcMain.handle('playback-action', async (_e, action) => {
     return { ok: true };
   }
   if (action.type === 'telemetry') return { ok: true };
-  if (action.type === 'poll') { pollSpotify(); return { ok: true }; }
+  if (action.type === 'poll') { pollCurrentTrack(); return { ok: true }; }
 
   try {
     const auth = { Authorization: 'Bearer ' + tokens.access_token };
@@ -946,16 +1178,16 @@ ipcMain.handle('playback-action', async (_e, action) => {
     }
     if (action.type === 'next') {
       await httpsRequest('POST', 'https://api.spotify.com/v1/me/player/next', '', auth);
-      setTimeout(pollSpotify, 800); return { ok: true };
+      setTimeout(pollCurrentTrack, 800); return { ok: true };
     }
     if (action.type === 'prev' || action.type === 'previous') {
       await httpsRequest('POST', 'https://api.spotify.com/v1/me/player/previous', '', auth);
-      setTimeout(pollSpotify, 800); return { ok: true };
+      setTimeout(pollCurrentTrack, 800); return { ok: true };
     }
     if (action.type === 'seek') {
       const ms = Math.max(0, Math.round(action.position_ms ?? (action.position * 1000) ?? 0));
       await httpsRequest('PUT', `https://api.spotify.com/v1/me/player/seek?position_ms=${ms}`, '', auth);
-      setTimeout(pollSpotify, 500); return { ok: true };
+      setTimeout(pollCurrentTrack, 500); return { ok: true };
     }
     if (action.type === 'volume') {
       const vol = Math.max(0, Math.min(100, Math.round(action.value)));
@@ -1074,6 +1306,38 @@ ipcMain.handle('preset-thumb-clear', async () => {
     }
     return { ok: true };
   } catch(e) { return { ok: false, error: e.message }; }
+});
+
+// Persistent broken-preset list. Stored by name (stable identifier across
+// restarts even if extra packs reorder allPresets).
+const BROKEN_FILE = () => path.join(app.getPath('userData'), 'IKANDY-broken-presets.json');
+
+function readBroken() {
+  try {
+    const raw = fs.readFileSync(BROKEN_FILE(), 'utf8');
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter(n => typeof n === 'string') : [];
+  } catch(e) { return []; }
+}
+function writeBroken(names) {
+  try { fs.writeFileSync(BROKEN_FILE(), JSON.stringify(names)); return true; }
+  catch(e) { console.warn('[IKANDY] writeBroken:', e.message); return false; }
+}
+
+ipcMain.handle('broken-presets-load', async () => readBroken());
+
+ipcMain.handle('broken-presets-add', async (_e, name) => {
+  if (typeof name !== 'string' || !name) return { ok: false };
+  const cur = new Set(readBroken());
+  if (cur.has(name)) return { ok: true, already: true };
+  cur.add(name);
+  // Soft cap so a runaway crash loop doesn't bloat the file
+  const arr = Array.from(cur).slice(-1000);
+  return writeBroken(arr) ? { ok: true, total: arr.length } : { ok: false };
+});
+
+ipcMain.handle('broken-presets-clear', async () => {
+  return writeBroken([]) ? { ok: true } : { ok: false };
 });
 
 ipcMain.handle('pick-image-folder', async () => {
@@ -1197,6 +1461,8 @@ function createWindow() {
   mainWindow.setMenu(null);
 
   mainWindow.once('ready-to-show', () => { mainWindow.maximize(); mainWindow.show(); });
+  // Fire the GitHub release-check ~3s after launch so the UI is settled first.
+  setTimeout(checkForUpdate, 3000);
   mainWindow.loadFile(path.join(__dirname, 'IKANDY.html'));
   // mainWindow.webContents.openDevTools({ mode: 'detach' });
 
@@ -1286,6 +1552,8 @@ async function pollVLC() {
     mainWindow?.webContents.send('spotify-state', {
       type: 'track', id: trackId, title, artist, album,
       art, progress, duration, playing, timestamp: Date.now(), volume,
+      shuffle:     !!data.random,
+      shuffleMode: data.random ? 'on' : 'off',
     });
 
     if (trackId !== lastTrackId) {
@@ -1299,9 +1567,13 @@ async function pollVLC() {
 
 // ── Foobar2000 (Beefweb) polling ──────────────────────────────────────────────
 async function pollFoobar() {
+  // Bail if user switched away while a queued poll was about to fire.
+  if (sourceMode !== 'foobar') return;
   try {
-    const cols = encodeURIComponent('%title%,%artist%,%album%,%length_seconds%');
-    const res  = await httpGet(`http://localhost:${foobarPort}/api/player?trcolumns=${cols}`, foobarAuthHeaders());
+    const cols = encodeURIComponent('%title%,%artist%,%album%,%length_seconds%,%path%');
+    // Beefweb < ~0.10 used `trcolumns`; newer versions use `columns`. Send both
+    // so iKandy works against any version the user has installed.
+    const res  = await httpGet(`http://localhost:${foobarPort}/api/player?columns=${cols}&trcolumns=${cols}`, foobarAuthHeaders());
     if (res.status === 401) {
       mainWindow?.webContents.send('spotify-state', { type: 'error', message: 'foobar: wrong password' });
       return;
@@ -1314,9 +1586,34 @@ async function pollFoobar() {
     const p    = data.player || {};
     const item = p.activeItem || {};
     const c    = item.columns || [];
-    const title    = c[0] || 'Unknown';
-    const artist   = c[1] || '';
-    const album    = c[2] || '';
+    let title    = c[0] || '';
+    let artist   = c[1] || '';
+    const album  = c[2] || '';
+    const path   = c[4] || '';
+
+    // Filename fallback for files without a %title% tag — use the basename
+    if (!title && path) {
+      const base = String(path).split(/[\/\\]/).pop() || '';
+      title = base.replace(/\.[^.]+$/, '');
+    }
+    if (!title) title = 'Unknown';
+
+    // One-shot diagnostic if metadata still came back empty — helps catch
+    // beefweb version/parameter changes (e.g. trcolumns vs columns).
+    if (title === 'Unknown' && (item.playlistId || typeof item.index === 'number')) {
+      if (!pollFoobar._loggedEmpty) {
+        pollFoobar._loggedEmpty = true;
+        const dump = JSON.stringify(item).slice(0, 500);
+        console.warn('[IKANDY] foobar returned empty metadata for active item — raw activeItem:', dump);
+        // Also surface to the renderer console so the user can see it without a terminal
+        mainWindow?.webContents.send('spotify-state', {
+          type: 'debug', message: '[foobar diag] empty activeItem.columns — raw: ' + dump,
+        });
+      }
+    } else if (title !== 'Unknown') {
+      pollFoobar._loggedEmpty = false; // reset once we get real data
+    }
+
     const lengthS  = Number(c[3]) || item.duration || 0;
     const duration = Math.round(lengthS * 1000);
     const progress = Math.round((item.position || 0) * 1000);
@@ -1340,9 +1637,19 @@ async function pollFoobar() {
       : '';
 
     lastKnownPlaying = playing;
+    // beefweb playbackMode: 0=default, 1=repeat-pl, 2=repeat-track,
+    // 3=random, 4=shuffle-tracks, 5=shuffle-albums, 6=shuffle-folders.
+    const fbModeMap = ['default','repeat-playlist','repeat-track','random','shuffle-tracks','shuffle-albums','shuffle-folders'];
+    const fbMode = (typeof p.playbackMode === 'number' && p.playbackMode >= 0 && p.playbackMode < fbModeMap.length)
+      ? fbModeMap[p.playbackMode] : 'default';
     mainWindow?.webContents.send('spotify-state', {
       type: 'track', id: trackId, title, artist, album,
       art, progress, duration, playing, timestamp: Date.now(), volume,
+      shuffle:     fbMode !== 'default' && fbMode !== 'repeat-playlist' && fbMode !== 'repeat-track',
+      shuffleMode: fbMode,
+      // Active playlist & item index — used by the drill-in view to highlight the playing row
+      activePlaylistId: item.playlistId || null,
+      activeItemIndex:  (typeof item.index === 'number' && item.index >= 0) ? item.index : -1,
     });
 
     if (trackId !== lastTrackId) {
@@ -1353,6 +1660,218 @@ async function pollFoobar() {
     mainWindow?.webContents.send('spotify-state', { type: 'error', message: 'foobar: not reachable — is it running?' });
   }
 }
+
+// ── SMTC (Windows System Media Transport Controls) ────────────────────────────
+// Reads "what's playing right now" from any media app that registers with
+// Windows (Spotify desktop, YouTube Music, Apple Music, browser tabs, etc.)
+// via a long-running PowerShell child process that polls SMTC every second.
+// One-shot PowerShell calls handle transport actions (play/pause/next/prev).
+let smtcProcess  = null;
+let smtcConnected = false;
+let smtcLastTrackId = '';
+
+const SMTC_POLL_SCRIPT = `
+$ErrorActionPreference = 'SilentlyContinue'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$asTaskGen = ([System.WindowsRuntimeSystemExtensions].GetMethods() | ? { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
+function Await($op, $t) { $asTaskGen.MakeGenericMethod($t).Invoke($null, @($op)).GetAwaiter().GetResult() }
+[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,Windows.Media.Control,ContentType=WindowsRuntime] | Out-Null
+[Windows.Media.Control.GlobalSystemMediaTransportControlsSession,Windows.Media.Control,ContentType=WindowsRuntime] | Out-Null
+[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties,Windows.Media.Control,ContentType=WindowsRuntime] | Out-Null
+$mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+# PlaybackStatus enum: 0=Closed 1=Opened 2=Changing 3=Stopped 4=Playing 5=Paused
+while ($true) {
+  $session = $mgr.GetCurrentSession()
+  $obj = $null
+  if ($session) {
+    try {
+      $info = Await ($session.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties])
+      $playback = $session.GetPlaybackInfo()
+      $timeline = $session.GetTimelineProperties()
+      $controls = $playback.Controls
+      $statusVal = [int]$playback.PlaybackStatus
+      $obj = [ordered]@{
+        ok         = $true
+        title      = if ($info.Title)      { $info.Title }      else { '' }
+        artist     = if ($info.Artist)     { $info.Artist }     else { '' }
+        album      = if ($info.AlbumTitle) { $info.AlbumTitle } else { '' }
+        appId      = $session.SourceAppUserModelId
+        playing    = ($statusVal -eq 4)
+        positionMs = [int64]$timeline.Position.TotalMilliseconds
+        durationMs = [int64]$timeline.EndTime.TotalMilliseconds
+        canPlay    = [bool]$controls.IsPlayEnabled
+        canPause   = [bool]$controls.IsPauseEnabled
+        canNext    = [bool]$controls.IsNextEnabled
+        canPrev    = [bool]$controls.IsPreviousEnabled
+        canStop    = [bool]$controls.IsStopEnabled
+        canShuffle = [bool]$controls.IsShuffleEnabled
+      }
+    } catch {
+      $obj = [ordered]@{ ok = $false; error = ('poll-failed: ' + $_.Exception.Message) }
+    }
+  } else {
+    $obj = [ordered]@{ ok = $true; empty = $true }
+  }
+  $obj | ConvertTo-Json -Compress
+  Start-Sleep -Milliseconds 1000
+}
+`;
+
+function startSMTCPoller() {
+  if (process.platform !== 'win32') {
+    console.log('[IKANDY] SMTC: not Windows — unsupported on this platform');
+    smtcConnected = false;
+    mainWindow?.webContents.send('spotify-state', { type: 'error', message: 'Now Playing requires Windows' });
+    return;
+  }
+  if (smtcProcess) return; // already running
+  try {
+    smtcProcess = spawn('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', SMTC_POLL_SCRIPT
+    ], { windowsHide: true });
+  } catch (e) {
+    console.warn('[IKANDY] SMTC spawn failed:', e.message);
+    smtcConnected = false;
+    return;
+  }
+  smtcConnected = true;
+  smtcLastTrackId = '';
+  let buf = '';
+  smtcProcess.stdout.on('data', (chunk) => {
+    buf += chunk.toString('utf8');
+    let nl;
+    while ((nl = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (line) handleSMTCLine(line);
+    }
+  });
+  smtcProcess.stderr.on('data', (chunk) => {
+    const msg = chunk.toString().trim();
+    if (msg) console.warn('[IKANDY] SMTC stderr:', msg);
+  });
+  smtcProcess.on('exit', (code) => {
+    console.log('[IKANDY] SMTC poller exited:', code);
+    smtcProcess = null;
+    smtcConnected = false;
+  });
+  console.log('[IKANDY] SMTC poller started');
+}
+
+function stopSMTCPoller() {
+  if (smtcProcess) {
+    try { smtcProcess.kill(); } catch(e) {}
+    smtcProcess = null;
+  }
+  smtcConnected = false;
+  smtcLastTrackId = '';
+}
+
+function handleSMTCLine(line) {
+  let data;
+  try { data = JSON.parse(line); } catch(e) { return; }
+  if (sourceMode !== 'smtc') return; // user switched away — drop the update
+  if (data.empty) {
+    mainWindow?.webContents.send('spotify-state', { type: 'idle' });
+    return;
+  }
+  if (!data.ok) {
+    mainWindow?.webContents.send('spotify-state', { type: 'error', message: data.error || 'SMTC error' });
+    return;
+  }
+  const title  = data.title  || 'Unknown';
+  const artist = data.artist || '';
+  const album  = data.album  || '';
+  const trackId = title + '::' + artist;
+  lastKnownPlaying = !!data.playing;
+  mainWindow?.webContents.send('spotify-state', {
+    type:     'track',
+    id:       trackId,
+    title, artist, album,
+    art:      '',
+    progress: Number(data.positionMs) || 0,
+    duration: Number(data.durationMs) || 0,
+    playing:  !!data.playing,
+    timestamp: Date.now(),
+    appId:    data.appId || '',
+    smtcControls: {
+      canPlay:    !!data.canPlay,
+      canPause:   !!data.canPause,
+      canNext:    !!data.canNext,
+      canPrev:    !!data.canPrev,
+      canStop:    !!data.canStop,
+      canShuffle: !!data.canShuffle,
+    },
+  });
+  if (trackId !== smtcLastTrackId) {
+    smtcLastTrackId = trackId;
+    lastTrackId = trackId;
+    if (title && title !== 'Unknown') fetchLyrics(title, artist);
+  }
+}
+
+// One-shot PS for transport actions. SMTC supports Try*Async on the active
+// session — these get delivered to whatever app is currently the SMTC owner.
+function smtcAction(action) {
+  if (process.platform !== 'win32') return Promise.resolve({ ok: false, error: 'Windows only' });
+  const methodMap = {
+    'playpause': 'TryTogglePlayPauseAsync',
+    'play':      'TryPlayAsync',
+    'pause':     'TryPauseAsync',
+    'next':      'TrySkipNextAsync',
+    'prev':      'TrySkipPreviousAsync',
+    'previous':  'TrySkipPreviousAsync',
+  };
+  const method = methodMap[action];
+  if (!method) return Promise.resolve({ ok: false, error: 'Unsupported action: ' + action });
+
+  const script = `
+$ErrorActionPreference = 'SilentlyContinue'
+Add-Type -AssemblyName System.Runtime.WindowsRuntime
+$asTaskGen = ([System.WindowsRuntimeSystemExtensions].GetMethods() | ? { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' })[0]
+function Await($op, $t) { $asTaskGen.MakeGenericMethod($t).Invoke($null, @($op)).GetAwaiter().GetResult() }
+[Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,Windows.Media.Control,ContentType=WindowsRuntime] | Out-Null
+$mgr = Await ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
+$session = $mgr.GetCurrentSession()
+if ($session) {
+  $r = Await ($session.${method}()) ([bool])
+  if ($r) { Write-Output 'OK' } else { Write-Output 'REJECTED' }
+} else { Write-Output 'NO_SESSION' }
+`;
+  return new Promise((resolve) => {
+    let out = '', err = '';
+    let ps;
+    try {
+      ps = spawn('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script
+      ], { windowsHide: true });
+    } catch(e) {
+      return resolve({ ok: false, error: e.message });
+    }
+    ps.stdout.on('data', c => out += c.toString());
+    ps.stderr.on('data', c => err += c.toString());
+    ps.on('exit', (code) => {
+      const result = (out || '').trim();
+      const stderr = (err || '').trim();
+      const logLine = `[SMTC ${action}] exit=${code} | stdout=${JSON.stringify(result)} | stderr=${JSON.stringify(stderr)}`;
+      console.log('[IKANDY]', logLine);
+      // Also surface to the renderer DevTools so the user can see it
+      mainWindow?.webContents.send('spotify-state', { type: 'debug', message: logLine });
+      if (result.includes('OK'))            resolve({ ok: true });
+      else if (result.includes('REJECTED')) resolve({ ok: false, error: 'App rejected the command' });
+      else if (result.includes('NO_SESSION')) resolve({ ok: false, error: 'Nothing is playing' });
+      else resolve({ ok: false, error: (stderr || result || 'unknown').trim() });
+    });
+    // Safety timeout — actions should be sub-second
+    setTimeout(() => { try { ps.kill(); } catch(e) {} resolve({ ok: false, error: 'timeout' }); }, 3000);
+  });
+}
+
+ipcMain.handle('smtc-action', async (_e, action) => {
+  if (!action || typeof action.type !== 'string') return { ok: false, error: 'Invalid action' };
+  return smtcAction(action.type);
+});
 
 // ── Telemetry ─────────────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://grimznincoiujnurhmlx.supabase.co/rest/v1';
@@ -1512,9 +2031,40 @@ app.whenReady().then(() => {
   });
 });
 
+// ── GitHub release check (manual, on every launch) ────────────────────────────
+function semverGt(a, b) {
+  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return true;
+    if ((pa[i] || 0) < (pb[i] || 0)) return false;
+  }
+  return false;
+}
+async function checkForUpdate() {
+  try {
+    const res = await httpsRequest('GET', 'https://api.github.com/repos/IKANDYapp/IKANDY/releases/latest', '',
+      { 'User-Agent': 'IKANDY-update-check', 'Accept': 'application/vnd.github+json' });
+    if (res.status !== 200) return;
+    const data = JSON.parse(res.body);
+    const latest = (data.tag_name || '').replace(/^v/i, '');
+    const current = app.getVersion();
+    if (!latest || !semverGt(latest, current)) return;
+    const exeAsset = (data.assets || []).find(a => /\.exe$/i.test(a.name));
+    mainWindow?.webContents.send('update-available', {
+      currentVersion: current,
+      latestVersion:  latest,
+      releaseUrl:     data.html_url,
+      downloadUrl:    exeAsset ? exeAsset.browser_download_url : data.html_url,
+      notes:          (data.body || '').slice(0, 600),
+    });
+  } catch (e) { /* offline / GitHub down — fail silent */ }
+}
+
 app.on('window-all-closed', () => {
   pingClose();
   if (pollTimer) clearInterval(pollTimer);
+  stopSMTCPoller();
   if (authServer) authServer.close();
   if (process.platform !== 'darwin') app.quit();
 });

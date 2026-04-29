@@ -5,17 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>IKANDY</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<style>
-  /* Load Bebas Neue locally — eliminates font-swap flicker on startup */
-  @font-face {
-    font-family: 'Bebas Neue';
-    src: url('./assets/BebasNeue.woff2') format('woff2');
-    font-weight: normal;
-    font-style: normal;
-    font-display: block; /* block rendering until font ready — no swap flash */
-  }
-</style>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=block" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=block" rel="stylesheet">
 <style>
 /* ─── RESET & TOKENS ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -242,6 +234,124 @@ html, body {
 .cb svg { width: 17px; height: 17px; fill: currentColor; }
 .cb:hover { border-color: var(--acc); color: var(--acc); }
 .cb.on   { border-color: var(--sp);  color: var(--sp); }
+/* SMTC: button locked because the source app doesn't expose this command */
+.smtc-locked {
+  opacity: 0.32;
+  cursor: not-allowed !important;
+  filter: grayscale(0.7);
+}
+.smtc-locked:hover { border-color: var(--bdr) !important; color: var(--dim) !important; }
+/* Source-tier blurb shown at the top of each source's accordion panel */
+.src-tier {
+  font-size: 11px; color: var(--dim); line-height: 1.5;
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--bdr); border-left: 2px solid var(--sp);
+  padding: 6px 8px; margin-bottom: 10px; border-radius: 3px;
+  display: flex; align-items: flex-start; gap: 6px;
+}
+.src-tier b { color: var(--txt); font-weight: 600; }
+.tier-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 5px;
+}
+.tier-dot.full  { background: var(--sp);  box-shadow: 0 0 4px var(--sp); }
+.tier-dot.std   { background: var(--acc); }
+.tier-dot.basic { background: var(--dim); }
+/* Source buttons: full-tier (Spotify, foobar) get a subtle green-tinted lift
+   so they read as "premium" picks at a glance, even when not selected. */
+.btn.tier-full {
+  background: linear-gradient(180deg, rgba(30,215,96,.10) 0%, rgba(30,215,96,.04) 100%);
+  border-color: rgba(30,215,96,.35);
+  color: var(--txt);
+}
+.btn.tier-full:hover { border-color: var(--sp); color: var(--sp); }
+/* When selected, primary styling still wins — but with a thicker green border */
+.btn.tier-full.primary { border-color: var(--sp); box-shadow: 0 0 0 1px rgba(30,215,96,.25) inset; }
+/* Help (?) icon next to "Source" header */
+.src-help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; margin-left: 4px;
+  border: 1px solid var(--dim); border-radius: 50%;
+  font-size: 9px; color: var(--dim); cursor: help;
+  font-weight: 600; vertical-align: middle;
+  transition: all .13s;
+}
+.src-help:hover { border-color: var(--acc); color: var(--acc); }
+/* Source help modal */
+#src-help-modal,
+#gh-update-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.75); z-index: 9999;
+  align-items: center; justify-content: center;
+  padding: 20px;
+}
+#src-help-modal.open,
+#gh-update-modal.open { display: flex; }
+#src-help-modal .box,
+#gh-update-modal .box {
+  background: #0f0f12; border: 1px solid var(--bdr); border-radius: 6px;
+  max-width: 520px; width: 100%; max-height: 88vh; overflow-y: auto;
+  padding: 22px 24px; color: var(--txt); font-size: 12.5px; line-height: 1.6;
+  box-shadow: 0 12px 40px rgba(0,0,0,.6);
+}
+#src-help-modal h2,
+#gh-update-modal h2 {
+  margin: 0 0 14px 0; font-size: 15px; color: var(--sp);
+  display: flex; justify-content: space-between; align-items: center;
+}
+#src-help-modal h3 {
+  margin: 16px 0 4px 0; font-size: 12.5px; color: var(--acc);
+  display: flex; align-items: center; gap: 7px;
+}
+#src-help-modal .close-x {
+  background: none; border: none; color: var(--dim); cursor: pointer;
+  font-size: 18px; padding: 0 4px; line-height: 1;
+}
+#src-help-modal .close-x:hover { color: var(--txt); }
+#src-help-modal p { margin: 4px 0 0 0; color: var(--dim); }
+#src-help-modal b { color: var(--txt); }
+/* Smart Shuffle: small sparkle dot in the top-right corner */
+#cb-shuf { position: relative; }
+#cb-shuf.smart::after {
+  content: '✦';
+  position: absolute; top: 1px; right: 3px;
+  font-size: 9px; line-height: 1;
+  color: var(--sp);
+  text-shadow: 0 0 4px var(--sp);
+  pointer-events: none;
+}
+
+/* Shuffle / playback-order popup menu (Spotify + foobar) */
+#shuf-menu {
+  position: fixed;
+  display: none;
+  background: rgba(6,6,8,.96);
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  font-family: var(--ui);
+}
+#shuf-menu.open { display: block; }
+.shuf-opt {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--dim);
+  cursor: pointer;
+  transition: color .12s, background .12s;
+  user-select: none;
+}
+.shuf-opt:hover { color: var(--txt); background: rgba(255,255,255,.04); }
+.shuf-opt.active { color: var(--sp); }
+.shuf-opt.active::before { content: '✓'; margin-right: 8px; font-size: 11px; }
+.shuf-opt:not(.active)::before { content: ''; display: inline-block; width: 11px; margin-right: 8px; }
+.shuf-opt .label { flex: 1; }
+.shuf-opt .hint  { font-size: 9px; color: rgba(255,255,255,.3); margin-left: 12px; letter-spacing: .04em; }
 #cb-pp { width: 48px; height: 48px; }
 #cb-pp svg { width: 21px; height: 21px; }
 
@@ -370,9 +480,9 @@ body.ui-hidden #status-badge {
   display: block; width: 15px; height: 1.5px; background: var(--acc);
   transition: transform .18s, opacity .18s;
 }
-#ltab.open span:nth-child(1) { transform: rotate(45deg) translate(2px, 2px); }
+#ltab.open span:nth-child(1) { transform: rotate(-45deg) translate(-2px, 2px); }
 #ltab.open span:nth-child(2) { opacity: 0; }
-#ltab.open span:nth-child(3) { transform: rotate(-45deg) translate(2px, -2px); }
+#ltab.open span:nth-child(3) { transform: rotate(45deg) translate(-2px, -2px); }
 
 /* ─── RIGHT TAB ─── */
 #ptab {
@@ -524,6 +634,20 @@ body.ui-hidden #status-badge {
   font-size: 18px; letter-spacing: .2em;
   color: var(--acc-txt); line-height: 1;
 }
+.beta-pill {
+  display: inline-block;
+  font-family: var(--ui);
+  font-size: 8.5px; font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--acc);
+  background: rgba(255,255,255,.06);
+  border: 1px solid var(--acc);
+  border-radius: 3px;
+  padding: 2px 5px;
+  margin-left: 6px;
+  vertical-align: 3px;
+  cursor: help;
+}
 #app-tagline {
   font-size: 9px; color: rgba(255,255,255,.2);
   letter-spacing: .1em; margin-top: 4px;
@@ -585,13 +709,25 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   display: flex; gap: 8px; align-items: center;
   padding: 10px clamp(10px, 3vw, 20px); border-bottom: 1px solid var(--bdr); flex-shrink: 0;
 }
+#plp-search-wrap { position: relative; flex: 1; }
 #plp-search {
-  flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
+  width: 100%; box-sizing: border-box;
+  background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
   color: var(--txt); font-family: var(--ui); font-size: 13px;
-  padding: 10px 13px; border-radius: var(--r); outline: none;
+  padding: 10px 36px 10px 13px; border-radius: var(--r); outline: none;
 }
 #plp-search:focus { border-color: var(--sp); }
 #plp-search::placeholder { color: var(--dim); }
+#plp-search-clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; border: none; border-radius: 50%;
+  background: rgba(255,255,255,.08); color: var(--dim);
+  font-size: 11px; line-height: 1; cursor: pointer; padding: 0;
+  display: none; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+#plp-search-clear:hover { background: rgba(255,255,255,.16); color: var(--txt); }
+#plp-search-wrap.has-text #plp-search-clear { display: flex; }
 #plp-grid-wrap {
   flex: 1; overflow-y: auto; padding: 14px clamp(10px, 3vw, 20px) 28px;
   box-sizing: border-box;
@@ -632,6 +768,56 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 .plcard.active .plcard-name { color: var(--sp); }
 #plp-empty { color: var(--dim); font-size: 13px; text-align: center; padding: 48px; display: none; }
 
+/* Drill-in (track view) */
+#plp-back {
+  background: none; border: none; color: var(--dim);
+  font-size: 22px; cursor: pointer; padding: 4px 8px;
+  line-height: 1; transition: color .12s;
+}
+#plp-back:hover { color: var(--sp); }
+#plp-play-btn {
+  background: var(--sp); color: #000; border: none;
+  font-family: var(--ui); font-size: 11px; font-weight: 700;
+  padding: 0 16px; height: 32px; border-radius: var(--r); cursor: pointer;
+  letter-spacing: .08em; transition: background .14s; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+#plp-play-btn:hover { background: #21d860; }
+#plp-grid.track-mode {
+  display: block;
+  border: 1px solid var(--bdr); border-radius: 8px;
+  overflow: hidden; background: rgba(255,255,255,.02);
+}
+.tr-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 7px 14px; border-bottom: 1px solid var(--bdr);
+  cursor: pointer; transition: background .12s;
+}
+.tr-row:last-child { border-bottom: none; }
+.tr-row:hover  { background: rgba(255,255,255,.05); }
+.tr-row.active { background: rgba(29,185,84,.10); }
+.tr-row.active .tr-name { color: var(--sp); }
+.tr-art    { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,.04); }
+.tr-noart  { width: 36px; height: 36px; border-radius: 4px; flex-shrink: 0; background: rgba(255,255,255,.04); display: flex; align-items: center; justify-content: center; color: var(--dim); font-size: 14px; }
+.tr-num    { font-size: 11px; color: var(--dim); width: 26px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.tr-name   { flex: 2;   font-size: 13px; color: var(--txt); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tr-artist { flex: 1.2; font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tr-album  { flex: 1;   font-size: 12px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tr-year   { font-size: 11px; color: var(--dim); width: 38px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.tr-genre  { font-size: 11px; color: var(--dim); width: 90px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-dur    { font-size: 11px; color: var(--dim); width: 46px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) { .tr-genre { display: none; } }
+@media (max-width: 760px) { .tr-album { display: none; } .tr-year { display: none; } }
+@media (max-width: 540px) { .tr-artist { display: none; } .tr-art, .tr-noart { display: none; } }
+
+/* Playlist art shown in the header when drilled into a playlist */
+#plp-header-art {
+  width: 48px; height: 48px; border-radius: 6px; object-fit: cover;
+  background: rgba(255,255,255,.04); flex-shrink: 0;
+  display: none;
+}
+#plp-header { gap: 12px; }
+
 /* ─── PRESET PANEL ─── */
 #preset-panel {
   position: fixed; inset: 0; z-index: 40;
@@ -660,13 +846,25 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   display: flex; gap: 8px; align-items: center;
   padding: 10px 20px; border-bottom: 1px solid var(--bdr); flex-shrink: 0;
 }
+#pp-search-wrap { position: relative; flex: 1; }
 #pp-search {
-  flex: 1; background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
+  width: 100%; box-sizing: border-box;
+  background: rgba(255,255,255,.06); border: 1px solid var(--bdr);
   color: var(--txt); font-family: var(--ui); font-size: 13px;
-  padding: 10px 13px; border-radius: var(--r); outline: none;
+  padding: 10px 36px 10px 13px; border-radius: var(--r); outline: none;
 }
 #pp-search:focus { border-color: var(--acc); }
 #pp-search::placeholder { color: var(--dim); }
+#pp-search-clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 24px; height: 24px; border: none; border-radius: 50%;
+  background: rgba(255,255,255,.08); color: var(--dim);
+  font-size: 11px; line-height: 1; cursor: pointer; padding: 0;
+  display: none; align-items: center; justify-content: center;
+  transition: background .12s, color .12s;
+}
+#pp-search-clear:hover { background: rgba(255,255,255,.16); color: var(--txt); }
+#pp-search-wrap.has-text #pp-search-clear { display: flex; }
 #pp-rand {
   background: rgba(255,255,255,.05); border: 1px solid var(--bdr);
   color: var(--dim); cursor: pointer; font-size: 18px;
@@ -879,15 +1077,33 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   display: none;
   position: fixed; inset: 0;
   z-index: 99990;
-  pointer-events: all;
+  pointer-events: none;
 }
 #tk-mask.visible { display: block; }
 #tk-hole {
   position: absolute;
   border-radius: 8px;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,.65);
-  pointer-events: all;
+  pointer-events: none;
   transition: all .3s ease;
+  box-shadow:
+    0 0 0 2px var(--acc, #d4a843),
+    0 0 0 4px rgba(212,168,67,.25),
+    0 0 22px 4px rgba(212,168,67,.55);
+  animation: tkPulse 2.2s ease-in-out infinite;
+}
+@keyframes tkPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px var(--acc, #d4a843),
+      0 0 0 4px rgba(212,168,67,.25),
+      0 0 22px 4px rgba(212,168,67,.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--acc, #d4a843),
+      0 0 0 5px rgba(212,168,67,.35),
+      0 0 32px 8px rgba(212,168,67,.75);
+  }
 }
 #tk-label {
   font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
@@ -1092,6 +1308,10 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     Controls require Spotify Premium
   </div>
 
+  <!-- Shuffle (routes per-source) -->
+  <button class="cb" id="cb-shuf" onclick="onShuffleClick(event)" title="Shuffle">
+    <svg viewBox="0 0 24 24"><path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+  </button>
   <!-- Skip Back -->
   <button class="cb" id="cb-prev" onclick="spAction('prev')" title="Previous">
     <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
@@ -1109,28 +1329,37 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
   </button>
   <!-- Volume (controls Spotify directly via API) -->
-  <div id="vol-row">
+  <div id="vol-row" class="smtc-locked" title="Volume control isn&rsquo;t available in iKandy &mdash; use the source app or your system mixer">
     <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-    <input type="range" id="vol-sl" min="0" max="100" value="80"
-      oninput="setVolume(+this.value)" title="Volume (Spotify)">
+    <input type="range" id="vol-sl" min="0" max="100" value="80" disabled
+      oninput="setVolume(+this.value)" title="Volume control isn&rsquo;t available in iKandy">
   </div>
 </div>
 
 <!-- PLAYLIST PANEL -->
 <div id="playlist-panel">
   <div id="plp-header">
-    <h2>PLAYLISTS</h2>
+    <button id="plp-back" onclick="exitTrackView()" style="display:none;" title="Back to playlists">←</button>
+    <img id="plp-header-art" alt="">
+    <h2 id="plp-title">PLAYLISTS</h2>
+    <button id="plp-play-btn" onclick="playCurrentPlaylist()" style="display:none;" title="Play this playlist">▶ PLAY</button>
     <span id="plp-count"></span>
     <button id="plp-close" onclick="closePlaylistPanel()">✕</button>
   </div>
   <div id="plp-toolbar">
-    <input type="text" id="plp-search" placeholder="Search playlists…" oninput="plpFilter(this.value)">
+    <div id="plp-search-wrap">
+      <input type="text" id="plp-search" placeholder="Search playlists…" oninput="plpFilter(this.value)">
+      <button id="plp-search-clear" type="button" onclick="clearPlpSearch()" title="Clear" aria-label="Clear search">✕</button>
+    </div>
   </div>
   <div id="plp-grid-wrap">
     <div id="plp-grid"></div>
   </div>
   <div id="plp-empty">No playlists found</div>
 </div>
+
+<!-- Shuffle / playback-order popup -->
+<div id="shuf-menu" role="menu"></div>
 
 <!-- PRESET PANEL (slides up from bottom) -->
 <div id="preset-panel">
@@ -1146,7 +1375,10 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <button onclick="setViewMode('grid')"  id="vm-grid"  title="Grid"  style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:var(--r);background:transparent;color:var(--dim);cursor:pointer;font-family:var(--ui);letter-spacing:.04em;transition:all .15s;">GRID</button>
       <button onclick="setViewMode('large')" id="vm-large" title="Large" style="font-size:11px;padding:4px 10px;border:1px solid var(--bdr);border-radius:var(--r);background:transparent;color:var(--dim);cursor:pointer;font-family:var(--ui);letter-spacing:.04em;transition:all .15s;">LARGE</button>
     </div>
-    <input type="text" id="pp-search" placeholder="Search presets…" oninput="ppFilter(this.value)">
+    <div id="pp-search-wrap">
+      <input type="text" id="pp-search" placeholder="Search presets…" oninput="ppFilter(this.value)">
+      <button id="pp-search-clear" type="button" onclick="clearPpSearch()" title="Clear" aria-label="Clear search">✕</button>
+    </div>
     <button id="pp-rand" onclick="randPreset(false); closePresetPanel();" title="Random">⟳</button>
   </div>
   <div id="pp-cats">
@@ -1176,7 +1408,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <!-- APP BRANDING -->
   <div id="app-brand">
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div id="app-name">IKANDY</div>
+      <div id="app-name">IKANDY <span class="beta-pill" title="iKandy is in beta — code signing certificate is pending verification, so Windows may show a SmartScreen warning on first launch">BETA</span></div>
       <div style="display:flex;gap:6px;align-items:center;">
         <button id="sync-btn" title="Sync panels — both open together"
           onclick="toggleSync()"
@@ -1214,17 +1446,18 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 
   <!-- SOURCE -->
   <div class="acc-hd open" onclick="accToggle(this)">
-    <span>Source</span><span class="chev">›</span>
+    <span>Source <span class="src-help" onclick="event.stopPropagation();openSourceHelp()" title="How sources work">?</span></span><span class="chev">›</span>
   </div>
   <div class="acc-bd open">
     <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
-      <button id="src-spotify-btn" class="btn primary" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('spotify')">Spotify</button>
-      <button id="src-vlc-btn" class="btn" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('vlc')">VLC</button>
-      <button id="src-foobar-btn" class="btn" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('foobar')">foobar2000</button>
-      <button id="src-local-btn" class="btn" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('local')">Local</button>
+      <button id="src-spotify-btn" class="btn primary tier-full" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('spotify')">Spotify</button>
+      <button id="src-foobar-btn"  class="btn tier-full"         style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('foobar')">foobar2000</button>
+      <button id="src-vlc-btn"     class="btn"                   style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('vlc')">VLC</button>
+      <button id="src-smtc-btn"    class="btn"                   style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('smtc')">Now Playing</button>
     </div>
     <button class="btn" id="recapture-btn" onclick="startSystemAudioCapture()" style="margin-bottom:6px;border-color:var(--sp);color:var(--sp);">🎤 Reconnect System Audio</button>
     <div id="src-spotify-panel">
+      <div class="src-tier"><span class="tier-dot full"></span><b>Premium:</b> full features &mdash; playlists, search, shuffle modes, art, lyrics. <b>Free:</b> transport only.</div>
       <div id="sp-info" style="font-size:12px;color:var(--dim);line-height:1.6;margin-bottom:10px;">Not connected.</div>
       <button class="btn green" id="sb-connect" onclick="startLogin()">Connect Spotify</button>
       <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.6;">Open Spotify and start playing something before using IKANDY's controls.</div>
@@ -1235,6 +1468,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <button class="btn" id="manual-fetch-btn" onclick="manualFetchOnce()" style="display:none;margin-top:6px;font-size:11px;padding:6px 12px;">Fetch Current Track (manual)</button>
     </div>
     <div id="src-vlc-panel" style="display:none;">
+      <div class="src-tier"><span class="tier-dot std"></span><b>Standard:</b> transport, shuffle on/off, album art, lyrics. No library browse.</div>
       <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:8px;">
         Enable VLC's Web interface:<br>
         <span style="color:var(--acc);">Tools → Preferences → All → Interface → Main interfaces → check "Web"</span><br>
@@ -1248,6 +1482,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <div id="vlc-status" style="font-size:11px;margin-top:6px;color:var(--dim);line-height:1.5;"></div>
     </div>
     <div id="src-foobar-panel" style="display:none;">
+      <div class="src-tier"><span class="tier-dot full"></span><b>Full features</b> &mdash; playlist browse with search, all shuffle modes, art, lyrics.</div>
       <div style="font-size:11px;color:var(--dim);line-height:1.6;margin-bottom:8px;">
         Install <span style="color:var(--acc);">foo_beefweb</span> in foobar2000:<br>
         <span style="color:var(--acc);">File → Preferences → Components → Install</span>, then enable in <span style="color:var(--acc);">Preferences → Tools → Beefweb</span>.<br>
@@ -1261,8 +1496,13 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <button class="btn" id="fb-playlists-btn" onclick="openPlaylistPanel()" style="display:none;border-color:var(--sp);color:var(--sp);margin-top:4px;">Playlists</button>
       <div id="foobar-status" style="font-size:11px;margin-top:6px;color:var(--dim);line-height:1.5;"></div>
     </div>
-    <div id="src-local-info" style="display:none;font-size:11px;color:var(--dim);line-height:1.6;padding:4px 0;">
-      Click <span style="color:var(--acc-txt);">🎤 System Audio</span> above, pick your audio source and check <span style="color:var(--acc-txt);">"Share audio"</span> to start the visualizer.
+    <div id="src-smtc-panel" style="display:none;">
+      <div class="src-tier"><span class="tier-dot basic"></span><b>Basic</b> &mdash; transport (depends on the source app), lyrics. No browse, no shuffle, no art.</div>
+      <div id="smtc-info" style="font-size:11px;color:var(--dim);line-height:1.6;padding:4px 0;">
+        Reads <span style="color:var(--acc);">whatever's playing</span> via Windows Media Controls — Spotify, YouTube Music, Apple Music, browser tabs, etc.<br>
+        Just start playing music in any app and iKandy will follow it. Transport controls work too.<br>
+        <span style="color:var(--dim);font-size:10px;">Windows only.</span>
+      </div>
     </div>
   </div>
 
@@ -1550,6 +1790,7 @@ function renderLoop(ts) {
       if (badIdx != null && !window._brokenPresets.has(badIdx)) {
         window._brokenPresets.add(badIdx);
         console.warn(`[iKandy] Render-time crash on preset "${allNames[badIdx]}" — marking broken (${window._brokenPresets.size} total)`);
+        window.IKANDY?.addBrokenPreset?.(allNames[badIdx]);
         // Jump to the next non-broken preset on the next tick
         setTimeout(() => {
           for (let i = 1; i < allPresets.length; i++) {
@@ -1840,9 +2081,20 @@ function initAudio() {
   analyserNode.smoothingTimeConstant = 0.75;
   analyserNode.minDecibels = -100;
   analyserNode.maxDecibels = 0;
+  // Channel handling left at AnalyserNode default (channelCountMode='max') —
+  // the actual 5.1/7.1 → stereo downmix happens on boostGain (one node, one job).
   gainNode = audioCtx.createGain();
   gainNode.gain.value = 0.8;
   gainNode.connect(audioCtx.destination);
+}
+
+/* Convert Hz → FFT bin index. Sample-rate-aware so spectrum mappings
+   stay correct after the Realtek AudioContext rebuild at 96k/192k. */
+function _hzToBin(hz) {
+  if (!audioCtx || !analyserNode) return 0;
+  const nyq = audioCtx.sampleRate * 0.5;
+  const idx = Math.floor((hz / nyq) * analyserNode.frequencyBinCount);
+  return Math.min(analyserNode.frequencyBinCount - 1, Math.max(0, idx));
 }
 
 function initButterchurn() {
@@ -1860,7 +2112,11 @@ async function autoConnectSystemAudio() {
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { width: 1, height: 1, frameRate: 1 },
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      audio: {
+        echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+        sampleRate:   { ideal: 48000 },  // hint, not strict — won't fail on exotic rates
+        channelCount: { ideal: 2 },      // hint, not strict — won't fail on 5.1/7.1
+      },
     });
     stream.getVideoTracks().forEach(t => t.stop());
     if (!stream.getAudioTracks().length) {
@@ -1889,7 +2145,11 @@ async function startSystemAudioCapture() {
     toast('🎵 Pick the Spotify window → check "Share audio" → click Share');
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { width: 1, height: 1, frameRate: 1 },
-      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      audio: {
+        echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+        sampleRate:   { ideal: 48000 },  // hint, not strict — won't fail on exotic rates
+        channelCount: { ideal: 2 },      // hint, not strict — won't fail on 5.1/7.1
+      },
     });
     stream.getVideoTracks().forEach(t => t.stop());
     if (!stream.getAudioTracks().length) {
@@ -1903,25 +2163,118 @@ async function startSystemAudioCapture() {
   }
 }
 
-async function connectAudioStream(stream, label, silent = false) {
+async function connectAudioStream(stream, label, silent = false, _isRetry = false) {
+  // ─── Realtek non-default-format fix ─────────────────────────────────────
+  // If the captured track's sample rate doesn't match audioCtx, Chromium's
+  // implicit resampler can deliver silent buffers (esp. 24-bit / 96k / 192k
+  // Realtek loopback). Rebuild AudioContext + analyser + Butterchurn at the
+  // track's actual rate when there's a mismatch.
+  const _track = stream.getAudioTracks()[0];
+  const _trackRate = _track && _track.getSettings ? _track.getSettings().sampleRate : null;
+  const _trackCh   = _track && _track.getSettings ? _track.getSettings().channelCount : null;
+  console.log('[IKANDY] Track rate:', _trackRate, '| ch:', _trackCh, '| Ctx rate:', audioCtx && audioCtx.sampleRate);
+  if (_trackRate && audioCtx && _trackRate !== audioCtx.sampleRate) {
+    console.warn('[IKANDY] Sample rate mismatch — rebuilding AudioContext at', _trackRate);
+    const _oldCtx = audioCtx;
+    try { if (_systemAudioSrc) _systemAudioSrc.disconnect(); } catch(e) {}
+    _systemAudioSrc = null;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: _trackRate, latencyHint: 'playback'
+    });
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 2048;
+    analyserNode.smoothingTimeConstant = 0.75;
+    analyserNode.minDecibels = -100;
+    analyserNode.maxDecibels = 0;
+    // Channel handling left at default — boostGain handles the downmix
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.8;
+    gainNode.connect(audioCtx.destination);
+    if (visualizer && typeof butterchurn !== 'undefined') {
+      const bc = butterchurn.default || butterchurn;
+      visualizer = bc.createVisualizer(audioCtx, vizCanvas, {
+        width: W || window.innerWidth, height: H || window.innerHeight,
+        pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+      });
+      visualizer.connectAudio(analyserNode);
+      // Reload current preset against the fresh context
+      if (typeof currentIdx === 'number' && typeof loadPreset === 'function') {
+        try { loadPreset(currentIdx, 0); } catch(e) { console.warn('[IKANDY] Preset reload after ctx rebuild failed:', e); }
+      }
+    }
+    try { await _oldCtx.close(); } catch(e) {}
+  }
+  // ─── end Realtek fix ────────────────────────────────────────────────────
+
   if (_systemAudioSrc) { try { _systemAudioSrc.disconnect(); } catch(e) {} _systemAudioSrc = null; }
   _systemAudioStream = stream;
   if (audioCtx.state !== 'running') await audioCtx.resume();
   _systemAudioSrc = audioCtx.createMediaStreamSource(stream);
   const boostGain = audioCtx.createGain();
   boostGain.gain.value = 4.0;
+  // Single downmix point: 5.1/7.1 input → stereo via standard speakers formula
+  // (L + 0.7071·C + 0.7071·Ls, etc). Analyser then receives a clean stereo
+  // signal regardless of source channel count. One node, one job.
+  boostGain.channelCount = 2;
+  boostGain.channelCountMode = 'explicit';
+  boostGain.channelInterpretation = 'speakers';
   window._boostGainNode = boostGain;
   _systemAudioSrc.connect(boostGain);
   boostGain.connect(analyserNode);
-  console.log('[IKANDY] Audio chain: stream → boost(4x) → analyser [visuals only, no echo]');
+  console.log('[IKANDY] Audio chain: stream(' + (_trackCh || '?') + 'ch) → boost(4x, →2ch) → analyser');
   if (!silent) {
     setTimeout(() => {
       const data = new Uint8Array(analyserNode.frequencyBinCount);
       analyserNode.getByteFrequencyData(data);
       const peak = Math.max(...data);
       console.log('[IKANDY] Signal check — peak:', peak, '| AudioCtx:', audioCtx.state);
-      if (peak < 5) toast('⚠ No audio signal detected. Make sure music is playing.');
-      else toast('✓ Audio signal active — visuals reacting to music');
+      if (peak < 5) {
+        // Self-heal: if the rebuild didn't fix it, force one more rebuild attempt
+        // by closing the ctx and re-running the full connect path on the same stream.
+        if (!_isRetry) {
+          console.warn('[IKANDY] No signal after connect — attempting one self-heal rebuild');
+          (async () => {
+            try {
+              const freshRate = _track.getSettings().sampleRate || 48000;
+              try { _systemAudioSrc.disconnect(); } catch(e) {}
+              _systemAudioSrc = null;
+              const oldCtx2 = audioCtx;
+              audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: freshRate, latencyHint: 'playback'
+              });
+              analyserNode = audioCtx.createAnalyser();
+              analyserNode.fftSize = 2048;
+              analyserNode.smoothingTimeConstant = 0.75;
+              analyserNode.minDecibels = -100;
+              analyserNode.maxDecibels = 0;
+              // Channel handling left at default — boostGain handles the downmix
+              gainNode = audioCtx.createGain();
+              gainNode.gain.value = 0.8;
+              gainNode.connect(audioCtx.destination);
+              if (visualizer && typeof butterchurn !== 'undefined') {
+                const bc = butterchurn.default || butterchurn;
+                visualizer = bc.createVisualizer(audioCtx, vizCanvas, {
+                  width: W || window.innerWidth, height: H || window.innerHeight,
+                  pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+                });
+                visualizer.connectAudio(analyserNode);
+                if (typeof currentIdx === 'number' && typeof loadPreset === 'function') {
+                  try { loadPreset(currentIdx, 0); } catch(e) {}
+                }
+              }
+              try { await oldCtx2.close(); } catch(e) {}
+              await connectAudioStream(stream, label, silent, true);
+            } catch(e) {
+              console.error('[IKANDY] Self-heal failed:', e);
+              toast('⚠ No audio signal detected. Make sure music is playing.');
+            }
+          })();
+        } else {
+          toast('⚠ No audio signal detected. Make sure music is playing.');
+        }
+      } else {
+        toast('✓ Audio signal active — visuals reacting to music');
+      }
     }, 3000);
     toast('🎵 ' + label + ' — visuals reacting to audio');
   }
@@ -1982,7 +2335,8 @@ function setupSpotifyIPC() {
       el('sb-playlists-btn').style.display = 'none';
       el('sp-info').textContent = 'Not connected.';
       setSpotifyControls(false);
-      _plLoaded = false; _playlists = [];
+      _plLoaded = false; _playlists = []; _trackCache = {};
+      if (_plView === 'tracks') exitTrackView();
       el('plp-count').textContent = '';
       el('sb-playlists-btn').style.display = 'none';
     } else if (state.error) {
@@ -1995,6 +2349,10 @@ function setupSpotifyIPC() {
   });
 
   window.IKANDY.onSpotifyState(state => {
+    if (state.type === 'debug') {
+      console.warn(state.message);
+      return;
+    }
     if (state.type === 'local') {
       el('hud').style.display      = 'none';
       el('controls').style.display = 'none';
@@ -2010,6 +2368,11 @@ function setupSpotifyIPC() {
       return;
     }
     if (state.type === 'track') {
+      // First real track event from this source proves it's running. Record it
+      // so the first-launch nudge in spAction stops firing.
+      if (state.title && currentSource && _sourceStarted[currentSource] === false) {
+        _sourceStarted[currentSource] = true;
+      }
       // VLC always shows HUD; Spotify checks premium
       if (currentSource === 'vlc') {
         el('hud').style.display      = '';
@@ -2020,6 +2383,22 @@ function setupSpotifyIPC() {
       }
       trackPlaying = state.playing;
       setPlayIcon(state.playing);
+      if (typeof state.shuffleMode === 'string') setShuffleMode(state.shuffleMode);
+      // SMTC: lock buttons the active app says it doesn't support
+      if (currentSource === 'smtc' && state.smtcControls) {
+        applySMTCCaps(state.smtcControls);
+      }
+      // Foobar drill-in: track active playlist + item so the now-playing row highlights
+      if (currentSource === 'foobar' && typeof state.activeItemIndex === 'number') {
+        const newIdx = state.activeItemIndex;
+        const newUri = state.activePlaylistId ? ('fb2k:' + state.activePlaylistId) : '';
+        const changed = (newIdx !== _activeFoobarTrackIdx) || (newUri !== _activePlUri);
+        _activeFoobarTrackIdx = newIdx;
+        if (newUri) _activePlUri = newUri;
+        if (changed && _plView === 'tracks' && _plViewing && _plViewing.uri === _activePlUri) {
+          renderTrackList();
+        }
+      }
       if (!state.title) return; // partial update (e.g. play state sync only)
       trackDuration    = state.duration;
       _pollAnchorProgress = state.progress;
@@ -2087,6 +2466,23 @@ function setupSpotifyIPC() {
       }
     });
   }
+
+  // Manual GitHub release check (every launch — beta, no auto-installer yet)
+  if (window.IKANDY.onUpdateAvailable) {
+    window.IKANDY.onUpdateAvailable(({ currentVersion, latestVersion, downloadUrl, releaseUrl, notes }) => {
+      const m = el('gh-update-modal');
+      if (!m) return;
+      el('gh-update-current').textContent = 'v' + currentVersion;
+      el('gh-update-latest').textContent  = 'v' + latestVersion;
+      el('gh-update-notes').textContent   = (notes || '').trim() || 'See the release page for what changed.';
+      el('gh-update-download').onclick = async () => {
+        await window.IKANDY.openExternal(downloadUrl || releaseUrl);
+        m.classList.remove('open');
+      };
+      el('gh-update-continue').onclick = () => m.classList.remove('open');
+      m.classList.add('open');
+    });
+  }
 }
 
 /* ── HUD ── */
@@ -2147,15 +2543,259 @@ function setPlayIcon(playing) {
     : '<path d="M8 5v14l11-7z"/>';
 }
 
+// SMTC capability gating — the active session's Controls property tells us
+// which commands the source app actually accepts. Lock the rest with a
+// hover tooltip so users know it's the source app's limit, not iKandy's.
+function lockBtn(id, locked, reason) {
+  const b = el(id);
+  if (!b) return;
+  if (locked) {
+    b.classList.add('smtc-locked');
+    b.disabled = true;
+    b.setAttribute('title', reason);
+  } else {
+    b.classList.remove('smtc-locked');
+    b.disabled = false;
+    // Restore the original title from data-title if we stashed one
+    const orig = b.getAttribute('data-orig-title');
+    if (orig) b.setAttribute('title', orig);
+  }
+}
+function applySMTCCaps(caps) {
+  // Stash original titles once so we can restore them when leaving SMTC mode
+  ['cb-shuf','cb-prev','cb-pp','cb-stop','cb-next'].forEach(id => {
+    const b = el(id);
+    if (b && !b.getAttribute('data-orig-title')) {
+      b.setAttribute('data-orig-title', b.getAttribute('title') || '');
+    }
+  });
+  lockBtn('cb-shuf', !caps.canShuffle, 'This app doesn\u2019t expose shuffle via Windows Media Controls');
+  lockBtn('cb-prev', !caps.canPrev,    'This app doesn\u2019t expose Previous via Windows Media Controls');
+  lockBtn('cb-next', !caps.canNext,    'This app doesn\u2019t expose Next via Windows Media Controls');
+  // Stop is unreliable across SMTC apps (often reported supported but behaves
+  // like pause or does nothing) — lock it always for consistency.
+  lockBtn('cb-stop', true, 'Stop isn\u2019t supported via Windows Media Controls \u2014 use Pause');
+  // play/pause is effectively always available; if the app says no to both, lock it
+  lockBtn('cb-pp',   !(caps.canPlay || caps.canPause), 'This app doesn\u2019t expose Play/Pause via Windows Media Controls');
+}
+function clearSMTCCaps() {
+  ['cb-shuf','cb-prev','cb-pp','cb-stop','cb-next'].forEach(id => {
+    const b = el(id);
+    if (!b) return;
+    b.classList.remove('smtc-locked');
+    b.disabled = false;
+    const orig = b.getAttribute('data-orig-title');
+    if (orig != null) b.setAttribute('title', orig);
+  });
+}
+
 /* ── CONTROLS ── */
+// Shuffle / playback-order. Per-source mode strings:
+//   spotify: 'off' | 'shuffle' | 'smart'   (smart is read-only via the API)
+//   foobar:  'default' | 'repeat-playlist' | 'repeat-track' | 'random' |
+//            'shuffle-tracks' | 'shuffle-albums' | 'shuffle-folders'
+//   vlc:     'off' | 'on'
+// _shuffleMode is the *displayed* current state; updated optimistically on
+// click and authoritatively from track events (so external changes in the
+// source app reflect here within one poll cycle).
+let _shuffleMode = 'off';
+
+const SPOTIFY_SHUFFLE_OPTS = [
+  { mode: 'off',     label: 'Off' },
+  { mode: 'shuffle', label: 'Shuffle' },
+  { mode: 'smart',   label: 'Smart Shuffle', hint: 'set in Spotify' },
+];
+const FOOBAR_SHUFFLE_OPTS = [
+  { mode: 'default',         label: 'Default' },
+  { mode: 'repeat-playlist', label: 'Repeat (playlist)' },
+  { mode: 'repeat-track',    label: 'Repeat (track)' },
+  { mode: 'random',          label: 'Random' },
+  { mode: 'shuffle-tracks',  label: 'Shuffle (tracks)' },
+  { mode: 'shuffle-albums',  label: 'Shuffle (albums)' },
+  { mode: 'shuffle-folders', label: 'Shuffle (folders)' },
+];
+
+function shuffleOptsForSource() {
+  if (currentSource === 'spotify') return SPOTIFY_SHUFFLE_OPTS;
+  if (currentSource === 'foobar')  return FOOBAR_SHUFFLE_OPTS;
+  return null; // VLC has no menu — simple toggle
+}
+
+function labelForMode(mode) {
+  const opts = shuffleOptsForSource();
+  if (opts) {
+    const o = opts.find(o => o.mode === mode);
+    if (o) return o.label;
+  }
+  if (currentSource === 'vlc') return mode === 'on' ? 'Shuffle' : 'Off';
+  return 'Shuffle';
+}
+
+function isModeOn(mode) {
+  // What counts as "lit-up" varies by source. For Spotify, shuffle/smart only.
+  // For foobar, anything except default/repeat-* (those aren't really shuffle).
+  // For VLC, on.
+  if (currentSource === 'spotify') return mode === 'shuffle' || mode === 'smart';
+  if (currentSource === 'foobar')  return mode === 'random' || mode === 'shuffle-tracks' || mode === 'shuffle-albums' || mode === 'shuffle-folders';
+  if (currentSource === 'vlc')     return mode === 'on';
+  return false;
+}
+
+function updateShuffleUI() {
+  const b = el('cb-shuf');
+  if (!b) return;
+  const on    = isModeOn(_shuffleMode);
+  const smart = currentSource === 'spotify' && _shuffleMode === 'smart';
+  b.classList.toggle('on', on);
+  b.classList.toggle('smart', smart);
+  b.title = on ? labelForMode(_shuffleMode) : 'Shuffle';
+  // If menu is open, refresh checkmarks
+  const menu = el('shuf-menu');
+  if (menu && menu.classList.contains('open')) {
+    menu.querySelectorAll('.shuf-opt').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.mode === _shuffleMode);
+    });
+  }
+}
+
+function setShuffleMode(mode, smartHint) {
+  // smartHint kept for back-compat with prior callsites — derived from mode now.
+  _shuffleMode = mode || 'off';
+  updateShuffleUI();
+}
+
+function openShuffleMenu() {
+  const opts = shuffleOptsForSource();
+  if (!opts) return; // VLC: no menu
+  const menu = el('shuf-menu');
+  // Build options
+  menu.innerHTML = '';
+  opts.forEach(o => {
+    const div = document.createElement('div');
+    div.className = 'shuf-opt' + (o.mode === _shuffleMode ? ' active' : '');
+    div.dataset.mode = o.mode;
+    div.setAttribute('role', 'menuitemradio');
+    div.setAttribute('aria-checked', o.mode === _shuffleMode ? 'true' : 'false');
+    div.innerHTML = '<span class="label">' + esc(o.label) + '</span>'
+                  + (o.hint ? '<span class="hint">' + esc(o.hint) + '</span>' : '');
+    div.onclick = (e) => { e.stopPropagation(); selectShuffleMode(o.mode); };
+    menu.appendChild(div);
+  });
+  // Show, then position above the button (centered horizontally)
+  menu.classList.add('open');
+  const btn = el('cb-shuf').getBoundingClientRect();
+  const m   = menu.getBoundingClientRect();
+  let left  = btn.left + btn.width / 2 - m.width / 2;
+  // Keep within viewport with an 8px margin
+  left = Math.max(8, Math.min(left, window.innerWidth - m.width - 8));
+  menu.style.left = left + 'px';
+  menu.style.top  = (btn.top - m.height - 8) + 'px';
+  // Outside-click closer (next tick so the opening click doesn't immediately close it)
+  setTimeout(() => document.addEventListener('mousedown', closeShuffleMenuOnOutside), 0);
+  document.addEventListener('keydown', closeShuffleMenuOnEsc);
+}
+
+function closeShuffleMenu() {
+  const menu = el('shuf-menu');
+  if (!menu) return;
+  menu.classList.remove('open');
+  document.removeEventListener('mousedown', closeShuffleMenuOnOutside);
+  document.removeEventListener('keydown', closeShuffleMenuOnEsc);
+}
+
+function closeShuffleMenuOnOutside(e) {
+  const menu = el('shuf-menu');
+  const btn  = el('cb-shuf');
+  if (!menu.contains(e.target) && !btn.contains(e.target)) closeShuffleMenu();
+}
+
+function closeShuffleMenuOnEsc(e) {
+  if (e.key === 'Escape') closeShuffleMenu();
+}
+
+async function onShuffleClick(e) {
+  e?.stopPropagation();
+  // SMTC: no public API for remote shuffle control — short-circuit.
+  if (currentSource === 'smtc') {
+    toast('Shuffle has to be set in the playing app');
+    return;
+  }
+  // VLC: simple toggle (no menu — VLC only has on/off)
+  if (currentSource === 'vlc') {
+    return selectShuffleMode(_shuffleMode === 'on' ? 'off' : 'on');
+  }
+  // Spotify / foobar: pop menu (or close if already open)
+  const menu = el('shuf-menu');
+  if (menu.classList.contains('open')) closeShuffleMenu();
+  else openShuffleMenu();
+}
+
+async function selectShuffleMode(mode) {
+  closeShuffleMenu();
+
+  // Spotify Smart Shuffle: API doesn't expose a way to enable it. Show a
+  // friendly note and don't change state — but if the user enables it in
+  // Spotify, the next poll will set _shuffleMode = 'smart' automatically.
+  if (currentSource === 'spotify' && mode === 'smart') {
+    toast('Smart Shuffle has to be enabled inside Spotify — iKandy will reflect it once on.');
+    return;
+  }
+
+  const prev = _shuffleMode;
+  setShuffleMode(mode); // optimistic
+
+  try {
+    const r = await window.IKANDY.setShuffle(mode);
+    if (r && r.ok === false) {
+      setShuffleMode(prev);
+      toast('Shuffle: ' + (r.error || 'failed'));
+    }
+  } catch(err) {
+    setShuffleMode(prev);
+    toast('Shuffle: ' + (err.message || 'failed'));
+  }
+}
+
+// Reposition / close menu on resize (in case the controls bar moves)
+window.addEventListener('resize', () => closeShuffleMenu());
+
+// Per-session "has this source produced a track yet" tracking. Used so the
+// very first play-press on a fresh launch can surface a clear nudge if the
+// user hasn't actually started the source app yet.
+const _sourceStarted = { spotify: false, vlc: false, foobar: false, smtc: false };
+function sourceNotStartedHint(src) {
+  switch (src) {
+    case 'spotify': return 'Open Spotify on any device and start playing first';
+    case 'vlc':     return 'Load and play something in VLC first';
+    case 'foobar':  return 'Load and play a track in foobar2000 first';
+    case 'smtc':    return 'Start playing music in any app first';
+    default:        return 'Start the source app first';
+  }
+}
+
 async function spAction(cmd) {
   const type = typeof cmd === 'string' ? cmd : cmd.type;
+  // First-launch nudge: if user hits play but nothing has come back from this
+  // source yet, the source app probably isn't running / isn't playing anything.
+  if ((type === 'play' || type === 'playpause' || type === 'next' || type === 'prev' || type === 'previous')
+      && !_sourceStarted[currentSource]) {
+    toast(sourceNotStartedHint(currentSource));
+    return;
+  }
   if (currentSource === 'vlc') {
     await window.IKANDY.vlcAction(typeof cmd === 'string' ? { type: cmd } : cmd);
     return;
   }
   if (currentSource === 'foobar') {
     await window.IKANDY.foobarAction(typeof cmd === 'string' ? { type: cmd } : cmd);
+    return;
+  }
+  if (currentSource === 'smtc') {
+    // SMTC: only transport actions are meaningful (no seek/volume/stop).
+    if (['playpause','play','pause','next','prev','previous'].includes(type)) {
+      const r = await window.IKANDY.smtcAction(typeof cmd === 'string' ? { type: cmd } : cmd);
+      if (r && r.ok === false && r.error) toast('Now Playing: ' + r.error);
+    }
     return;
   }
   if (type === 'playpause') {
@@ -2235,6 +2875,10 @@ async function startLogin() {
 }
 /* ── PLAYLIST PANEL ── */
 let _playlists = [], _plLoaded = false, _plSource = '', _activePlUri = '', _plSearchStr = '';
+let _trackCache = {};      // { [playlistId]: [{idx, title, artist, album, duration, year, genre, trackNum}] }
+let _plView = 'grid';      // 'grid' | 'tracks'
+let _plViewing = null;     // playlist object currently drilled into
+let _activeFoobarTrackIdx = -1; // for highlighting the now-playing row
 
 async function openPlaylistPanel() {
   el('playlist-panel').classList.add('open');
@@ -2242,11 +2886,13 @@ async function openPlaylistPanel() {
     _plLoaded = false;
     _plSource = currentSource;
     _activePlUri = '';
+    _trackCache = {};
     await loadPlaylists();
   }
 }
 function closePlaylistPanel() {
   el('playlist-panel').classList.remove('open');
+  if (_plView === 'tracks') exitTrackView();
 }
 async function loadPlaylists() {
   el('plp-grid').innerHTML = '<div style="padding:48px;text-align:center;color:var(--dim);font-size:13px;">Loading…</div>';
@@ -2267,19 +2913,166 @@ function buildPlpGrid(list) {
   grid.innerHTML = '';
   const filtered = _plSearchStr ? list.filter(p => p.name.toLowerCase().includes(_plSearchStr)) : list;
   el('plp-empty').style.display = filtered.length === 0 ? 'block' : 'none';
+  el('plp-empty').textContent = 'No playlists found';
   filtered.forEach(p => {
     const card = document.createElement('div');
     card.className = 'plcard' + (p.uri === _activePlUri ? ' active' : '');
-    card.onclick = () => playPlaylist(p.uri, p.id);
+    // foobar drills in; spotify (and any other source) plays directly
+    card.onclick = () => (currentSource === 'foobar') ? enterTrackView(p) : playPlaylist(p.uri, p.id);
     card.innerHTML = `
-      ${p.image ? `<img class="plcard-art" src="${esc(p.image)}" loading="lazy" alt="">` : `<div class="plcard-noart">♪</div>`}
+      ${p.image ? `<img class="plcard-art" src="${esc(p.image)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'plcard-noart',textContent:'♪'}))">` : `<div class="plcard-noart">♪</div>`}
       <div class="plcard-info"><div class="plcard-name">${esc(p.name)}</div></div>`;
     grid.appendChild(card);
   });
 }
 function plpFilter(q) {
   _plSearchStr = q.toLowerCase();
+  // Show/hide the clear button via the wrapper class
+  const wrap = el('plp-search-wrap');
+  if (wrap) wrap.classList.toggle('has-text', !!q);
+  if (_plView === 'tracks') renderTrackList();
+  else buildPlpGrid(_playlists);
+}
+function clearPlpSearch() {
+  const input = el('plp-search');
+  if (!input) return;
+  input.value = '';
+  input.focus();
+  plpFilter('');
+}
+function trackMatches(t, q) {
+  if (!t) return false;
+  const fields = ['title','artist','album','genre','year','trackNum'];
+  for (const k of fields) {
+    const v = t[k];
+    if (v != null && String(v).toLowerCase().includes(q)) return true;
+  }
+  return false;
+}
+function fmtDuration(seconds) {
+  const s = Math.max(0, Math.round(+seconds || 0));
+  const m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
+}
+
+async function enterTrackView(playlist) {
+  _plView = 'tracks';
+  _plViewing = playlist;
+  _plSearchStr = '';
+  el('plp-search').value = ''; el('plp-search-wrap')?.classList.remove('has-text');
+  el('plp-search').placeholder = 'Search this playlist…';
+  el('plp-back').style.display = 'inline-block';
+  el('plp-title').textContent = playlist.name;
+  el('plp-title').style.fontSize = '20px';
+  el('plp-play-btn').style.display = 'inline-flex';
+  el('plp-empty').style.display = 'none';
+  // Playlist art in the header
+  const headerArt = el('plp-header-art');
+  if (headerArt) {
+    if (playlist.image) {
+      headerArt.src = playlist.image;
+      headerArt.style.display = 'block';
+      headerArt.onerror = () => { headerArt.style.display = 'none'; };
+    } else {
+      headerArt.style.display = 'none';
+    }
+  }
+
+  const grid = el('plp-grid');
+  grid.classList.add('track-mode');
+
+  if (_trackCache[playlist.id]) { renderTrackList(); return; }
+
+  el('plp-count').textContent = '';
+  grid.innerHTML = '<div style="padding:48px;text-align:center;color:var(--dim);font-size:13px;">Loading tracks…</div>';
+
+  try {
+    const result = await window.IKANDY.getFoobarPlaylistTracks(playlist.id);
+    if (result && result.ok && Array.isArray(result.tracks)) {
+      _trackCache[playlist.id] = result.tracks;
+    } else {
+      _trackCache[playlist.id] = [];
+      toast('Could not load tracks: ' + (result?.error || 'unknown'));
+    }
+  } catch (e) {
+    _trackCache[playlist.id] = [];
+    toast('Could not load tracks: ' + (e?.message || 'IPC error'));
+  }
+  // Bail if user navigated away while we were loading
+  if (_plView !== 'tracks' || !_plViewing || _plViewing.id !== playlist.id) return;
+  renderTrackList();
+}
+
+function exitTrackView() {
+  _plView = 'grid';
+  _plViewing = null;
+  _plSearchStr = '';
+  el('plp-search').value = ''; el('plp-search-wrap')?.classList.remove('has-text');
+  el('plp-search').placeholder = 'Search playlists…';
+  el('plp-back').style.display = 'none';
+  el('plp-title').textContent = 'PLAYLISTS';
+  el('plp-title').style.fontSize = '';
+  el('plp-play-btn').style.display = 'none';
+  el('plp-grid').classList.remove('track-mode');
+  const headerArt = el('plp-header-art');
+  if (headerArt) headerArt.style.display = 'none';
+  el('plp-count').textContent = _playlists.length + ' playlists';
   buildPlpGrid(_playlists);
+}
+
+function renderTrackList() {
+  if (!_plViewing) return;
+  const grid = el('plp-grid');
+  grid.innerHTML = '';
+  const tracks = _trackCache[_plViewing.id] || [];
+  const filtered = _plSearchStr ? tracks.filter(t => trackMatches(t, _plSearchStr)) : tracks;
+  el('plp-count').textContent = _plSearchStr
+    ? filtered.length + ' / ' + tracks.length + ' tracks'
+    : tracks.length + ' tracks';
+  if (filtered.length === 0) {
+    el('plp-empty').textContent = tracks.length === 0 ? 'No tracks in this playlist' : 'No matches';
+    el('plp-empty').style.display = 'block';
+    return;
+  }
+  el('plp-empty').style.display = 'none';
+  // Determine which row is currently playing (only valid when viewing the active playlist)
+  const isActivePlaylist = _activePlUri === _plViewing.uri;
+  filtered.forEach(t => {
+    const row = document.createElement('div');
+    const isActive = isActivePlaylist && t.idx === _activeFoobarTrackIdx;
+    row.className = 'tr-row' + (isActive ? ' active' : '');
+    row.onclick = () => playFoobarTrackFromUI(t.idx);
+    const artHtml = t.art
+      ? `<img class="tr-art" src="${esc(t.art)}" loading="lazy" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'tr-noart',textContent:'♪'}))">`
+      : `<div class="tr-noart">♪</div>`;
+    row.innerHTML = `
+      ${artHtml}
+      <div class="tr-num">${t.idx + 1}</div>
+      <div class="tr-name">${esc(t.title || '—')}</div>
+      <div class="tr-artist">${esc(t.artist || '')}</div>
+      <div class="tr-album">${esc(t.album || '')}</div>
+      <div class="tr-year">${esc(t.year || '')}</div>
+      <div class="tr-genre">${esc(t.genre || '')}</div>
+      <div class="tr-dur">${t.duration ? fmtDuration(t.duration) : ''}</div>`;
+    grid.appendChild(row);
+  });
+}
+
+async function playCurrentPlaylist() {
+  if (!_plViewing) return;
+  await playPlaylist(_plViewing.uri, _plViewing.id);
+}
+
+async function playFoobarTrackFromUI(index) {
+  if (!_plViewing) return;
+  const playlistId = _plViewing.id; // capture before closePlaylistPanel nulls _plViewing
+  _activePlUri = _plViewing.uri;
+  _activeFoobarTrackIdx = index;
+  // Update active row immediately for snappy feedback
+  renderTrackList();
+  closePlaylistPanel();
+  const result = await window.IKANDY.playFoobarTrack(playlistId, index);
+  if (result && result.ok === false) toast('Could not start track — is foobar2000 running?');
 }
 
 /* ── PLAY PLAYLIST ── */
@@ -2380,17 +3173,17 @@ async function initSource() {
 }
 function applySourceUI(mode) {
   const isVlc    = mode === 'vlc';
-  const isLocal  = mode === 'local';
   const isFoobar = mode === 'foobar';
   const isSpotify= mode === 'spotify';
+  const isSmtc   = mode === 'smtc';
   el('src-spotify-panel').style.display = isSpotify ? '' : 'none';
   el('src-vlc-panel').style.display     = isVlc    ? '' : 'none';
   el('src-foobar-panel') && (el('src-foobar-panel').style.display = isFoobar ? '' : 'none');
-  el('src-local-info')   && (el('src-local-info').style.display   = isLocal  ? '' : 'none');
+  el('src-smtc-panel')   && (el('src-smtc-panel').style.display   = isSmtc   ? '' : 'none');
   el('src-spotify-btn').className = isSpotify ? 'btn primary' : 'btn';
   el('src-vlc-btn').className     = isVlc     ? 'btn primary' : 'btn';
   el('src-foobar-btn') && (el('src-foobar-btn').className = isFoobar ? 'btn primary' : 'btn');
-  el('src-local-btn').className   = isLocal   ? 'btn primary' : 'btn';
+  el('src-smtc-btn')   && (el('src-smtc-btn').className   = isSmtc   ? 'btn primary' : 'btn');
 }
 let _isPremium = false; // track premium state across source switches
 
@@ -2409,6 +3202,14 @@ async function setSourceMode(mode) {
   }
   currentSource = mode;
   applySourceUI(mode);
+  if (mode !== 'smtc') clearSMTCCaps(); // restore buttons when leaving SMTC
+  // Hide controls that have no meaning in Now Playing mode (no remote shuffle,
+  // no working stop, no volume). Restored for every other source.
+  const hideForSmtc = (mode === 'smtc');
+  ['cb-shuf','cb-stop','vol-row'].forEach(id => {
+    const e = el(id);
+    if (e) e.style.display = hideForSmtc ? 'none' : '';
+  });
   window.IKANDY.action({ type: 'telemetry', source_mode: mode });
   if (mode === 'local') {
     await window.IKANDY.setSource('local');
@@ -2421,12 +3222,10 @@ async function setSourceMode(mode) {
     el('hud').style.display      = '';
     el('controls').style.display = '';
     el('free-note').style.display = 'none';
-    // Unlock all control buttons for VLC
-    document.querySelectorAll('#controls .cb, #vol-row').forEach(b => {
+    // Unlock all control buttons for VLC (except the perma-locked vol-row)
+    document.querySelectorAll('#controls .cb').forEach(b => {
       b.disabled = false; b.style.opacity = '1'; b.style.pointerEvents = '';
     });
-    const volSl = el('vol-sl');
-    if (volSl) { volSl.disabled = false; volSl.style.opacity = '1'; }
     updateBadge(_vlcConnected, _vlcConnected ? 'VLC' : 'VLC — click Connect');
     el('vlc-status').textContent = _vlcConnected ? '✓ Connected to VLC' : 'Switched to VLC — click Connect VLC';
     el('vlc-status').style.color = _vlcConnected ? 'var(--sp)' : 'var(--dim)';
@@ -2435,11 +3234,9 @@ async function setSourceMode(mode) {
     el('hud').style.display      = '';
     el('controls').style.display = '';
     el('free-note').style.display = 'none';
-    document.querySelectorAll('#controls .cb, #vol-row').forEach(b => {
+    document.querySelectorAll('#controls .cb').forEach(b => {
       b.disabled = false; b.style.opacity = '1'; b.style.pointerEvents = '';
     });
-    const volSl = el('vol-sl');
-    if (volSl) { volSl.disabled = false; volSl.style.opacity = '1'; }
     el('fb-playlists-btn') && (el('fb-playlists-btn').style.display = _foobarConnected ? '' : 'none');
     updateBadge(_foobarConnected, _foobarConnected ? 'foobar2000' : 'foobar2000 — click Connect');
     if (el('foobar-status')) {
@@ -2453,6 +3250,14 @@ async function setSourceMode(mode) {
     if (live) _isPremium = true;
     setSpotifyControls(_isPremium);
     updateBadge(_isPremium, _isPremium ? 'Spotify Premium' : 'Spotify Free');
+  } else if (mode === 'smtc') {
+    el('hud').style.display      = '';
+    el('controls').style.display = '';
+    el('free-note').style.display = 'none';
+    document.querySelectorAll('#controls .cb').forEach(b => {
+      b.disabled = false; b.style.opacity = '1'; b.style.pointerEvents = '';
+    });
+    updateBadge(true, 'Now Playing');
   }
 }
 let _vlcConnected = false;
@@ -2474,7 +3279,13 @@ async function vlcConnect() {
     el('free-note').style.display = 'none';
     updateBadge(true, 'VLC');
   } else {
-    el('vlc-status').textContent = '✗ ' + (result.error || 'Failed');
+    // Mirror the foobar CFA hint: on Windows, "not reachable" failures are
+    // commonly caused by Defender's Controlled Folder Access blocking vlc.exe.
+    let html = '✗ ' + esc(result.error || 'Failed');
+    if (window.IKANDY.platform === 'win32' && result.error && /not reachable/i.test(result.error)) {
+      html += '<div style="font-size:10px;color:var(--dim);margin-top:6px;line-height:1.5;">↳ If Windows Defender <strong>Controlled Folder Access</strong> is on, allow <code>vlc.exe</code> via <em>Ransomware protection → Allow an app through Controlled folder access</em>.</div>';
+    }
+    el('vlc-status').innerHTML = html;
     el('vlc-status').style.color = 'var(--red)';
     _vlcConnected = false;
   }
@@ -2499,7 +3310,14 @@ async function foobarConnect() {
     el('fb-playlists-btn') && (el('fb-playlists-btn').style.display = '');
     updateBadge(true, 'foobar2000');
   } else {
-    el('foobar-status').textContent = '✗ ' + (result.error || 'Failed');
+    // Reachability failures on Windows are commonly caused by Defender's
+    // Controlled Folder Access blocking foobar2000.exe — surface that hint
+    // when the symptoms match (Windows + "not reachable" message).
+    let html = '✗ ' + esc(result.error || 'Failed');
+    if (window.IKANDY.platform === 'win32' && result.error && /not reachable/i.test(result.error)) {
+      html += '<div style="font-size:10px;color:var(--dim);margin-top:6px;line-height:1.5;">↳ If Windows Defender <strong>Controlled Folder Access</strong> is on, allow <code>foobar2000.exe</code> via <em>Ransomware protection → Allow an app through Controlled folder access</em>.</div>';
+    }
+    el('foobar-status').innerHTML = html;
     el('foobar-status').style.color = 'var(--red)';
     _foobarConnected = false;
     el('fb-playlists-btn') && (el('fb-playlists-btn').style.display = 'none');
@@ -2721,6 +3539,22 @@ function loadPresets() {
   allPresets = allNames.map(n => rawMap[n]);
   el('pp-count').textContent = allNames.length + ' presets';
   el('pc-count').textContent = allNames.length;
+
+  // Hydrate the broken-preset set from disk so we don't replay yesterday's crashes.
+  // Translate persisted names → indices in the current allNames order.
+  if (window.IKANDY && typeof window.IKANDY.loadBrokenPresets === 'function') {
+    window.IKANDY.loadBrokenPresets().then(names => {
+      if (!Array.isArray(names) || !names.length) return;
+      const lookup = new Map(allNames.map((n, i) => [n, i]));
+      let hits = 0;
+      for (const n of names) {
+        const idx = lookup.get(n);
+        if (idx != null) { window._brokenPresets.add(idx); hits++; }
+      }
+      if (hits) console.log(`[iKandy] Loaded ${hits} previously broken preset(s) from disk`);
+    }).catch(e => console.warn('[iKandy] loadBrokenPresets:', e));
+  }
+
   // Try random presets until one loads cleanly (skip broken ones)
   for (let tries = 0; tries < 20; tries++) {
     const idx = Math.floor(Math.random() * allPresets.length);
@@ -2748,6 +3582,7 @@ function loadPreset(idx, blend, manual = false) {
     window._brokenPresets.add(tryIdx);
     console.warn(`[iKandy] Broken preset (skipping): ${allNames[tryIdx]}`,
       `— ${window._brokenPresets.size} broken so far`);
+    window.IKANDY?.addBrokenPreset?.(allNames[tryIdx]);
     // Recurse to the next preset
     if (window._brokenPresets.size < allPresets.length) {
       return loadPreset(tryIdx + 1, blend, manual);
@@ -3206,7 +4041,19 @@ function ppCat(cat) {
   document.querySelectorAll('.pp-pill').forEach(p => p.classList.toggle('active', p.dataset.cat === cat));
   buildGrid();
 }
-function ppFilter(q) { ppSearchStr = q.toLowerCase(); buildGrid(); }
+function ppFilter(q) {
+  ppSearchStr = q.toLowerCase();
+  const wrap = el('pp-search-wrap');
+  if (wrap) wrap.classList.toggle('has-text', !!q);
+  buildGrid();
+}
+function clearPpSearch() {
+  const input = el('pp-search');
+  if (!input) return;
+  input.value = '';
+  input.focus();
+  ppFilter('');
+}
 
 /* ── SIDEBAR / TOAST / ACCORDION ── */
 let sidebarOpen = false;      // right (FX) panel
@@ -4060,7 +4907,8 @@ function drawPlanet(ctx, cx, cy, W, H) {
   if (analyserNode) {
     const _dpData    = new Uint8Array(analyserNode.frequencyBinCount);
     analyserNode.getByteFrequencyData(_dpData);
-    const _dpBassEnd = Math.floor(_dpData.length * 0.08);
+    // Hz-bounded bass range — matches ~2 kHz cap that 0.08*bufLen gave at 48k
+    const _dpBassEnd = Math.max(4, _hzToBin(2000));
     let _dpSum = 0;
     for (let i = 0; i < _dpBassEnd; i++) _dpSum += _dpData[i];
     _dpBass = _dpSum / _dpBassEnd / 255; // 0..1, raw, same as spectrum bars
@@ -4390,10 +5238,14 @@ function renderSpectrum() {
   const gap    = Math.max(1, barW * 0.15);
   const midY   = H * 0.62; // bars grow up from here, reflection below
 
+  // Cap top bin at 18 kHz — sample-rate-aware so high-rate AudioContexts
+  // (Realtek 96k/192k loopback) still show music across the full bar range.
+  const topBin = Math.max(8, _hzToBin(18000));
+
   for (let i = 0; i < BAR_COUNT; i++) {
     // Map bar index to frequency bin — log scale feels more musical
     const t      = i / BAR_COUNT;
-    const binIdx = Math.floor(Math.pow(t, 1.8) * bufLen * 0.75);
+    const binIdx = Math.floor(Math.pow(t, 1.8) * topBin);
     const raw    = freqData[Math.min(binIdx, bufLen - 1)] / 255;
     const val    = Math.pow(raw, 0.7) * I; // gamma for better visual range
 
@@ -4524,7 +5376,8 @@ function renderWaveray() {
   if (analyserNode) {
     const _wrData    = new Uint8Array(analyserNode.frequencyBinCount);
     analyserNode.getByteFrequencyData(_wrData);
-    const _wrBassEnd = Math.floor(_wrData.length * 0.08);
+    // Hz-bounded bass range — matches ~2 kHz cap that 0.08*bufLen gave at 48k
+    const _wrBassEnd = Math.max(4, _hzToBin(2000));
     let _wrSum = 0;
     for (let i = 0; i < _wrBassEnd; i++) _wrSum += _wrData[i];
     _wrBassRaw = _wrSum / _wrBassEnd / 255;
@@ -4741,9 +5594,12 @@ function renderFireEQ() {
 
   _fireTime += 0.016;
 
+  // Cap top bin at 18 kHz — sample-rate-aware (see spectrum scene comment)
+  const topBin = Math.max(8, _hzToBin(18000));
+
   for (let i = 0; i < FIRE_BARS; i++) {
     const t      = i / FIRE_BARS;
-    const binIdx = Math.floor(Math.pow(t, 1.8) * bufLen * 0.75);
+    const binIdx = Math.floor(Math.pow(t, 1.8) * topBin);
     const raw    = freqData[Math.min(binIdx, bufLen-1)] / 255;
     const val    = Math.pow(raw, 0.65) * I;
 
@@ -6905,18 +7761,21 @@ async function bootApp() {
     { sel:'#controls',        place:'above', title:'Playback Controls',  body:'Play, pause, skip, adjust volume. Works with Spotify Premium and VLC only.' },
     { sel:'#hide-btn',        place:'below', title:'Hide UI',            body:'Click ◎ (or press H) to hide all controls for a clean full-screen view. Press F for fullscreen. Click ◎ again to restore.' },
     // Sidebar steps — sidebar opened once on entry, closed on leave
-    { sel:'#ptab',            place:'left',  title:'Settings Sidebar',   body:'Click this tab to open the sidebar at any time. It holds all app settings.', sbOpen: true },
-    { sel:'#app-brand',       place:'left',  title:'Theme',              body:'Pick an accent colour from the swatches to change the whole app\'s colour scheme.', sbOpen: true },
-    { sel:'#acc-all-btn',     place:'left',  title:'Expand / Collapse',  body:'Instantly expand or collapse all sidebar sections at once.', sbOpen: true },
-    { sel:'#src-spotify-btn', place:'left',  title:'Audio Source',       body:'Switch between Spotify, VLC, foobar2000, and Local audio. Spotify, VLC, and foobar2000 show track info, lyrics, and full controls. Local reacts to system audio.', sbOpen: true },
-    { sel:'#recapture-btn',   place:'left',  title:'System Audio',       body:'If visuals stop reacting to music, click this to reconnect the audio capture.', sbOpen: true },
-    { sel:'#acc-presets',     place:'left',  title:'Presets (Sidebar)',  body:'Set auto-cycle interval and blend time. Browse all presets from here too.', sbOpen: true },
-    { sel:'#acc-master', place:'left', title:'Master Controls',   body:'Reactivity and Smoothness affect everything in the app — presets, scenes, and lyrics all respond to these.', sbOpen: true,
-      onEnter: () => window.accOpen('acc-master'), onLeave: () => window.accClose('acc-master') },
-    { sel:'#acc-vibe',    place:'left', title:'FX & Vibe', body:'Apply real-time GLSL shaders over a background image. Add grain or scanlines for a lo-fi feel.', sbOpen: true,
+    // Left sidebar walkthrough (place:'right' so tooltips appear in the visualizer, not inside the panel)
+    { sel:'#ltab',            place:'right', title:'Settings Sidebar',   body:'Click this tab to open the sidebar at any time. It holds all app settings.', sbOpen: true },
+    { sel:'#app-brand',       place:'right', title:'Theme',              body:'Pick an accent colour from the swatches to change the whole app\'s colour scheme.', sbOpen: true },
+    { sel:'#acc-all-btn',     place:'right', title:'Expand / Collapse',  body:'Instantly expand or collapse all sidebar sections at once.', sbOpen: true },
+    { sel:'#src-spotify-btn', place:'right', title:'Audio Source',       body:'Switch between Spotify, VLC, foobar2000, and Local audio. Spotify, VLC, and foobar2000 show track info, lyrics, and full controls. Local reacts to system audio.', sbOpen: true },
+    { sel:'#recapture-btn',   place:'right', title:'System Audio',       body:'If visuals stop reacting to music, click this to reconnect the audio capture.', sbOpen: true },
+    // Right sidebar walkthrough — natural top-to-bottom order, each section expanded for its step
+    { sel:'#acc-master',  place:'left', title:'Master Controls',  body:'Reactivity and Smoothness affect everything in the app — presets, scenes, and lyrics all respond to these. Grain and Scanlines add lo-fi texture.', sbOpen: true,
+      onEnter: () => window.accOpen('acc-master'),  onLeave: () => window.accClose('acc-master') },
+    { sel:'#acc-presets', place:'left', title:'Waveform',         body:'Browse and cycle MilkDrop presets. Set auto-cycle interval, blend time, animation speed, and load custom community preset folders.', sbOpen: true,
+      onEnter: () => window.accOpen('acc-presets'), onLeave: () => window.accClose('acc-presets') },
+    { sel:'#acc-scenes',  place:'left', title:'Scenes',           body:'Toggle audio-reactive overlay scenes — Fire EQ, Spectrum, Waveray, Aurora, Starfield, and Singularity.', sbOpen: true,
+      onEnter: () => window.accOpen('acc-scenes'),  onLeave: () => window.accClose('acc-scenes') },
+    { sel:'#acc-vibe',    place:'left', title:'FX & Vibe',        body:'Apply real-time GLSL shaders over a background image. Add grain or scanlines for a lo-fi feel.', sbOpen: true, last: true,
       onEnter: () => window.accOpen('acc-vibe'),    onLeave: () => window.accClose('acc-vibe') },
-    { sel:'#acc-lyrics',  place:'left', title:'Lyrics',    body:'Lyrics auto-fetch from LRCLIB. Classic mode shows one line; Physics mode lets words float around the screen.', sbOpen: true, last: true,
-      onEnter: () => window.accOpen('acc-lyrics'),  onLeave: () => window.accClose('acc-lyrics') },
   ];
 
   let cur = 0;
@@ -6965,6 +7824,8 @@ async function bootApp() {
     const s = STEPS[i];
     const el = document.querySelector(s.sel);
     if (!el) { cur++; if (cur < STEPS.length) draw(cur); else skip(); return; }
+    // Make sure the target is within the visible scroll area of its sidebar
+    try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch(e) {}
     const r = el.getBoundingClientRect();
     if (!r.width || !r.height) { cur++; if (cur < STEPS.length) draw(cur); else skip(); return; }
 
@@ -7048,6 +7909,56 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
     <button id="tk-next" onclick="tkNext()">Next →</button>
   </div>
 </div>
+
+<!-- GitHub release update modal — shown on launch when newer release exists -->
+<div id="gh-update-modal" onclick="if(event.target===this)el('gh-update-modal').classList.remove('open')">
+  <div class="box">
+    <h2>⬆ Update available</h2>
+    <p style="color:var(--dim);margin-bottom:6px;">A newer version of IKANDY is on GitHub.</p>
+    <div style="display:flex;align-items:baseline;gap:14px;margin:14px 0 18px 0;font-family:var(--ui);">
+      <div><span style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;">Yours</span> &nbsp;<strong id="gh-update-current" style="color:var(--txt);"></strong></div>
+      <div style="color:var(--acc);">→</div>
+      <div><span style="font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;">Latest</span> &nbsp;<strong id="gh-update-latest" style="color:var(--sp);"></strong></div>
+    </div>
+    <div style="background:rgba(255,255,255,.04);border-left:2px solid var(--sp);padding:10px 12px;margin-bottom:18px;font-size:11.5px;line-height:1.6;color:var(--dim);max-height:140px;overflow-y:auto;white-space:pre-wrap;" id="gh-update-notes"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn green" id="gh-update-download" style="flex:1;">↓ Download latest</button>
+      <button class="btn"      id="gh-update-continue" style="flex:1;">Continue with current</button>
+    </div>
+  </div>
+</div>
+
+<!-- Source help modal -->
+<div id="src-help-modal" onclick="if(event.target===this)closeSourceHelp()">
+  <div class="box">
+    <h2>How sources work <button class="close-x" onclick="closeSourceHelp()" aria-label="Close">&times;</button></h2>
+    <p>iKandy can connect to four different sources. Each one offers a different feature set depending on what its underlying API exposes.</p>
+
+    <h3><span class="tier-dot full"></span>Full features</h3>
+    <p><b>Spotify Premium</b> &mdash; playlist browse, search, drill-in to tracks, all shuffle modes, transport controls, album art, lyrics. Requires a Premium subscription for transport control. Free accounts get track info only.</p>
+    <p><b>foobar2000</b> &mdash; playlist browse with search, drill-in to tracks, every shuffle mode foobar supports (random, shuffle by track/album/folder, repeat playlist, repeat track), transport, album art, lyrics. Requires the <span style="color:var(--acc)">foo_beefweb</span> component.</p>
+
+    <h3><span class="tier-dot std"></span>Standard</h3>
+    <p><b>VLC</b> &mdash; transport, shuffle on/off, album art, lyrics. No library browse. Requires VLC&rsquo;s Web interface to be enabled with a password.</p>
+
+    <h3><span class="tier-dot basic"></span>Basic</h3>
+    <p><b>Now Playing</b> &mdash; reads whatever app is currently playing music on Windows (Spotify desktop, YouTube Music, Apple Music, Chrome/Edge tabs, etc.) via the system Media Controls. Transport works, but exact controls depend on what each source app supports &mdash; greyed-out buttons mean that app didn&rsquo;t expose that command. No browsing, no shuffle, no album art. Windows only.</p>
+
+    <h3>What about volume?</h3>
+    <p>Volume control isn&rsquo;t exposed by iKandy &mdash; use the source app or your system mixer.</p>
+
+    <h3>Which one should I use?</h3>
+    <p>If you have <b>Spotify Premium</b> or use <b>foobar2000</b>, pick those for the richest experience. If you mostly play music in a browser tab or another app, use <b>Now Playing</b>. <b>VLC</b> is best if you&rsquo;re playing local files in VLC specifically.</p>
+  </div>
+</div>
+
+<script>
+function openSourceHelp() { el('src-help-modal').classList.add('open'); }
+function closeSourceHelp() { el('src-help-modal').classList.remove('open'); }
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && el('src-help-modal')?.classList.contains('open')) closeSourceHelp();
+});
+</script>
 
 </body>
 </html>

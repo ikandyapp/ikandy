@@ -79,6 +79,22 @@
   }
   .nav-links a:hover { color: var(--gold); }
 
+  .beta-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 3px 7px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .15em;
+    color: var(--gold);
+    background: rgba(212,168,67,.08);
+    border: 1px solid rgba(212,168,67,.4);
+    border-radius: 3px;
+    vertical-align: 4px;
+    cursor: help;
+  }
+
   /* ── HERO ── */
   .hero {
     position: relative;
@@ -415,6 +431,21 @@
     display: block;
   }
 
+  .tier-pill {
+    display: inline-block;
+    padding: 4px 9px;
+    margin-bottom: 18px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    border: 1px solid;
+  }
+  .tier-pill.tier-full  { color: var(--green); border-color: rgba(29,185,84,.45); background: rgba(29,185,84,.08); }
+  .tier-pill.tier-std   { color: #ff6b35;     border-color: rgba(255,107,53,.45); background: rgba(255,107,53,.08); }
+  .tier-pill.tier-basic { color: var(--ice);  border-color: rgba(91,200,245,.45); background: rgba(91,200,245,.08); }
+
   .source-name {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 32px;
@@ -697,13 +728,226 @@
     cursor: default;
   }
   .dot:hover { transform: scale(1.25); border-color: rgba(255,255,255,.4); }
+
+  /* ── PLAIN-LANGUAGE EXPLAINER ── */
+  .explainer {
+    padding: 64px 48px;
+    background: linear-gradient(135deg, rgba(212,168,67,.06) 0%, rgba(91,200,245,.05) 100%);
+    border-top: 1px solid rgba(255,255,255,.08);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    text-align: center;
+  }
+  .explainer-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .explainer-line {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 16px 24px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(16px, 2vw, 22px);
+    color: var(--txt);
+    font-weight: 300;
+    line-height: 1.4;
+  }
+  .explainer-step strong {
+    color: var(--gold);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3em;
+    letter-spacing: .08em;
+    margin-right: 6px;
+  }
+  .explainer-arrow {
+    color: rgba(212,168,67,.5);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4em;
+  }
+  .explainer-blurb {
+    margin-top: 28px;
+    font-size: 14px;
+    color: var(--dim);
+    line-height: 1.7;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  @media (max-width: 700px) {
+    .explainer { padding: 48px 24px; }
+    .explainer-arrow { display: none; }
+    .explainer-line { flex-direction: column; gap: 14px; }
+  }
+
+  /* ── COMPATIBILITY STRIP ── */
+  .compat-strip {
+    padding: 56px 48px 64px;
+    background:
+      linear-gradient(180deg, rgba(4,4,10,.0) 0%, rgba(4,4,10,.6) 100%),
+      radial-gradient(ellipse at 30% 0%, rgba(0,120,215,.10), transparent 60%),
+      radial-gradient(ellipse at 70% 100%, rgba(212,168,67,.05), transparent 60%);
+    border-top: 1px solid rgba(255,255,255,.06);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+    position: relative;
+  }
+  .compat-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: auto 1px 1fr;
+    align-items: center;
+    gap: 48px;
+  }
+
+  /* "Built for Windows" badge */
+  .compat-windows {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+  }
+  .compat-win-mark {
+    width: 36px; height: 36px;
+    fill: #0078D7;
+  }
+  .compat-windows-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: .12em;
+    color: var(--txt);
+    line-height: 1;
+  }
+  .compat-windows-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .15em;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-top: 5px;
+  }
+
+  /* Vertical divider on desktop, horizontal on mobile */
+  .compat-inner::before {
+    content: '';
+    grid-column: 2;
+    grid-row: 1;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(180deg, transparent, rgba(255,255,255,.15), transparent);
+  }
+
+  /* Tier wrapper */
+  .compat-tier {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .compat-tier-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .2em;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+  .compat-tier-advanced .compat-tier-label::before {
+    content: '●';
+    color: var(--green);
+    margin-right: 6px;
+    text-shadow: 0 0 6px var(--green);
+  }
+  .compat-tier-rest .compat-tier-label::before {
+    content: '●';
+    color: var(--ice);
+    margin-right: 6px;
+  }
+
+  /* Icon row */
+  .compat-icons {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  .compat-icon {
+    --c: var(--txt);
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--c);
+    cursor: help;
+    opacity: .85;
+    transition: opacity .2s, transform .2s;
+  }
+  .compat-icon:hover { opacity: 1; transform: translateY(-2px); }
+  .compat-icon svg {
+    fill: currentColor;
+    display: block;
+  }
+  .compat-icon-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .12em;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  /* Big icons for advanced tier */
+  .compat-icons-lg .compat-icon svg { width: 38px; height: 38px; }
+  .compat-icons-lg .compat-icon-name { font-size: 10px; }
+
+  /* Small icons for everything-else tier */
+  .compat-icons-sm .compat-icon svg { width: 22px; height: 22px; }
+  .compat-icons-sm { gap: 18px; }
+
+  .compat-icon-more .compat-more-dots {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border: 1px dashed rgba(255,255,255,.3);
+    border-radius: 50%;
+    color: var(--dim);
+    font-size: 14px;
+    font-weight: 300;
+  }
+
+  .compat-rest-note {
+    font-size: 12px;
+    color: var(--dim);
+    line-height: 1.6;
+    margin-top: 6px;
+    max-width: 600px;
+  }
+  .compat-rest-note strong { color: var(--ice); font-weight: 500; }
+
+  @media (max-width: 900px) {
+    .compat-strip { padding: 40px 24px 48px; }
+    .compat-inner {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+    .compat-inner::before {
+      grid-column: 1;
+      grid-row: 2;
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.15), transparent);
+    }
+    .compat-windows { justify-content: center; }
+    .compat-icons { justify-content: center; gap: 18px; }
+    .compat-icons-sm { gap: 14px; }
+    .compat-tier-label { text-align: center; }
+    .compat-rest-note { text-align: center; margin-left: auto; margin-right: auto; }
+  }
 </style>
 </head>
 <body>
 
 <!-- NAV -->
 <nav>
-  <a href="#" class="nav-logo">IKANDY</a>
+  <a href="#" class="nav-logo">IKANDY <span class="beta-badge" title="IKANDY is in beta. Code-signing certificate is in verification — Windows may show a SmartScreen warning on first launch until that completes.">BETA</span></a>
   <ul class="nav-links">
     <li><a href="#features">Features</a></li>
     <li><a href="#watch">Watch</a></li>
@@ -722,13 +966,100 @@
   <div class="hero-content" style="padding: 0 48px 80px;">
     <div class="hero-eyebrow">🎵 Visual Music for Windows</div>
     <h1 class="hero-title">IKANDY</h1>
-    <p class="hero-sub">Your music, made visible. 350+ MilkDrop presets, 5 custom audio-reactive scenes, 12 real-time FX shaders, synced lyrics — all reacting to every beat.</p>
+    <p class="hero-sub">Play any song in any app. IKANDY turns the music into a moving picture &mdash; colors, light and shapes that dance with every beat. Like a music video, but for whatever you&rsquo;re already listening to.</p>
     <div class="hero-cta">
       <a href="#download" class="btn-primary pulse">
         ↓ Download Free
       </a>
       <a href="#watch" class="btn-secondary">▶ Watch Demo</a>
     </div>
+  </div>
+</section>
+
+<!-- COMPATIBILITY STRIP -->
+<section class="compat-strip">
+  <div class="compat-inner">
+
+    <!-- Windows badge -->
+    <div class="compat-windows">
+      <svg class="compat-win-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+      </svg>
+      <div class="compat-windows-text">
+        <div class="compat-windows-title">Built for Windows</div>
+        <div class="compat-windows-sub">10 / 11 &middot; Free &middot; Open source</div>
+      </div>
+    </div>
+
+    <!-- Advanced tier -->
+    <div class="compat-tier compat-tier-advanced">
+      <div class="compat-tier-label">Advanced features with</div>
+      <div class="compat-icons compat-icons-lg">
+        <span class="compat-icon" data-brand="Spotify" title="Spotify &mdash; full integration: playlists, search, shuffle modes, transport, art, lyrics" style="--c:#1DB954;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.56.3z"/></svg>
+          <span class="compat-icon-name">Spotify</span>
+        </span>
+        <span class="compat-icon" data-brand="foobar2000" title="foobar2000 &mdash; full integration: playlist browse, search, all shuffle modes, transport, art, lyrics" style="--c:#9b72cf;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v3H3zm0 6.5h18v3H3zm0 6.5h18v3H3z" opacity=".0"/><text x="12" y="16" text-anchor="middle" font-family="'Bebas Neue',sans-serif" font-size="9" font-weight="600" fill="currentColor" letter-spacing="0.5">foobar</text><text x="12" y="22" text-anchor="middle" font-family="'Bebas Neue',sans-serif" font-size="6" fill="currentColor" letter-spacing="1">2000</text></svg>
+          <span class="compat-icon-name">foobar2000</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Everything else tier -->
+    <div class="compat-tier compat-tier-rest">
+      <div class="compat-tier-label">Plus anything else playing on your PC</div>
+      <div class="compat-icons compat-icons-sm">
+        <span class="compat-icon" title="YouTube &amp; YouTube Music" style="--c:#FF0000;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          <span class="compat-icon-name">YouTube</span>
+        </span>
+        <span class="compat-icon" title="Apple Music" style="--c:#FA243C;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23.997 6.124c0-.738-.065-1.47-.24-2.19-.317-1.31-1.062-2.31-2.18-3.043C21.003.517 20.373.285 19.7.164c-.517-.093-1.038-.135-1.564-.15-.04-.003-.083-.01-.124-.013H5.988c-.152.01-.303.017-.455.026C4.786.07 4.043.15 3.32.398 2.024.842 1.044 1.6.46 2.846c-.36.766-.495 1.578-.502 2.41V18.74c.026.272.05.547.082.82.107.928.421 1.797.94 2.585.715 1.082 1.69 1.798 2.86 2.196.642.218 1.298.31 1.967.34h12.06c.276-.024.55-.046.825-.075.788-.084 1.55-.275 2.244-.69 1.39-.83 2.302-2.064 2.7-3.74.087-.378.135-.764.158-1.15.005-.054.013-.107.02-.16zm-7.022 7.572c-.296 1.255-1.243 2.135-2.566 2.43-.484.108-.97.158-1.46.158-.484 0-.97-.05-1.453-.158-1.323-.295-2.27-1.175-2.566-2.43-.135-.575-.158-1.166-.07-1.749.094-.616.358-1.15.756-1.604.49-.557 1.114-.875 1.847-.946.345-.034.69-.034 1.034 0 .344.034.683.099 1.013.196.073.022.142.054.207.097.115.077.18.187.18.323v6.69c0 .2-.062.366-.193.494-.13.128-.298.19-.504.19h-.013c-.205 0-.373-.062-.504-.19-.13-.128-.193-.295-.193-.494v-3.99c-.155.076-.32.13-.498.157-.49.075-.965.027-1.42-.137-.567-.205-.97-.59-1.207-1.157-.236-.566-.29-1.16-.165-1.78.13-.66.444-1.213.946-1.658.5-.444 1.097-.708 1.79-.79.354-.04.708-.04 1.063 0 .354.04.7.118 1.04.232.235.078.467.17.694.276.114.054.218.123.314.205.137.117.207.27.207.46v6.79c0 .2-.062.366-.193.494-.13.128-.298.19-.504.19h-.013zM12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0z" opacity=".0"/><path d="M19.05 6.473c-.038.014-.083.02-.13.02-.197 0-.353-.156-.353-.353V4.06c0-.196.156-.352.353-.352.197 0 .353.156.353.352V6.14c0 .142-.084.265-.223.333zM5.96 16.27c0 1.323 1.072 2.395 2.395 2.395s2.395-1.072 2.395-2.395-1.072-2.395-2.395-2.395-2.395 1.072-2.395 2.395zm10.91-1.66c0 1.323 1.072 2.395 2.395 2.395s2.394-1.072 2.394-2.395-1.073-2.395-2.395-2.395-2.394 1.072-2.394 2.395zM10.75 14.61V5.4c0-.273.197-.51.467-.555l9-1.5c.34-.057.66.205.66.555v8.165c0 .273-.197.51-.467.555l-9 1.5c-.34.057-.66-.205-.66-.555z"/></svg>
+          <span class="compat-icon-name">Apple Music</span>
+        </span>
+        <span class="compat-icon" title="Tidal" style="--c:#FFFFFF;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.012 3.992L8.008 7.996 4.004 3.992 0 7.996l4.004 4.004L8.008 7.996l4.004 4.008 4.004-4.008-4.004-4.004zm0 8.008l-4.004 4.004 4.004 4.004 4.004-4.004-4.004-4.004zm4.004-4.004L20.02 3.992l4.004 4.004-4.004 4.004z"/></svg>
+          <span class="compat-icon-name">Tidal</span>
+        </span>
+        <span class="compat-icon" title="VLC" style="--c:#FF8800;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.295 0l-1.642 4.054h4.694L12.705 0zm-3.273 7.643L4 17.757h16L15.978 7.643h-2.81l.701 1.737h-3.738l.701-1.737zM3 19v3.071A1.93 1.93 0 0 0 4.929 24H19.07A1.93 1.93 0 0 0 21 22.071V19z"/></svg>
+          <span class="compat-icon-name">VLC</span>
+        </span>
+        <span class="compat-icon" title="Chrome / browser tabs" style="--c:#4285F4;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 0C8.21 0 4.831 1.757 2.632 4.501l3.953 6.848A5.454 5.454 0 0 1 12 6.545h10.691A12 12 0 0 0 12 0zM1.931 5.47A11.943 11.943 0 0 0 0 12c0 6.012 4.42 10.991 10.189 11.864l3.953-6.847a5.45 5.45 0 0 1-6.865-2.29zm13.342 2.166a5.446 5.446 0 0 1 1.45 7.09l.002.001h-.002l-5.344 9.257c.206.01.413.016.621.016 6.627 0 12-5.373 12-12 0-1.54-.29-3.011-.818-4.364zM12 16.364a4.364 4.364 0 1 1 0-8.728 4.364 4.364 0 0 1 0 8.728Z"/></svg>
+          <span class="compat-icon-name">Chrome</span>
+        </span>
+        <span class="compat-icon" title="Microsoft Edge" style="--c:#0078D7;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.86 17.86q.14 0 .25.12.1.13.1.25.13.25-1.5 1.86-1.6 1.6-4.46 1.6t-4.95-1.71q-2.1-1.7-2.99-3.79-1.74 3.99-1.74 5.99 0 .25.12.61.13.36.13.61 0 .61-.36.61-.5 0-1.74-1.62-1.24-1.62-1.86-3.61-.61-2-.61-3.86 0-2.86 1.12-5.36 1.13-2.5 3.13-4.46 1.99-1.99 4.6-3.11Q9.86 0 13 0q4.86 0 7.97 2.86 3.11 2.86 3.11 7.07 0 4.21-3.27 7.07-3.26 2.86-7.86 2.86-2 0-3.5-.75-1.5-.74-2.5-2.21.5 1.86 1.99 3.07 1.5 1.21 3.71 1.21 1.61 0 2.86-.43 1.24-.43 1.74-.86.5-.43.86-.43z"/></svg>
+          <span class="compat-icon-name">Edge</span>
+        </span>
+        <span class="compat-icon" title="Firefox (with media.hardwaremediakeys.enabled flag)" style="--c:#FF7139;">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.616 5.043c.097.054.197.147.288.198a4.46 4.46 0 0 1 1.247 1.029c.832-.063 1.7-.054 2.51.21a3.83 3.83 0 0 0-1.61-.806 3.49 3.49 0 0 1 1.838-.183 3.92 3.92 0 0 0-2.13-.726c-.652-.014-1.3.13-1.901.408-.07.04-.179.054-.242-.13zM23.5 9.752a18.9 18.9 0 0 0-1.45-2.92 8.16 8.16 0 0 0-1.04-1.36 9.96 9.96 0 0 0-2.31-1.83l-.04-.18c.1-.18.21-.3.32-.34.51-.18.61-.45.32-.71-.39-.34-1.4-.53-2.61-.45-.34.02-.65.07-.93.14-.87-.55-1.84-.94-2.86-1.12-.4-.07-.81-.1-1.22-.1-1.94 0-3.85.66-5.42 1.93C5.05 3.87 4.43 4.45 3.95 5.13a13.8 13.8 0 0 0-2.18 4.71 12.43 12.43 0 0 0-.34 1.97c-.07.83-.1 1.65 0 2.48.06.69.18 1.4.4 2.06a11.9 11.9 0 0 0 2.55 4.31c1.17 1.21 2.55 2.13 4.06 2.71a13 13 0 0 0 2.79.66c.93.13 1.88.18 2.81.06 1.5-.18 2.95-.7 4.21-1.55a11.79 11.79 0 0 0 4.91-7.5c.27-1.46.27-3 .04-4.46-.16-.5-.3-.95-.5-1.4z"/></svg>
+          <span class="compat-icon-name">Firefox</span>
+        </span>
+        <span class="compat-icon compat-icon-more" title="Any app that publishes to Windows Media Controls">
+          <span class="compat-more-dots">+</span>
+          <span class="compat-icon-name">more</span>
+        </span>
+      </div>
+      <p class="compat-rest-note">Anything that publishes to Windows Media Controls works through the <strong>Now Playing</strong> source &mdash; no setup, no auth.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- WHAT IS IT — plain-language explainer -->
+<section class="explainer">
+  <div class="explainer-inner">
+    <p class="explainer-line">
+      <span class="explainer-step"><strong>1.</strong> Open Spotify, YouTube, or any other music app.</span>
+      <span class="explainer-arrow">→</span>
+      <span class="explainer-step"><strong>2.</strong> Open IKANDY and pick how it should listen.</span>
+      <span class="explainer-arrow">→</span>
+      <span class="explainer-step"><strong>3.</strong> Hit play. Watch your screen come alive.</span>
+    </p>
+    <p class="explainer-blurb">No editing. No syncing. IKANDY listens to the music you&rsquo;re already playing and paints it across your screen in real time &mdash; 350+ classic MilkDrop visuals, custom audio-reactive scenes, and cinematic FX overlays. Free, offline, no subscription.</p>
   </div>
 </section>
 
@@ -916,28 +1247,32 @@
   <div style="max-width:1200px;margin:0 auto;padding:120px 48px 48px;">
     <p class="section-tag">05 — Audio Sources</p>
     <h2>Four Ways<br>to Listen</h2>
-    <p class="lead">Connect whatever you're playing. IKANDY reacts to all of it.</p>
+    <p class="lead">Connect whatever you&rsquo;re playing. Each source offers a different feature set &mdash; richer integrations on top, simpler ones below.</p>
   </div>
   <div class="sources-grid">
     <div class="source-card" style="--c:var(--green);">
+      <span class="tier-pill tier-full">● Full features</span>
       <span class="source-icon">🎵</span>
       <div class="source-name">Spotify</div>
-      <p class="source-desc">Full Spotify integration with PKCE OAuth. Track info, album art, synced lyrics from LRCLIB, playlist browser, and playback controls. Requires Spotify Premium for controls.</p>
-    </div>
-    <div class="source-card" style="--c:#ff6b35;">
-      <span class="source-icon">📺</span>
-      <div class="source-name">VLC</div>
-      <p class="source-desc">Connect to VLC's web interface for full playback control. Play, pause, skip, stop, restart — all from IKANDY. Lyrics fetched automatically from LRCLIB.</p>
+      <p class="source-desc">Full Spotify integration with PKCE OAuth. Track info, album art, synced lyrics, playlist browser with search, and full playback control. Premium account required for transport &mdash; Free accounts get track info only.</p>
     </div>
     <div class="source-card" style="--c:#9b72cf;">
+      <span class="tier-pill tier-full">● Full features</span>
       <span class="source-icon">🎧</span>
       <div class="source-name">foobar2000</div>
-      <p class="source-desc">Connects via the Beefweb plugin for full transport control — play, pause, skip, volume — with track info and album art. The audiophile's player, now with iKandy reacting to every track.</p>
+      <p class="source-desc">Connects via the foo_beefweb component for the full experience &mdash; playlist browse with search, every shuffle mode foobar supports, transport, album art, lyrics. The audiophile&rsquo;s player, fully integrated.</p>
+    </div>
+    <div class="source-card" style="--c:#ff6b35;">
+      <span class="tier-pill tier-std">● Standard</span>
+      <span class="source-icon">📺</span>
+      <div class="source-name">VLC</div>
+      <p class="source-desc">Connect to VLC&rsquo;s web interface for transport &mdash; play, pause, skip, shuffle on/off &mdash; with album art and synced lyrics. No library browse.</p>
     </div>
     <div class="source-card" style="--c:var(--ice);">
+      <span class="tier-pill tier-basic">● Basic</span>
       <span class="source-icon">🎙️</span>
-      <div class="source-name">Local</div>
-      <p class="source-desc">Capture any system audio — browser, game, streaming app, anything. IKANDY reacts to whatever's playing on your computer without needing a specific app.</p>
+      <div class="source-name">Now Playing</div>
+      <p class="source-desc">Reads whatever app is currently playing music on Windows &mdash; Spotify desktop, YouTube Music, Apple Music, browser tabs, anything that publishes to Windows Media Controls. Transport works (subject to what each source app supports). No browse, no shuffle, no album art.</p>
     </div>
   </div>
 </section>
@@ -996,8 +1331,8 @@
     </a>
   </div>
   <p class="download-note">
-    ~75MB · You'll need your own free <a href="https://developer.spotify.com/dashboard" target="_blank">Spotify Client ID</a> for Spotify features.<br>
-    Windows SmartScreen may warn on first run — click <strong>More info → Run anyway</strong>. App is safe and open source.
+    ~75MB · Currently in <strong style="color:var(--gold);">BETA</strong> &mdash; the code-signing certificate is in verification, so Windows SmartScreen will warn on first run. Click <strong>More info → Run anyway</strong>. Once the certificate is issued the warning will go away. IKANDY is open source &mdash; you can read every line on GitHub.<br>
+    You&rsquo;ll need your own free <a href="https://developer.spotify.com/dashboard" target="_blank">Spotify Client ID</a> for Spotify features.
   </p>
   <div style="margin-top:48px;display:flex;gap:24px;justify-content:center;flex-wrap:wrap;">
     <a href="guide.html" style="font-family:'Space Mono',monospace;font-size:11px;color:var(--dim);text-decoration:none;letter-spacing:.1em;text-transform:uppercase;transition:color .2s;" onmouseover="this.style.color='#d4a843'" onmouseout="this.style.color=''">
@@ -1014,7 +1349,7 @@
 
 <!-- FOOTER -->
 <footer>
-  <div class="footer-logo">IKANDY</div>
+  <div class="footer-logo">IKANDY <span class="beta-badge" style="font-size:8px;vertical-align:5px;">BETA</span></div>
   <ul class="footer-links">
     <li><a href="guide.html">User Guide</a></li>
     <li><a href="https://github.com/IKANDYapp/IKANDY" target="_blank">GitHub</a></li>

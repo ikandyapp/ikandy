@@ -27,9 +27,17 @@ contextBridge.exposeInMainWorld('IKANDY', {
   saveThumb:     (name, dataUrl) => ipcRenderer.invoke('preset-thumb-save', { name, dataUrl }),
   clearThumbs:   ()              => ipcRenderer.invoke('preset-thumb-clear'),
 
+  // Broken-preset persistence (presets that crash butterchurn — never replay)
+  loadBrokenPresets:  ()      => ipcRenderer.invoke('broken-presets-load'),
+  addBrokenPreset:    (name)  => ipcRenderer.invoke('broken-presets-add', name),
+  clearBrokenPresets: ()      => ipcRenderer.invoke('broken-presets-clear'),
+
   // Playlists
   getPlaylists: ()     => ipcRenderer.invoke('get-playlists'),
   playPlaylist: (uri)  => ipcRenderer.invoke('play-playlist', uri),
+
+  // Shuffle (routes to active source). Accepts a mode string per source.
+  setShuffle:   (mode) => ipcRenderer.invoke('set-shuffle', mode),
 
   // Source mode
   getSource:    ()     => ipcRenderer.invoke('get-source'),
@@ -40,8 +48,15 @@ contextBridge.exposeInMainWorld('IKANDY', {
   setFoobarConfig: (cfg) => ipcRenderer.invoke('set-foobar-config', cfg),
   foobarTest:      ()    => ipcRenderer.invoke('foobar-test'),
   foobarAction:    (cmd) => ipcRenderer.invoke('foobar-action', cmd),
-  getFoobarPlaylists: () => ipcRenderer.invoke('get-foobar-playlists'),
-  playFoobarPlaylist: (id) => ipcRenderer.invoke('play-foobar-playlist', id),
+  // SMTC ("Now Playing" — Windows only)
+  smtcAction:      (cmd) => {
+    const payload = typeof cmd === 'string' ? { type: cmd } : cmd;
+    return ipcRenderer.invoke('smtc-action', payload);
+  },
+  getFoobarPlaylists:       ()                      => ipcRenderer.invoke('get-foobar-playlists'),
+  getFoobarPlaylistTracks:  (id)                    => ipcRenderer.invoke('get-foobar-playlist-tracks', id),
+  playFoobarPlaylist:       (id)                    => ipcRenderer.invoke('play-foobar-playlist', id),
+  playFoobarTrack:          (playlistId, index)     => ipcRenderer.invoke('play-foobar-track', { playlistId, index }),
 
   // Playback action - string or object
   action: (cmd) => {
@@ -54,6 +69,8 @@ contextBridge.exposeInMainWorld('IKANDY', {
   onSpotifyState: (cb) => { ipcRenderer.removeAllListeners('spotify-state'); ipcRenderer.on('spotify-state', (_e, d) => cb(d)); },
   onLyrics:       (cb) => { ipcRenderer.removeAllListeners('lyrics');        ipcRenderer.on('lyrics',        (_e, d) => cb(d)); },
   onUpdateStatus: (cb) => { ipcRenderer.removeAllListeners('update-status'); ipcRenderer.on('update-status', (_e, d) => cb(d)); },
+  onUpdateAvailable: (cb) => { ipcRenderer.removeAllListeners('update-available'); ipcRenderer.on('update-available', (_e, d) => cb(d)); },
+  openExternal:  (url) => ipcRenderer.invoke('open-external', url),
   installUpdate:  ()   => ipcRenderer.send('update-install'),
 
   platform:      process.platform,

@@ -82,6 +82,22 @@
   .nav-links a.home-link { color: var(--gold); }
   .nav-links a.home-link:hover { color: #fff; }
 
+  .beta-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 3px 7px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .15em;
+    color: var(--gold);
+    background: rgba(212,168,67,.08);
+    border: 1px solid rgba(212,168,67,.4);
+    border-radius: 3px;
+    vertical-align: 4px;
+    cursor: help;
+  }
+
   /* ── PAGE HEADER (compact, not full-screen) ── */
   .page-header {
     padding: 180px 48px 80px;
@@ -691,7 +707,7 @@
 
 <!-- NAV -->
 <nav>
-  <a href="index.html" class="nav-logo">IKANDY</a>
+  <a href="index.html" class="nav-logo">IKANDY <span class="beta-badge" title="IKANDY is in beta. Code-signing certificate is in verification — Windows may show a SmartScreen warning on first launch until that completes.">BETA</span></a>
   <ul class="nav-links">
     <li><a href="#sources">Sources</a></li>
     <li><a href="#presets">Presets</a></li>
@@ -705,7 +721,7 @@
 <header class="page-header">
   <p class="page-eyebrow">📖 The Manual</p>
   <h1 class="page-title">User Guide</h1>
-  <p class="page-sub">Everything you need to get IKANDY set up and running. Audio sources, presets, custom scenes, FX shaders, lyrics, troubleshooting — covered end to end. Written for the casual listener, not the power user.</p>
+  <p class="page-sub"><strong style="color:var(--txt);">IKANDY paints your music.</strong> Press play in any music app and watch your screen come alive &mdash; colors, light and shapes that move with every beat. This guide walks you through everything: getting IKANDY installed, picking a music source, choosing presets and scenes, adding FX, and what to do when things misbehave.</p>
 </header>
 
 <!-- TOC -->
@@ -739,8 +755,8 @@
   </ol>
 
   <div class="callout warn">
-    <span class="callout-label">SmartScreen</span>
-    Windows may show <em>"Windows protected your PC"</em> on first run. The Certum code-signing certificate is in verification — once active, this warning will go away. For now, click <strong>More info → Run anyway</strong>. The app is open source and the full code lives at github.com/IKANDYapp/IKANDY.
+    <span class="callout-label">SmartScreen on first run</span>
+    Windows will show <em>"Windows protected your PC"</em> on the very first launch. This is because IKANDY is in beta and the Certum code-signing certificate is still in verification. Click <strong>More info → Run anyway</strong>. Once the certificate is issued, the warning disappears for everyone. The full source code is public at github.com/IKANDYapp/IKANDY.
   </div>
 
   <h3>What you'll see</h3>
@@ -748,7 +764,7 @@
 
   <div class="callout tip">
     <span class="callout-label">First-time tip</span>
-    If you just want to see something move, choose <strong>Local</strong> and play any audio on your computer. No setup, no auth — IKANDY listens to system audio and starts reacting immediately.
+    The fastest path to seeing IKANDY work: start playing music in any app on your computer (Spotify, YouTube, anything), then in IKANDY pick <strong>Now Playing</strong> as the source. No setup, no auth &mdash; IKANDY listens to whatever Windows is currently playing and starts reacting immediately.
   </div>
 </section>
 
@@ -781,7 +797,7 @@
   </div>
 
   <h3>Top bar</h3>
-  <p class="body">The top bar is your nerve centre. The IKANDY logo sits left, with a status badge showing which source is connected. The source selector lets you switch between Spotify, VLC, foobar2000 and Local at any time. The hide button on the right collapses both sidebars for a clean fullscreen view.</p>
+  <p class="body">The top bar is your nerve centre. The IKANDY logo sits left, with a status badge showing which source is connected. The source selector lets you switch between <strong>Spotify</strong>, <strong>foobar2000</strong>, <strong>VLC</strong> and <strong>Now Playing</strong> at any time. The hide button on the right collapses both sidebars for a clean fullscreen view.</p>
 
   <h3>Right sidebar — accordions</h3>
   <p class="body">Click any accordion header to expand or collapse it. The <strong>⊞ All</strong> button at the top expands or collapses every section at once. The four sections are:</p>
@@ -802,16 +818,21 @@
 <section id="sources">
   <p class="section-tag">03 — Audio Sources</p>
   <h2>Connect<br>Your Music</h2>
-  <p class="lead">IKANDY reacts to four audio sources. Pick whichever one matches what you're already using — they're all interchangeable, and switching between them automatically stops the previous one so you don't get two streams playing at once.</p>
+  <p class="lead">IKANDY can connect to four different sources. Each one offers a different feature set depending on what its underlying API exposes. Switching between them automatically pauses the previous one so you don&rsquo;t get two streams playing at once.</p>
+
+  <div class="callout tip" style="margin-bottom:48px;">
+    <span class="callout-label">Tier guide</span>
+    <strong style="color:var(--green);">Full features</strong> &mdash; the richest experience. Playlist browse, search, every shuffle mode, transport, art, lyrics. <strong style="color:#ff6b35;">Standard</strong> &mdash; transport, shuffle on/off, art, lyrics. No library browse. <strong style="color:var(--ice);">Basic</strong> &mdash; transport only, depending on what the source app supports. No browse, no shuffle, no art.
+  </div>
 
   <!-- SPOTIFY -->
   <div class="source-block" style="--c:var(--green);">
     <div class="source-block-head">
       <span class="source-block-icon">🎵</span>
       <span class="source-block-name">Spotify</span>
-      <span class="source-block-meta">BYOK · OAuth · Premium for controls</span>
+      <span class="source-block-meta" style="color:var(--green);">● Full features &middot; Premium recommended</span>
     </div>
-    <p class="body dim">Full Spotify integration. Track info, album art, synced lyrics, playlist browser, and playback controls (Premium only). IKANDY uses <em>Bring Your Own Key</em> auth — you create a free Spotify Developer app and paste the Client ID once. It's saved encrypted on your machine via Windows DPAPI and never leaves your computer.</p>
+    <p class="body dim">The richest integration. Track info, album art, synced lyrics, playlist browser with search, drill-in to tracks, and full transport &mdash; play, pause, skip, shuffle modes (including Smart Shuffle detection), all the way down. IKANDY uses <em>Bring Your Own Key</em> auth: you create a free Spotify Developer app and paste the Client ID once. It&rsquo;s saved encrypted on your machine via Windows DPAPI and never leaves your computer.</p>
 
     <h3 class="first">One-time setup</h3>
     <ol class="steps">
@@ -829,8 +850,33 @@
     </div>
 
     <div class="callout warn">
-      <span class="callout-label">Premium required for controls</span>
-      Spotify's API only allows playback control (play, pause, skip, volume) for Premium subscribers. Free accounts will see track info, album art, and lyrics, but the playback buttons will be greyed out.
+      <span class="callout-label">Premium required for transport</span>
+      Spotify's Web API only allows playback control (play, pause, skip, shuffle) for Premium subscribers. Free accounts will see track info, album art, and lyrics, but the playback buttons will be greyed out. <strong>It works with both Spotify desktop AND the web player</strong> &mdash; whichever Spotify Connect device is active will follow IKANDY&rsquo;s commands.
+    </div>
+  </div>
+
+  <!-- FOOBAR -->
+  <div class="source-block" style="--c:#9b72cf;">
+    <div class="source-block-head">
+      <span class="source-block-icon">🎧</span>
+      <span class="source-block-name">foobar2000</span>
+      <span class="source-block-meta" style="color:var(--green);">● Full features &middot; Beefweb plugin</span>
+    </div>
+    <p class="body dim">For the audiophile crowd. Connects to foobar2000 via the <strong>foo_beefweb</strong> component &mdash; a clean REST/JSON API that exposes the full library. Playlist browse with search, drill-in to tracks, every shuffle mode foobar supports (random, shuffle by track/album/folder, repeat playlist, repeat track), transport, album art, lyrics. The most feature-complete source IKANDY supports.</p>
+
+    <h3 class="first">One-time setup</h3>
+    <ol class="steps">
+      <li>Download and install the <strong>foo_beefweb</strong> component from <code>github.com/hyperblast/beefweb/releases</code>.</li>
+      <li>Open foobar2000. Go to <strong>File → Preferences → Tools → Beefweb Remote Control</strong>.</li>
+      <li>Tick <strong>Enable HTTP server</strong>. The default port is <code>8880</code>.</li>
+      <li>Optionally set a password under <strong>Authentication</strong> if you want to require one.</li>
+      <li>Click Apply, then OK.</li>
+      <li>In IKANDY, choose <strong>foobar2000</strong>, leave port at <code>8880</code> (or change to match), enter the password if set, and click <strong>Connect</strong>.</li>
+    </ol>
+
+    <div class="callout tip">
+      <span class="callout-label">Why Beefweb</span>
+      Beefweb is the modern, actively-maintained way to control foobar2000 over HTTP. It supports album art, playlists, search, and every shuffle/repeat mode foobar offers natively.
     </div>
   </div>
 
@@ -839,9 +885,9 @@
     <div class="source-block-head">
       <span class="source-block-icon">📺</span>
       <span class="source-block-name">VLC</span>
-      <span class="source-block-meta">Local HTTP · Full transport</span>
+      <span class="source-block-meta" style="color:#ff6b35;">● Standard &middot; Local HTTP</span>
     </div>
-    <p class="body dim">Connects to VLC's built-in web interface for full playback control over local files. Lyrics fetched automatically from LRCLIB based on the playing track's metadata.</p>
+    <p class="body dim">Connects to VLC&rsquo;s built-in web interface for transport control over local files &mdash; play, pause, skip, shuffle on/off, album art, synced lyrics. No library browse: VLC&rsquo;s playlist API isn&rsquo;t expressive enough for IKANDY&rsquo;s drill-in browser, so you control playback in IKANDY but pick what to play in VLC itself.</p>
 
     <h3 class="first">One-time setup</h3>
     <ol class="steps">
@@ -857,57 +903,42 @@
       <span class="callout-label">Custom port</span>
       If port 8080 is taken on your system, you can change it in the same VLC preferences pane. Just match it in IKANDY's VLC settings.
     </div>
-  </div>
 
-  <!-- FOOBAR -->
-  <div class="source-block" style="--c:#9b72cf;">
-    <div class="source-block-head">
-      <span class="source-block-icon">🎧</span>
-      <span class="source-block-name">foobar2000</span>
-      <span class="source-block-meta">Beefweb plugin · REST API</span>
-    </div>
-    <p class="body dim">For the audiophile crowd. Connects to foobar2000 via the <strong>foo_beefweb</strong> plugin — a clean REST/JSON API that exposes playback state, transport controls, and album art.</p>
-
-    <h3 class="first">One-time setup</h3>
-    <ol class="steps">
-      <li>Download and install the <strong>foo_beefweb</strong> component from <code>github.com/hyperblast/beefweb/releases</code>.</li>
-      <li>Open foobar2000. Go to <strong>File → Preferences → Tools → Beefweb Remote Control</strong>.</li>
-      <li>Tick <strong>Enable HTTP server</strong>. The default port is <code>8880</code>.</li>
-      <li>Optionally set a password under <strong>Authentication</strong> if you want to require one.</li>
-      <li>Click Apply, then OK.</li>
-      <li>In IKANDY, choose <strong>foobar2000</strong>, leave port at <code>8880</code> (or change to match), enter the password if set, and click <strong>Connect</strong>.</li>
-    </ol>
-
-    <div class="callout tip">
-      <span class="callout-label">Why Beefweb</span>
-      Beefweb is the modern, actively-maintained way to control foobar2000 over HTTP. It supports album art, playlists, search, and works exactly like the VLC HTTP interface from IKANDY's perspective.
+    <div class="callout">
+      <span class="callout-label">Heads up</span>
+      If you mostly play music in a browser tab or in any other app besides VLC, <strong>Now Playing</strong> covers all of that without needing the VLC web interface set up. VLC&rsquo;s dedicated source is most useful when you specifically use VLC as your music player.
     </div>
   </div>
 
-  <!-- LOCAL -->
+  <!-- NOW PLAYING (was: LOCAL) -->
   <div class="source-block" style="--c:var(--ice);">
     <div class="source-block-head">
       <span class="source-block-icon">🎙️</span>
-      <span class="source-block-name">Local</span>
-      <span class="source-block-meta">System audio · Zero setup</span>
+      <span class="source-block-name">Now Playing</span>
+      <span class="source-block-meta" style="color:var(--ice);">● Basic &middot; Windows Media Controls &middot; Zero setup</span>
     </div>
-    <p class="body dim">The fallback that catches everything. Local mode captures your computer's playing audio — browser tabs, games, streaming apps, anything that makes sound — and reacts to it. No app integration needed.</p>
+    <p class="body dim">The catch-all. Reads whatever app is currently playing music on Windows &mdash; Spotify desktop, Spotify Web Player, YouTube Music, Apple Music, browser tabs (Chrome, Edge), Tidal, anything that publishes to Windows Media Controls. Track info shows up automatically; transport controls (play, pause, next, previous) work on whatever app is the current SMTC owner. No browse, no shuffle, no album art.</p>
 
     <h3 class="first">How to use it</h3>
     <ol class="steps">
-      <li>Open IKANDY's source selector and pick <strong>Local</strong>.</li>
-      <li>Play audio anywhere on your computer.</li>
-      <li>That's it. The visuals will react.</li>
+      <li>Start playing music in any app on your computer.</li>
+      <li>In IKANDY, open the source selector and pick <strong>Now Playing</strong>.</li>
+      <li>Within a second, the track info and transport controls light up. Hit play/pause/next/prev in IKANDY to control whatever app is playing.</li>
     </ol>
 
-    <div class="callout warn">
-      <span class="callout-label">Stereo Mix may be required</span>
-      On some Windows setups you need to enable <strong>Stereo Mix</strong> as a recording device for system audio capture to work. Right-click the speaker icon in your system tray → <strong>Sounds → Recording</strong> tab → right-click empty space → <strong>Show Disabled Devices</strong> → enable <strong>Stereo Mix</strong>.
+    <div class="callout tip">
+      <span class="callout-label">What works depends on the app</span>
+      IKANDY dynamically shows or greys out individual transport buttons based on what the current source app supports. A YouTube single video may not expose Next/Previous, so those buttons grey out. A YouTube Mix or Spotify playlist will light them up. Hover any greyed-out button to see why it&rsquo;s locked.
     </div>
 
     <div class="callout warn">
-      <span class="callout-label">Microphone privacy permission</span>
-      Even though IKANDY captures system audio (not your mic), Windows treats it the same way for privacy purposes. If you see <em>"Could not start audio source"</em>, go to <strong>Settings → Privacy &amp; security → Microphone</strong> and make sure <strong>Let desktop apps access your microphone</strong> is on.
+      <span class="callout-label">Firefox needs a flag</span>
+      Chrome and Edge bridge HTML5 Media Session to Windows Media Controls automatically. Firefox doesn&rsquo;t by default &mdash; if you use Firefox, open <code>about:config</code>, search <code>media.hardwaremediakeys.enabled</code>, set it to <strong>true</strong>, and restart Firefox.
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-label">Windows only</span>
+      Now Playing relies on Windows Media Controls, which are part of Windows itself. The source isn&rsquo;t available on macOS or Linux.
     </div>
   </div>
 </section>
@@ -1068,7 +1099,8 @@
     <li><strong>Drop visualizer opacity to spotlight scenes or backgrounds.</strong> The Butterchurn preset can fade to 30–50% to let a background image or scene breathe through.</li>
     <li><strong>Auto-cycle works while you're doing other things.</strong> Leave IKANDY running on a second monitor with auto-cycle on and forget about it — the show keeps changing.</li>
     <li><strong>Custom preset folder + your own .milk files.</strong> Decades of MilkDrop archive content still works. Drop a folder of <code>.milk</code> files into the custom preset path and they'll be merged into the browser.</li>
-    <li><strong>Different sources, different lyrics.</strong> Spotify ships its own track metadata; VLC and foobar2000 use the file's tags; Local mode has no track context, so no lyrics. If lyrics aren't loading, check that the metadata is correct on the playing source.</li>
+    <li><strong>Different sources, different lyrics.</strong> Spotify ships its own track metadata; foobar2000 and VLC use the file's tags; Now Playing reads whatever the source app reports to Windows. As long as title and artist are correct, lyrics fetch automatically. If lyrics aren&rsquo;t loading, double-check the metadata on the playing source.</li>
+    <li><strong>Volume control lives in the source app.</strong> IKANDY doesn&rsquo;t adjust volume directly &mdash; use the source app&rsquo;s own volume, or your Windows volume mixer. The volume slider in IKANDY is locked across all sources.</li>
     <li><strong>For recording or streaming.</strong> Classic lyric mode + a clean scene like Spectrum + a Holo or Plasma shader gives you a polished look that reads well on video.</li>
   </ul>
 </section>
@@ -1082,11 +1114,32 @@
   <div style="margin-top:32px;">
 
     <details class="tr">
-      <summary>"Could not start audio source"</summary>
+      <summary>Now Playing says "Nothing is playing"</summary>
       <div class="tr-body">
-        <p>Almost always a Windows privacy permission. Even though IKANDY captures system audio (not your mic), Windows treats it the same way.</p>
-        <p><strong>Fix:</strong> Go to <strong>Settings → Privacy &amp; security → Microphone</strong> and toggle <strong>Let desktop apps access your microphone</strong> on. Restart IKANDY.</p>
-        <p>If that doesn't fix it, enable <strong>Stereo Mix</strong>: right-click the speaker icon in your tray → <strong>Sounds → Recording</strong> tab → right-click empty space → <strong>Show Disabled Devices</strong> → right-click <strong>Stereo Mix</strong> → <strong>Enable</strong>. Then set Stereo Mix as the default device.</p>
+        <p>This means Windows reports no app is currently registered as the SMTC (Windows Media Controls) owner. To fix, simply <strong>start playing music in any app</strong> (Spotify, YouTube tab, Apple Music, etc.) and the message will disappear within a second.</p>
+        <p>If music is playing and Now Playing still doesn&rsquo;t see it, the source app probably isn&rsquo;t publishing to SMTC:</p>
+        <ul style="margin-top:8px;">
+          <li><strong>Firefox</strong> &mdash; doesn&rsquo;t bridge to SMTC by default. Open <code>about:config</code>, set <code>media.hardwaremediakeys.enabled</code> to <strong>true</strong>, restart Firefox.</li>
+          <li><strong>Chrome / Edge</strong> &mdash; usually works automatically. If not, check <code>chrome://flags</code> for <em>Hardware Media Key Handling</em> and set it to <strong>Enabled</strong>.</li>
+          <li><strong>Apple Music for Windows</strong> &mdash; can be inconsistent. Try pausing/resuming, or use the dedicated Spotify or foobar source instead if Apple Music is your main player.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="tr">
+      <summary>Now Playing controls grey out / Next or Previous don't work</summary>
+      <div class="tr-body">
+        <p>This is by design. IKANDY queries the active source app for which transport commands it actually exposes &mdash; some apps (single YouTube videos, some podcasts) don&rsquo;t advertise Next or Previous, so IKANDY locks those buttons to be honest about what works.</p>
+        <p>Hover any greyed-out button to see the reason in the tooltip. If you want full transport, try a YouTube <strong>Mix</strong> or <strong>playlist</strong> URL, or use Spotify Web Player / Spotify desktop &mdash; those expose every transport command.</p>
+      </div>
+    </details>
+
+    <details class="tr">
+      <summary>"Could not start audio source" / no audio reactivity</summary>
+      <div class="tr-body">
+        <p>Even though IKANDY captures system audio (not your microphone), Windows treats them the same way for privacy purposes.</p>
+        <p><strong>Fix:</strong> go to <strong>Settings → Privacy &amp; security → Microphone</strong> and toggle <strong>Let desktop apps access your microphone</strong> on. Restart IKANDY.</p>
+        <p>If that doesn&rsquo;t help, click <strong>🎤 Reconnect System Audio</strong> in the Source panel to re-grab the loopback stream.</p>
       </div>
     </details>
 
@@ -1094,7 +1147,8 @@
       <summary>Spotify playback controls are greyed out</summary>
       <div class="tr-body">
         <p>Spotify only allows external playback control for <strong>Premium</strong> subscribers — this is a Spotify API restriction, not an IKANDY one.</p>
-        <p>If you're on a Free account you'll still get track info, album art, and synced lyrics, but the play/pause/skip buttons will stay locked. Track info, lyrics, and visuals all still work normally.</p>
+        <p>If you&rsquo;re on a Free account you&rsquo;ll still get track info, album art, and synced lyrics, but the play/pause/skip buttons will stay locked. Track info, lyrics, and visuals all still work normally.</p>
+        <p><strong>Premium users:</strong> the dedicated Spotify source works whether you&rsquo;re playing in Spotify desktop, Spotify Web Player, mobile, or a Spotify Connect speaker &mdash; whichever device is the active Connect target gets IKANDY&rsquo;s commands.</p>
       </div>
     </details>
 
@@ -1127,8 +1181,8 @@
     <details class="tr">
       <summary>SmartScreen blocks the installer</summary>
       <div class="tr-body">
-        <p><em>"Windows protected your PC"</em> — this happens because the code-signing certificate is still in verification. The app is safe and the source is public on GitHub.</p>
-        <p><strong>Fix:</strong> click <strong>More info</strong>, then <strong>Run anyway</strong>. Once the Certum cert clears verification, future builds will be signed and the warning will disappear.</p>
+        <p><em>"Windows protected your PC"</em> &mdash; this happens because IKANDY is in beta and the Certum code-signing certificate is still in verification.</p>
+        <p><strong>Fix:</strong> click <strong>More info</strong>, then <strong>Run anyway</strong>. The app is open source and the source is public on GitHub. Once the certificate is issued, future builds will be signed automatically and SmartScreen will stop warning everyone.</p>
       </div>
     </details>
 
@@ -1136,8 +1190,23 @@
       <summary>Visuals don't react to my music</summary>
       <div class="tr-body">
         <p>Confirm the source is actually connected — the status badge in the top bar should show the source name (e.g. "Spotify") and a green dot.</p>
-        <p>If you're on Local and music is playing but nothing reacts, the audio isn't reaching IKANDY. Check Windows mic permissions (above) and Stereo Mix.</p>
-        <p>If you're on Spotify/VLC/foobar but the visuals are static, the audio API is feeding metadata but not the live audio stream — IKANDY currently uses Local-style capture for live audio reactivity even when a different source is connected for track info. Confirm system audio is reaching the app.</p>
+        <p>Visuals react to <strong>system audio</strong> regardless of which source you&rsquo;ve picked for track info. If music is playing but the visualizer is static, audio isn&rsquo;t reaching IKANDY. Click <strong>🎤 Reconnect System Audio</strong> in the Source panel, and check Windows microphone permissions (Settings → Privacy &amp; security → Microphone → Let desktop apps access your microphone).</p>
+      </div>
+    </details>
+
+    <details class="tr">
+      <summary>I have 5.1 or 7.1 surround sound and the visuals barely move</summary>
+      <div class="tr-body">
+        <p>IKANDY captures system audio as a stereo (2-channel) loopback stream. If your output device is configured for <strong>5.1 or 7.1 surround</strong>, Windows mixes most of the music into the rear/centre/sub channels, leaving the front L/R that IKANDY captures very quiet &mdash; so the visualizer barely reacts even though music is loud.</p>
+        <p><strong>Fix:</strong> set your default output to <strong>Stereo (2 channel)</strong>:</p>
+        <ol style="margin-top:8px;list-style-position:inside;">
+          <li>Right-click the speaker icon in the system tray → <strong>Sounds</strong>.</li>
+          <li>Open the <strong>Playback</strong> tab, right-click your active output device (speakers/headphones) → <strong>Configure Speakers</strong>.</li>
+          <li>Choose <strong>Stereo</strong>, click <strong>Next</strong> through the wizard, then <strong>Finish</strong>.</li>
+          <li>Back in the Playback tab, right-click the same device → <strong>Properties → Advanced</strong>, and pick a 2-channel format (e.g. <em>16 bit, 48000 Hz</em>) from the <strong>Default Format</strong> dropdown.</li>
+          <li>Click Apply, then in IKANDY hit <strong>🎤 Reconnect System Audio</strong>.</li>
+        </ol>
+        <p style="margin-top:10px;">Switch back to surround any time &mdash; the setting is just for IKANDY&rsquo;s capture. Some users keep stereo as the default and only switch to surround for movies; others toggle as needed.</p>
       </div>
     </details>
 
@@ -1187,7 +1256,7 @@
 
 <!-- FOOTER -->
 <footer>
-  <div class="footer-logo">IKANDY</div>
+  <div class="footer-logo">IKANDY <span class="beta-badge" style="font-size:8px;vertical-align:5px;">BETA</span></div>
   <ul class="footer-links">
     <li><a href="index.html">Home</a></li>
     <li><a href="https://github.com/IKANDYapp/IKANDY" target="_blank">GitHub</a></li>
