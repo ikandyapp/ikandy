@@ -2789,6 +2789,99 @@ function initButterchurn() {
   visualizer.connectAudio(analyserNode);
 }
 
+/* ── Stereo-Mix fallback ────────────────────────────────────────────────
+   Some Realtek/multi-channel setups (ALC897 in 5.1/7.1, Creative X-Fi in
+   surround mode, etc.) cause Chromium's getDisplayMedia({audio:'loopback'})
+   path to fail to negotiate the audio format with the WDM driver. The
+   error surfaces as "Could not start audio source" or an empty error.
+   Audacity / ProjectM / etc. work because they bypass the loopback path.
+   Fix: if loopback fails, capture the OS Stereo Mix / Wave Out Mix /
+   "What U Hear" device directly via getUserMedia — that uses the standard
+   capture path, which doesn't hit the loopback-format negotiation bug. ── */
+const _LOOPBACK_LABEL_PATTERNS = [
+  /stereo\s*mix/i,        // Realtek (en)
+  /stereomix/i,
+  /wave\s*out\s*mix/i,    // SigmaTel / older
+  /what\s*u\s*hear/i,     // Creative X-Fi / Sound Blaster
+  /audio\s*mixer/i,
+  /\bloopback\b/i,
+  /rec\.?\s*playback/i,
+  /missaggio\s+stereo/i,  // Italian Realtek
+  /mixage\s+st(é|e)r(é|e)o/i, // French Realtek
+  /stereomischung/i,      // German Realtek
+  /mezcla\s+est(é|e)reo/i,    // Spanish Realtek
+];
+const _MIC_LABEL_PATTERNS = [
+  /\bmicrophone\b/i, /\bmic\b/i, /\bmikrofon/i, /\bmicro\b/i,
+  /headset/i, /webcam/i, /camera/i, /line\s*in/i,
+];
+
+async function _enumerateInputsWithLabels() {
+  // Labels in enumerateDevices are hidden until the page has been granted
+  // a media permission. Try to seed permission with a throwaway getUserMedia
+  // if labels come back empty.
+  let devs = await navigator.mediaDevices.enumerateDevices();
+  let inputs = devs.filter(d => d.kind === 'audioinput');
+  const labelsHidden = inputs.length > 0 && inputs.every(d => !d.label);
+  if (labelsHidden) {
+    try {
+      const seed = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      seed.getTracks().forEach(t => t.stop());
+      devs = await navigator.mediaDevices.enumerateDevices();
+      inputs = devs.filter(d => d.kind === 'audioinput');
+    } catch(_) { /* permission denied — proceed with unlabelled list */ }
+  }
+  return inputs;
+}
+
+async function tryStereoMixFallback() {
+  try {
+    const inputs = await _enumerateInputsWithLabels();
+    const labels = inputs.map(d => d.label || '(no-label)');
+    console.log('[IKANDY] Audio inputs available for fallback:', labels);
+    const isMic  = lbl => _MIC_LABEL_PATTERNS.some(p => p.test(lbl));
+    const isLoop = lbl => _LOOPBACK_LABEL_PATTERNS.some(p => p.test(lbl));
+    const target = inputs.find(d => d.label && isLoop(d.label) && !isMic(d.label));
+    if (!target) {
+      console.warn('[IKANDY] Stereo-Mix fallback: no loopback-style input device found');
+      return null;
+    }
+    console.log('[IKANDY] Stereo-Mix fallback: using input device', JSON.stringify(target.label));
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        deviceId: { exact: target.deviceId },
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl:  false,
+      },
+      video: false,
+    });
+    if (!stream.getAudioTracks().length) {
+      stream.getTracks().forEach(t => t.stop());
+      console.warn('[IKANDY] Stereo-Mix fallback: getUserMedia returned no audio track');
+      return null;
+    }
+    return { stream, label: target.label };
+  } catch(e) {
+    console.error('[IKANDY] Stereo-Mix fallback failed:', e && (e.name + ': ' + e.message));
+    return null;
+  }
+}
+
+function _isLoopbackBugError(e) {
+  if (!e) return true; // empty {} error = loopback bug signature
+  const msg = (e.message || '').toLowerCase();
+  const name = (e.name || '').toLowerCase();
+  return !msg
+      || msg.includes('could not start audio')
+      || msg.includes('audio source')
+      || msg.includes('not allowed')   // odd ALC897 case where loopback returns NotAllowed
+      || name === 'notreadableerror'
+      || name === 'notfounderror'
+      || name === 'overconstrainederror'
+      || name === 'aborterror';
+}
+
 /* ── Auto-connect system audio on load (Electron bypasses picker) ── */
 async function autoConnectSystemAudio() {
   if (_systemAudioStream) return; // already connected
@@ -2803,14 +2896,28 @@ async function autoConnectSystemAudio() {
     });
     stream.getVideoTracks().forEach(t => t.stop());
     if (!stream.getAudioTracks().length) {
-      console.warn('[IKANDY] Auto-connect: no audio track — user will need to click 🎤');
+      console.warn('[IKANDY] Auto-connect: no audio track — trying Stereo Mix fallback');
+      const fb = await tryStereoMixFallback();
+      if (fb) { await connectAudioStream(fb.stream, 'Stereo Mix (' + fb.label + ')', true); return; }
       return;
     }
     await connectAudioStream(stream, 'System Audio', true);
     console.log('[IKANDY] System audio auto-connected on load');
   } catch(e) {
+    console.warn('[IKANDY] Auto-connect loopback failed:', e && e.message, '— attempting Stereo Mix fallback');
+    if (_isLoopbackBugError(e)) {
+      const fb = await tryStereoMixFallback();
+      if (fb) {
+        try {
+          await connectAudioStream(fb.stream, 'Stereo Mix (' + fb.label + ')', true);
+          console.log('[IKANDY] Auto-connected via Stereo Mix fallback (' + fb.label + ')');
+          return;
+        } catch(err2) {
+          console.error('[IKANDY] Stereo Mix fallback connect failed:', err2);
+        }
+      }
+    }
     // Silently fail — user can click 🎤 manually
-    console.warn('[IKANDY] Auto-connect audio failed:', e.message);
   }
 }
 
@@ -2841,8 +2948,27 @@ async function startSystemAudioCapture() {
     console.log('[IKANDY] Screen share audio track:', stream.getAudioTracks()[0].label);
     await connectAudioStream(stream, 'Application audio');
   } catch(e) {
-    if (e.name === 'NotAllowedError') toast('Capture cancelled — click 🎤 Reconnect System Audio to try again');
-    else { toast('Audio capture failed: ' + e.message); console.error('[IKANDY] getDisplayMedia error:', e); }
+    if (e.name === 'NotAllowedError' && !_isLoopbackBugError(e)) {
+      toast('Capture cancelled — click 🎤 Reconnect System Audio to try again');
+      return;
+    }
+    console.error('[IKANDY] getDisplayMedia error:', e);
+    if (_isLoopbackBugError(e)) {
+      toast('Loopback failed — trying Stereo Mix fallback…');
+      const fb = await tryStereoMixFallback();
+      if (fb) {
+        try {
+          await connectAudioStream(fb.stream, 'Stereo Mix (' + fb.label + ')');
+          toast('✓ Connected via Stereo Mix (' + fb.label + ')');
+          return;
+        } catch(err2) {
+          console.error('[IKANDY] Stereo Mix fallback connect failed:', err2);
+        }
+      }
+      toast('⚠ Audio capture failed (5.1/7.1 loopback bug + no Stereo Mix). Click BUG button → Copy → paste in chat.');
+      return;
+    }
+    toast('Audio capture failed: ' + e.message);
   }
 }
 

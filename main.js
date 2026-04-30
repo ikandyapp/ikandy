@@ -1466,6 +1466,43 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'IKANDY.html'));
   // mainWindow.webContents.openDevTools({ mode: 'detach' });
 
+  // ── Security hardening (Electron security checklist) ─────────────────────
+  // 1. Lock the renderer to its loaded HTML — block all navigation away from it.
+  //    Defense-in-depth: even if a script ever set location.href to something
+  //    external, the navigation is cancelled and the BrowserWindow stays put.
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const here = mainWindow.webContents.getURL();
+    if (url !== here) {
+      console.warn('[IKANDY] Blocked navigation to', url);
+      event.preventDefault();
+    }
+  });
+  // 2. Block any new BrowserWindow from being spawned by the renderer.
+  //    target="_blank", window.open, ctrl-clicks, etc. — none of those should
+  //    ever open inside Electron. Route GitHub release links to the OS browser
+  //    via the same safelist used by the open-external IPC handler; deny rest.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (typeof url === 'string' &&
+        /^https:\/\/(github\.com\/IKANDYapp\/|objects\.githubusercontent\.com\/)/i.test(url)) {
+      shell.openExternal(url).catch(() => {});
+    } else {
+      console.warn('[IKANDY] Blocked window.open to', url);
+    }
+    return { action: 'deny' };
+  });
+  // 3. Permission requests — Electron grants everything by default. Only
+  //    'media' is needed (getDisplayMedia / getUserMedia for audio reactivity).
+  //    Deny notifications, geolocation, clipboard-read, midi, hid, serial, etc.
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    const allowed = new Set(['media', 'display-capture', 'fullscreen']);
+    if (allowed.has(permission)) return callback(true);
+    console.warn('[IKANDY] Denied renderer permission request:', permission);
+    callback(false);
+  });
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
+    return permission === 'media' || permission === 'display-capture' || permission === 'fullscreen';
+  });
+
   // Register Ctrl+Shift+I to toggle DevTools
   if (!app.isPackaged) {
     globalShortcut.register('CommandOrControl+Shift+I', () => {
