@@ -547,14 +547,19 @@ body.ui-hidden #debug-panel,
 body.ui-hidden #debug-bug-btn { opacity: 0; pointer-events: none; }
 
 /* ─── UI HIDE MODE ─── */
-/* When .ui-hidden is on body, everything except the canvas fades out */
+/* Always hidden in hide mode — top bar, side-panel toggles, lyric overlay */
 body.ui-hidden #pnav,
 body.ui-hidden #ptab,
 body.ui-hidden #ltab,
-body.ui-hidden #controls,
-body.ui-hidden #hud,
-body.ui-hidden #lyric-wrap,
-body.ui-hidden #status-badge {
+body.ui-hidden #lyric-wrap {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity .5s ease;
+}
+/* Conditionally hidden — gated by per-section classes set from user prefs */
+body.ui-hidden.hide-ctrl   #controls,
+body.ui-hidden.hide-hud    #hud,
+body.ui-hidden.hide-status #status-badge {
   opacity: 0 !important;
   pointer-events: none !important;
   transition: opacity .5s ease;
@@ -563,6 +568,43 @@ body.ui-hidden #status-badge {
 #pnav, #ptab, #ltab, #controls, #hud, #lyric-wrap, #status-badge {
   transition: opacity .5s ease;
 }
+
+/* Hide-mode options popover — matches shuf-menu styling */
+#hide-opts-menu {
+  position: fixed;
+  display: none;
+  background: rgba(6,6,8,.96);
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 220px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  font-family: var(--ui);
+}
+#hide-opts-menu.open { display: block; }
+#hide-opts-menu .ho-hd {
+  padding: 6px 14px 8px; font-size: 10px;
+  color: rgba(255,255,255,.45); letter-spacing: .08em;
+  text-transform: uppercase; border-bottom: 1px solid var(--bdr);
+  margin-bottom: 4px;
+}
+.ho-opt {
+  display: flex; align-items: center;
+  padding: 8px 14px; font-size: 12px;
+  color: var(--dim); cursor: pointer;
+  transition: color .12s, background .12s;
+  user-select: none;
+}
+.ho-opt:hover { color: var(--txt); background: rgba(255,255,255,.04); }
+.ho-opt.on { color: var(--sp); }
+.ho-opt::before {
+  content: ''; display: inline-block;
+  width: 11px; margin-right: 10px; font-size: 11px;
+}
+.ho-opt.on::before { content: '✓'; }
 
 /* ─── LEFT TAB ─── */
 #ltab {
@@ -1372,7 +1414,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <button class="nvb" id="presets-btn" onclick="openPresetPanel()" title="Browse presets">PRESETS</button>
   <span id="view-controls" style="display:inline-flex;gap:0;">
     <button class="nvb" id="fs-btn" onclick="toggleFullscreen()" title="Fullscreen (F)">⛶</button>
-    <button class="nvb" id="hide-btn" onclick="toggleUI()" title="Hide UI (H)">◎</button>
+    <button class="nvb" id="hide-btn" onclick="toggleUI()" oncontextmenu="openHideOptsMenu(event); return false;" title="Hide UI (H) — right-click for options">◎</button>
   </span>
   <button class="nvb" id="debug-bug-btn" onclick="debugToggle()" title="Debug log">BUG<span id="debug-bug-badge">0</span></button>
   <button class="nvb" id="tour-btn" onclick="tkRestart()" title="Restart tour">?</button>
@@ -1476,6 +1518,12 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 
 <!-- Shuffle / playback-order popup -->
 <div id="shuf-menu" role="menu"></div>
+<div id="hide-opts-menu" role="menu">
+  <div class="ho-hd">Keep visible while hidden</div>
+  <div class="ho-opt" id="ho-ctrl"   onclick="toggleHideKeep('ctrl')">User controls</div>
+  <div class="ho-opt" id="ho-hud"    onclick="toggleHideKeep('hud')">Album art &amp; progress</div>
+  <div class="ho-opt" id="ho-status" onclick="toggleHideKeep('status')">Connection status</div>
+</div>
 
 <!-- PRESET PANEL (slides up from bottom) -->
 <div id="preset-panel">
@@ -2649,17 +2697,27 @@ function spawnPhysicsWords(line) {
       const hue = Math.random() < 0.25 ? Math.random() * 360 : -1;
       if (hue >= 0) div.style.color = `hsl(${hue}, 90%, 70%)`;
 
-      // Spawn near center
-      const x = cx + (Math.random() - 0.5) * W * 0.15;
-      const y = cy + (Math.random() - 0.5) * H * 0.15;
+      // Spawn each word on a ring around center and launch it outward along
+      // its own radial. This guarantees visual separation from frame 1, and
+      // makes friction's job (slowing the drift) feel like settling rather
+      // than killing motion before it ever starts.
+      const angle = Math.random() * Math.PI * 2;
+      const ringR = 60 + Math.random() * 80;          // 60–140 px from center
+      const jitter = 30;
+      const x = cx + Math.cos(angle) * ringR + (Math.random() - 0.5) * jitter;
+      const y = cy + Math.sin(angle) * ringR + (Math.random() - 0.5) * jitter;
       div.style.left    = x + 'px';
       div.style.top     = y + 'px';
       div.style.opacity = '0';
       wrap.appendChild(div);
 
-      // Gentle outward drift — speed slider controls this directly
-      const angle = Math.random() * Math.PI * 2;
-      const launch = (0.3 + Math.random() * 0.4) * spd; // slow, controlled
+      // Strong outward burst so words clearly disperse before friction wins.
+      // spd MODULATES the burst rather than multiplying it from zero — at the
+      // minimum slider setting words still travel a readable distance, at the
+      // max they fly. Old formula (* spd) collapsed to ~0 at low slider values.
+      const launchBase  = 4 + Math.random() * 3;       // 4–7 px/frame
+      const launchScale = 0.7 + spd * 0.65;            // 0.3→0.9, 1→1.35, 2→2.0
+      const launch      = launchBase * launchScale;
 
       _physicsWords.push({
         el:       div,
@@ -4403,7 +4461,17 @@ function toggleOverlay() {
   lyricsOn = !lyricsOn;
   el('overlay-btn').textContent = lyricsOn ? 'Overlay ON' : 'Overlay OFF';
   el('overlay-btn').style.color = lyricsOn ? 'var(--sp)' : '';
-  if (!lyricsOn) el('lyric-line').classList.add('blank');
+  if (!lyricsOn) {
+    el('lyric-line').classList.add('blank');
+    // Physics-mode words live as DOM children of #physics-wrap and are only
+    // updated/pruned inside renderPhysicsWords, which drawLyricOverlay skips
+    // when !lyricsOn. Without this, airborne words freeze in place forever.
+    if (_physicsWords.length) {
+      _physicsWords.forEach(w => { if (w.el) w.el.remove(); });
+      _physicsWords = [];
+      _lastLyricText = '';
+    }
+  }
 }
 
 /* ── PRESETS ── */
@@ -5185,38 +5253,116 @@ document.addEventListener('fullscreenchange', () => {
 
 /* ── UI HIDE MODE ── */
 // _uiHidden = the MODE (toggled by button/H key)
-// body.ui-hidden = the VISUAL STATE (can be temporarily lifted by mouse)
+// body.ui-hidden = base hide flag (always-hidden elements respond to this)
+// body.hide-ctrl / .hide-hud / .hide-status = per-section hide flags,
+//   set from user prefs whenever the mode is engaged. These let the user
+//   keep specific sections visible (controls / album art / status) while
+//   the top bar and side-panel icons always disappear.
 let _uiHidden = false;
 let _mouseTimer = null;
+
+// Persisted per-section "keep visible" prefs. Default = false (current
+// behaviour: everything hides) so existing users see no change on upgrade.
+let _hideKeepCtrl   = localStorage.getItem('IKANDY-hide-keep-ctrl')   === '1';
+let _hideKeepHud    = localStorage.getItem('IKANDY-hide-keep-hud')    === '1';
+let _hideKeepStatus = localStorage.getItem('IKANDY-hide-keep-status') === '1';
+
+function applyHideState(lifted) {
+  // lifted = mouse-move temporarily restored everything, ignore prefs.
+  const b = document.body.classList;
+  if (!_uiHidden || lifted) {
+    b.remove('ui-hidden');
+    b.remove('hide-ctrl');
+    b.remove('hide-hud');
+    b.remove('hide-status');
+    return;
+  }
+  b.add('ui-hidden');
+  b.toggle('hide-ctrl',   !_hideKeepCtrl);
+  b.toggle('hide-hud',    !_hideKeepHud);
+  b.toggle('hide-status', !_hideKeepStatus);
+}
 
 function toggleUI() {
   _uiHidden = !_uiHidden;
   if (_uiHidden) {
-    // Enter hide mode — start listening for mouse to temporarily show
     document.addEventListener('mousemove', onMouseMoveInHideMode);
-    // Hide immediately
-    document.body.classList.add('ui-hidden');
-    // Update button to show active state
+    applyHideState(false);
     const btn = el('hide-btn');
-    if (btn) { btn.classList.add('on'); btn.title = 'Show UI (H)'; }
+    if (btn) { btn.classList.add('on'); btn.title = 'Show UI (H) — right-click for options'; }
   } else {
-    // Exit hide mode entirely
     document.removeEventListener('mousemove', onMouseMoveInHideMode);
     clearTimeout(_mouseTimer);
-    document.body.classList.remove('ui-hidden');
+    applyHideState(false);
     const btn = el('hide-btn');
-    if (btn) { btn.classList.remove('on'); btn.title = 'Hide UI (H)'; }
+    if (btn) { btn.classList.remove('on'); btn.title = 'Hide UI (H) — right-click for options'; }
   }
 }
 
 function onMouseMoveInHideMode() {
-  // Temporarily show UI while mouse is moving
-  document.body.classList.remove('ui-hidden');
+  // Temporarily lift the entire hide state while mouse is moving
+  applyHideState(true);
   clearTimeout(_mouseTimer);
-  // After 3s of no movement, hide again (only if still in hide mode)
+  // After 3s of stillness, re-engage hide (with prefs respected)
   _mouseTimer = setTimeout(() => {
-    if (_uiHidden) document.body.classList.add('ui-hidden');
+    if (_uiHidden) applyHideState(false);
   }, 3000);
+}
+
+/* ── Hide-mode options popover ── */
+function openHideOptsMenu(ev) {
+  if (ev) ev.preventDefault();
+  const menu = el('hide-opts-menu');
+  const btn  = el('hide-btn');
+  if (!menu || !btn) return;
+  // Reflect current state on each row
+  el('ho-ctrl'  ).classList.toggle('on', _hideKeepCtrl);
+  el('ho-hud'   ).classList.toggle('on', _hideKeepHud);
+  el('ho-status').classList.toggle('on', _hideKeepStatus);
+  // Position above the button, right-aligned to it (top nav has limited space below)
+  menu.classList.add('open');
+  const r = btn.getBoundingClientRect();
+  const m = menu.getBoundingClientRect();
+  let left = r.right - m.width;
+  left = Math.max(8, Math.min(left, window.innerWidth - m.width - 8));
+  let top = r.bottom + 6;
+  // If it would clip off the bottom, flip above
+  if (top + m.height > window.innerHeight - 8) top = r.top - m.height - 6;
+  menu.style.left = left + 'px';
+  menu.style.top  = top  + 'px';
+  setTimeout(() => document.addEventListener('mousedown', closeHideOptsOnOutside), 0);
+  document.addEventListener('keydown', closeHideOptsOnEsc);
+}
+function closeHideOptsMenu() {
+  const menu = el('hide-opts-menu');
+  if (!menu) return;
+  menu.classList.remove('open');
+  document.removeEventListener('mousedown', closeHideOptsOnOutside);
+  document.removeEventListener('keydown', closeHideOptsOnEsc);
+}
+function closeHideOptsOnOutside(e) {
+  const menu = el('hide-opts-menu');
+  const btn  = el('hide-btn');
+  if (menu && !menu.contains(e.target) && btn && !btn.contains(e.target)) closeHideOptsMenu();
+}
+function closeHideOptsOnEsc(e) { if (e.key === 'Escape') closeHideOptsMenu(); }
+
+function toggleHideKeep(which) {
+  if (which === 'ctrl') {
+    _hideKeepCtrl = !_hideKeepCtrl;
+    localStorage.setItem('IKANDY-hide-keep-ctrl', _hideKeepCtrl ? '1' : '0');
+    el('ho-ctrl').classList.toggle('on', _hideKeepCtrl);
+  } else if (which === 'hud') {
+    _hideKeepHud = !_hideKeepHud;
+    localStorage.setItem('IKANDY-hide-keep-hud', _hideKeepHud ? '1' : '0');
+    el('ho-hud').classList.toggle('on', _hideKeepHud);
+  } else if (which === 'status') {
+    _hideKeepStatus = !_hideKeepStatus;
+    localStorage.setItem('IKANDY-hide-keep-status', _hideKeepStatus ? '1' : '0');
+    el('ho-status').classList.toggle('on', _hideKeepStatus);
+  }
+  // Re-apply immediately if currently hidden so the change is visible
+  if (_uiHidden) applyHideState(false);
 }
 
 /* ── KEYBOARD SHORTCUTS ── */
