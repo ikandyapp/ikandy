@@ -2515,7 +2515,13 @@ function renderLoop(ts) {
       const badIdx = currentIdx;
       if (badIdx != null && !window._brokenPresets.has(badIdx)) {
         window._brokenPresets.add(badIdx);
-        console.warn(`[iKandy] Render-time crash on preset "${allNames[badIdx]}" — marking broken (${window._brokenPresets.size} total)`);
+        // Use console.log (DevTools-only), NOT console.warn — the warn channel
+        // is mirrored into the user-facing debug panel and turns the BUG badge
+        // red. A broken preset is normal self-healing, not a user-actionable
+        // bug; surfacing it would alarm users on first launch as the auto-cycle
+        // hits each faulty preset once. Persisted to disk so subsequent
+        // launches skip it without ever entering this catch.
+        console.log(`[iKandy] Render-time crash on preset "${allNames[badIdx]}" — marking broken (${window._brokenPresets.size} total)`);
         window.IKANDY?.addBrokenPreset?.(allNames[badIdx]);
         // Jump to the next non-broken preset on the next tick
         setTimeout(() => {
