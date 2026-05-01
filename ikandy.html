@@ -51,6 +51,11 @@ html, body {
   z-index: 18; pointer-events: none;
   mix-blend-mode: screen;
 }
+#draw-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 19; pointer-events: none;
+  mix-blend-mode: screen;
+}
 #fx-canvas {
   /* FX Layer — chromatic aberration post-process.
      Reads #viz as a texture each frame, applies CA, displays here.
@@ -618,6 +623,12 @@ body.force-hide-status #status-badge {
 }
 .ho-opt:hover { color: var(--txt); background: rgba(255,255,255,.04); }
 .ho-opt.on { color: var(--sp); }
+.ho-draw-color {
+  font-size:14px; cursor:pointer; color:rgba(255,255,255,.25);
+  padding:2px 5px; border-radius:3px; transition:color .15s;
+}
+.ho-draw-color:hover { color:rgba(255,255,255,.7); }
+.ho-draw-color.on { color:var(--sp); }
 .ho-opt::before {
   content: ''; display: inline-block;
   width: 11px; margin-right: 10px; font-size: 11px;
@@ -1494,6 +1505,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <canvas id="vignette-canvas"></canvas>
 <canvas id="grain-canvas"></canvas>
 <canvas id="click-ripple-canvas"></canvas>
+<canvas id="draw-canvas"></canvas>
 <canvas id="scanline-canvas"></canvas>
 <canvas id="aurora-canvas"></canvas>
 <canvas id="pawrticles-canvas"></canvas>
@@ -1605,7 +1617,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
   </button>
   <!-- Volume (controls Spotify directly via API) -->
-  <div id="vol-row" class="smtc-locked" title="Volume control isn&rsquo;t available in iKandy &mdash; use the source app or your system mixer">
+  <div id="vol-row" class="smtc-locked" title="Volume control isn&rsquo;t available in IKANDY &mdash; use the source app or your system mixer">
     <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
     <input type="range" id="vol-sl" min="0" max="100" value="80"
       oninput="setVolume(+this.value)" title="Volume">
@@ -1648,6 +1660,13 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <span class="ho-show-toggle on" id="ho-show-status" onclick="event.stopPropagation(); toggleShowFeature('status')" title="Show connection status"></span>
   </div>
   <div class="ho-opt on" id="ho-mouse-fx" onclick="toggleMouseFx()" style="border-top:1px solid rgba(255,255,255,.07);margin-top:4px;padding-top:8px;">Mouse effects</div>
+  <div class="ho-opt on" id="ho-draw-mode" onclick="toggleDrawMode()" style="padding-left:18px;">↳ Draw on canvas</div>
+  <div style="padding:6px 14px 4px 28px;display:flex;gap:6px;align-items:center;" id="ho-draw-color-row">
+    <span style="font-size:10px;color:rgba(255,255,255,.3);margin-right:2px;">Color</span>
+    <span class="ho-draw-color on" id="hdc-random" onclick="setDrawColor('random')" title="Random">✦</span>
+    <span class="ho-draw-color" id="hdc-white"  onclick="setDrawColor('white')"  title="White">●</span>
+    <span class="ho-draw-color" id="hdc-accent" onclick="setDrawColor('accent')" title="Accent">◈</span>
+  </div>
 </div>
 
 <!-- PRESET PANEL (slides up from bottom) -->
@@ -1705,7 +1724,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <!-- APP BRANDING -->
   <div id="app-brand">
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div id="app-name">IKANDY <span class="beta-pill" title="iKandy is in beta — code signing certificate is pending verification, so Windows may show a SmartScreen warning on first launch">BETA</span></div>
+      <div id="app-name">IKANDY <span class="beta-pill" title="IKANDY is in beta — code signing certificate is pending verification, so Windows may show a SmartScreen warning on first launch">BETA</span></div>
       <div id="app-buttons" style="display:flex;gap:6px;align-items:center;">
         <button id="sb-debug-btn" onclick="debugToggle()" title="Open debug log"
           style="background:none;border:1px solid var(--bdr);border-radius:4px;color:var(--dim);
@@ -1803,7 +1822,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <div class="src-tier"><span class="tier-dot basic"></span><b>Basic</b> &mdash; transport (depends on the source app), lyrics. No browse, no shuffle, no art.</div>
       <div id="smtc-info" style="font-size:11px;color:var(--dim);line-height:1.6;padding:4px 0;">
         Reads <span style="color:var(--acc);">whatever's playing</span> via Windows Media Controls — Spotify, YouTube Music, Apple Music, browser tabs, etc.<br>
-        Just start playing music in any app and iKandy will follow it. Transport controls work too.<br>
+        Just start playing music in any app and IKANDY will follow it. Transport controls work too.<br>
         <span style="color:var(--dim);font-size:10px;">Windows only.</span>
       </div>
     </div>
@@ -2079,9 +2098,9 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   try {
     const mod = await import('https://cdn.jsdelivr.net/npm/butterchurn@3.0.0-beta.5/dist/butterchurn.js');
     window.butterchurn = mod.default || mod;
-    console.log('[iKandy] butterchurn 3.0.0-beta.5 loaded via ESM import');
+    console.log('[IKANDY] butterchurn 3.0.0-beta.5 loaded via ESM import');
   } catch (e) {
-    console.error('[iKandy] Failed to load butterchurn engine:', e);
+    console.error('[IKANDY] Failed to load butterchurn engine:', e);
   }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/base.min.js" defer></script>
@@ -2160,7 +2179,7 @@ function applyRenderScale(scale) {
   _renderScale = _clampRenderScale(scale);
   localStorage.setItem('IKANDY-render-scale', _renderScale);
   resize();
-  console.log(`[iKandy] Render scale: ${(_renderScale*100).toFixed(0)}% → ${W}×${H}`);
+  console.log(`[IKANDY] Render scale: ${(_renderScale*100).toFixed(0)}% → ${W}×${H}`);
 }
 
 function initRenderScale() {
@@ -2300,7 +2319,7 @@ const FXLAYER_FRAG = `
 function initFxLayer() {
   const gl = fxLayerGl;
   if (!gl) {
-    console.warn('[iKandy] FX Layer: WebGL unavailable — feature disabled');
+    console.warn('[IKANDY] FX Layer: WebGL unavailable — feature disabled');
     return;
   }
 
@@ -2309,7 +2328,7 @@ function initFxLayer() {
     const s = gl.createShader(type);
     gl.shaderSource(s, src); gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      console.error('[iKandy] FX Layer shader error:', gl.getShaderInfoLog(s));
+      console.error('[IKANDY] FX Layer shader error:', gl.getShaderInfoLog(s));
       return null;
     }
     return s;
@@ -2323,7 +2342,7 @@ function initFxLayer() {
   gl.attachShader(_fxLayerProgram, fs);
   gl.linkProgram(_fxLayerProgram);
   if (!gl.getProgramParameter(_fxLayerProgram, gl.LINK_STATUS)) {
-    console.error('[iKandy] FX Layer program link error:', gl.getProgramInfoLog(_fxLayerProgram));
+    console.error('[IKANDY] FX Layer program link error:', gl.getProgramInfoLog(_fxLayerProgram));
     _fxLayerProgram = null;
     return;
   }
@@ -2350,7 +2369,7 @@ function initFxLayer() {
   };
 
   resizeFxLayer();
-  console.log('[iKandy] FX Layer initialized');
+  console.log('[IKANDY] FX Layer initialized');
 }
 
 function resizeFxLayer() {
@@ -2379,7 +2398,7 @@ function setupFxLayerSrcCanvas() {
   _fxLayerSrcCanvas.width  = vizCanvas.width  || window.innerWidth;
   _fxLayerSrcCanvas.height = vizCanvas.height || window.innerHeight;
   _fxLayerSrcCtx = _fxLayerSrcCanvas.getContext('2d', { alpha: false, willReadFrequently: false });
-  console.log(`[iKandy] FX Layer source canvas ready: ${_fxLayerSrcCanvas.width}×${_fxLayerSrcCanvas.height}`);
+  console.log(`[IKANDY] FX Layer source canvas ready: ${_fxLayerSrcCanvas.width}×${_fxLayerSrcCanvas.height}`);
 }
 
 // Called from the render loop right after visualizer.render() — copies the
@@ -2595,7 +2614,7 @@ function renderPb(bassRaw) {
     const punch = Math.min(2, (bass - _pbBassAvg) / Math.max(0.05, dynRange) * 1.2);
     spawnPbBurst(Math.max(0.4, punch));
     _pbCooldown = 0;
-    if (window._pbDebug) console.log(`[iKandy] PB burst: bass=${bass.toFixed(3)} rise=${rise.toFixed(3)} avg=${_pbBassAvg.toFixed(3)} peak=${_pbBassPeak.toFixed(3)} dyn=${dynRange.toFixed(3)}`);
+    if (window._pbDebug) console.log(`[IKANDY] PB burst: bass=${bass.toFixed(3)} rise=${rise.toFixed(3)} avg=${_pbBassAvg.toFixed(3)} peak=${_pbBassPeak.toFixed(3)} dyn=${dynRange.toFixed(3)}`);
   }
 
   // Trail fade — destination-out preserves canvas transparency while fading existing pixels.
@@ -2674,7 +2693,7 @@ function setMonitorMode(mode) {
 
 async function refreshMonitorList() {
   if (_isMirror || _spanData) return;
-  const displays = await window.ipc?.invoke('get-displays') || [];
+  const displays = await window.IKANDY.getDisplays() || [];
   const list = document.getElementById('monitor-list');
   if (!list) return;
   list.innerHTML = '';
@@ -2695,13 +2714,13 @@ async function refreshMonitorList() {
     btn.onclick = async () => {
       if (d.isPrimary) return;
       if (_activeDisplayIds.has(d.id)) {
-        await window.ipc?.invoke('close-mirror', d.id);
+        await window.IKANDY.closeMirror(d.id);
         _activeDisplayIds.delete(d.id);
       } else {
         if (_monitorMode === 'span') {
           await _openSpan(displays, d.id);
         } else {
-          await window.ipc?.invoke('open-mirror', d.id);
+          await window.IKANDY.openMirror(d.id);
         }
         _activeDisplayIds.add(d.id);
       }
@@ -2736,17 +2755,17 @@ async function _openSpan(allDisplays, targetId) {
     sliceH:  target.bounds.height,
     totalW, totalH
   };
-  await window.ipc?.invoke('open-mirror', targetId, spanInfo);
+  await window.IKANDY.openMirror(targetId, spanInfo);
 }
 
 async function closeAllMirrors() {
-  await window.ipc?.invoke('close-all-mirrors');
+  await window.IKANDY.closeAllMirrors();
   _activeDisplayIds.clear();
   refreshMonitorList();
   document.getElementById('close-all-mirrors-btn').style.display = 'none';
 }
 
-window.ipc?.on('mirror-closed', (displayId) => {
+window.IKANDY.onMirrorClosed((displayId) => {
   _activeDisplayIds.delete(displayId);
   refreshMonitorList();
 });
@@ -2758,11 +2777,11 @@ if (!_isMirror && !_spanData) {
     const now = performance.now();
     if (now - _mirrorForwardThrottle < 33) return;
     _mirrorForwardThrottle = now;
-    if (_activeDisplayIds.size) window.ipc?.send('mirror-audio', { bass, mid, treble, intensity });
+    if (_activeDisplayIds.size) window.IKANDY.sendMirrorAudio({ bass, mid, treble, intensity });
   };
 } else {
   // Mirror/span mode — receive audio, hide UI
-  window.ipc?.on('mirror-audio', ({ bass, mid, treble }) => {
+  window.IKANDY.onMirrorAudio(({ bass, mid, treble }) => {
     window._mirrorBass    = bass;
     window._mirrorMid     = mid;
     window._mirrorTreble  = treble;
@@ -2790,6 +2809,91 @@ document.getElementById('acc-monitors')?.addEventListener('click', () => {
 });
 
 
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   DRAW MODE — right-click drag to draw, both buttons to clear
+   ═══════════════════════════════════════════════════════════════════ */
+const _drawCanvas = document.getElementById('draw-canvas');
+const _drawCtx    = _drawCanvas ? _drawCanvas.getContext('2d') : null;
+let _drawEnabled  = true;
+let _drawColor    = 'random';
+let _isDrawing    = false;
+let _lastDrawX    = 0, _lastDrawY = 0;
+let _currentStrokeColor = '#ffffff';
+
+const CR_COLORS_DRAW = ['#ff4d6d','#c77dff','#00b4d8','#06d6a0','#ffee32','#ff9f1c'];
+
+function _getDrawColor() {
+  if (_drawColor === 'white')  return '#ffffff';
+  if (_drawColor === 'accent') {
+    const acc = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim();
+    return acc || '#d4a843';
+  }
+  return CR_COLORS_DRAW[Math.floor(Math.random() * CR_COLORS_DRAW.length)];
+}
+
+function _resizeDrawCanvas() {
+  if (!_drawCanvas) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = _drawCanvas.width; tmp.height = _drawCanvas.height;
+  tmp.getContext('2d').drawImage(_drawCanvas, 0, 0);
+  _drawCanvas.width  = window.innerWidth;
+  _drawCanvas.height = window.innerHeight;
+  _drawCtx.drawImage(tmp, 0, 0);
+}
+window.addEventListener('resize', _resizeDrawCanvas);
+_resizeDrawCanvas();
+
+function toggleDrawMode() {
+  _drawEnabled = !_drawEnabled;
+  document.getElementById('ho-draw-mode')?.classList.toggle('on', _drawEnabled);
+  document.getElementById('ho-draw-color-row').style.opacity = _drawEnabled ? '1' : '0.3';
+  if (!_drawEnabled) { _isDrawing = false; document.body.style.cursor = ''; }
+}
+
+function setDrawColor(c) {
+  _drawColor = c;
+  ['random','white','accent'].forEach(id => {
+    document.getElementById('hdc-' + id)?.classList.toggle('on', id === c);
+  });
+}
+
+document.addEventListener('mousedown', e => {
+  if (e.button === 0 && _drawEnabled && _mouseFxEnabled) {
+    if (e.target.closest('#sidebar, #top-bar, #transport-bar')) return;
+    _isDrawing = true;
+    _lastDrawX = e.clientX; _lastDrawY = e.clientY;
+    _currentStrokeColor = _getDrawColor();
+    document.body.style.cursor = 'crosshair';
+  }
+  if (e.buttons === 3 && _drawEnabled) {
+    _drawCtx?.clearRect(0, 0, _drawCanvas.width, _drawCanvas.height);
+    _isDrawing = false;
+  }
+});
+
+document.addEventListener('mousemove', e => {
+  if (!_isDrawing || !_drawEnabled || !_drawCtx) return;
+  _drawCtx.beginPath();
+  _drawCtx.moveTo(_lastDrawX, _lastDrawY);
+  _drawCtx.lineTo(e.clientX, e.clientY);
+  _drawCtx.strokeStyle = _currentStrokeColor;
+  _drawCtx.lineWidth   = 3;
+  _drawCtx.lineCap     = 'round';
+  _drawCtx.lineJoin    = 'round';
+  _drawCtx.shadowColor = _currentStrokeColor;
+  _drawCtx.shadowBlur  = 8;
+  _drawCtx.globalAlpha = 0.9;
+  _drawCtx.stroke();
+  _drawCtx.shadowBlur  = 0;
+  _drawCtx.globalAlpha = 1;
+  _lastDrawX = e.clientX; _lastDrawY = e.clientY;
+});
+
+document.addEventListener('mouseup', e => {
+  if (e.button === 0) { _isDrawing = false; document.body.style.cursor = ''; }
+});
 
 /* ═══════════════════════════════════════════════════════════════════
    Click anywhere to spawn an expanding ring that fades out.
@@ -2856,6 +2960,7 @@ function _crLoop() {
 
 document.addEventListener('click', e => {
   if (!_mouseFxEnabled) return;
+  if (_drawEnabled) return; // draw mode owns left click
   if (e.target.closest('#sidebar, #top-bar, #transport-bar')) return;
   _crSpawn(e.clientX, e.clientY);
 });
@@ -3053,7 +3158,7 @@ function renderLoop(ts) {
         // bug; surfacing it would alarm users on first launch as the auto-cycle
         // hits each faulty preset once. Persisted to disk so subsequent
         // launches skip it without ever entering this catch.
-        console.log(`[iKandy] Render-time crash on preset "${allNames[badIdx]}" — marking broken (${window._brokenPresets.size} total)`);
+        console.log(`[IKANDY] Render-time crash on preset "${allNames[badIdx]}" — marking broken (${window._brokenPresets.size} total)`);
         window.IKANDY?.addBrokenPreset?.(allNames[badIdx]);
         // Jump to the next non-broken preset on the next tick
         setTimeout(() => {
@@ -4239,7 +4344,7 @@ function setPlayIcon(playing) {
 
 // SMTC capability gating — the active session's Controls property tells us
 // which commands the source app actually accepts. Lock the rest with a
-// hover tooltip so users know it's the source app's limit, not iKandy's.
+// hover tooltip so users know it's the source app's limit, not IKANDY's.
 function lockBtn(id, locked, reason) {
   const b = el(id);
   if (!b) return;
@@ -4431,7 +4536,7 @@ async function selectShuffleMode(mode) {
   // friendly note and don't change state — but if the user enables it in
   // Spotify, the next poll will set _shuffleMode = 'smart' automatically.
   if (currentSource === 'spotify' && mode === 'smart') {
-    toast('Smart Shuffle has to be enabled inside Spotify — iKandy will reflect it once on.');
+    toast('Smart Shuffle has to be enabled inside Spotify — IKANDY will reflect it once on.');
     return;
   }
 
@@ -5181,7 +5286,7 @@ async function loadAllPresetPacks() {
   const basePresets = extractPresets(window.base) || extractPresets(window.butterchurnPresets);
   if (basePresets) Object.assign(merged, basePresets);
   const baseCount = Object.keys(merged).length;
-  console.log(`[iKandy] Base pack: ${baseCount} presets`);
+  console.log(`[IKANDY] Base pack: ${baseCount} presets`);
 
   // Extra packs from butterchurn-presets@3.0.0-beta.4 — compatible with butterchurn@3.0.0-beta.5 engine.
   const extraPacks = [
@@ -5198,7 +5303,7 @@ async function loadAllPresetPacks() {
         let done = false;
         const finish = () => { if (!done) { done = true; resolve(); } };
         s.onload  = finish;
-        s.onerror = () => { console.warn(`[iKandy] pack 404/error: ${pack.url}`); finish(); };
+        s.onerror = () => { console.warn(`[IKANDY] pack 404/error: ${pack.url}`); finish(); };
         setTimeout(finish, 15000);
         document.head.appendChild(s);
       });
@@ -5207,12 +5312,12 @@ async function loadAllPresetPacks() {
       if (newPresets) {
         Object.assign(merged, newPresets);
         const added = Object.keys(merged).filter(k => !beforeKeys.has(k)).length;
-        console.log(`[iKandy] ${pack.url.split('/').pop()}: +${added} new presets (window.${pack.global})`);
+        console.log(`[IKANDY] ${pack.url.split('/').pop()}: +${added} new presets (window.${pack.global})`);
       } else {
-        console.warn(`[iKandy] ${pack.url.split('/').pop()}: loaded but no presets found`);
+        console.warn(`[IKANDY] ${pack.url.split('/').pop()}: loaded but no presets found`);
       }
     } catch (e) {
-      console.warn(`[iKandy] Failed to load ${pack.url}:`, e);
+      console.warn(`[IKANDY] Failed to load ${pack.url}:`, e);
     }
   }
 
@@ -5222,7 +5327,7 @@ async function loadAllPresetPacks() {
     getPresets: () => merged,
     default: { getPresets: () => merged },
   };
-  console.log(`[iKandy] Total preset library: ${finalCount} presets (added ${finalCount - baseCount})`);
+  console.log(`[IKANDY] Total preset library: ${finalCount} presets (added ${finalCount - baseCount})`);
   setTimeout(() => {
     if (typeof toast === 'function') {
       const added = finalCount - baseCount;
@@ -5261,8 +5366,8 @@ function loadPresets() {
         const idx = lookup.get(n);
         if (idx != null) { window._brokenPresets.add(idx); hits++; }
       }
-      if (hits) console.log(`[iKandy] Loaded ${hits} previously broken preset(s) from disk`);
-    }).catch(e => console.warn('[iKandy] loadBrokenPresets:', e));
+      if (hits) console.log(`[IKANDY] Loaded ${hits} previously broken preset(s) from disk`);
+    }).catch(e => console.warn('[IKANDY] loadBrokenPresets:', e));
   }
 
   // Try random presets until one loads cleanly (skip broken ones)
@@ -5290,7 +5395,7 @@ function loadPreset(idx, blend, manual = false) {
     visualizer.loadPreset(allPresets[tryIdx], +(blend ?? getBlend()));
   } catch (e) {
     window._brokenPresets.add(tryIdx);
-    console.warn(`[iKandy] Broken preset (skipping): ${allNames[tryIdx]}`,
+    console.warn(`[IKANDY] Broken preset (skipping): ${allNames[tryIdx]}`,
       `— ${window._brokenPresets.size} broken so far`);
     window.IKANDY?.addBrokenPreset?.(allNames[tryIdx]);
     // Recurse to the next preset
@@ -10104,27 +10209,29 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
 <!-- Welcome modal -->
 <div id="welcome-modal" onclick="if(event.target===this)closeWelcome()">
   <div class="wm-box">
-    <div class="wm-logo">iKandy App</div>
-    <h1>Welcome to iKandy</h1>
+    <div class="wm-logo">IKANDY App</div>
+    <h1>Welcome to IKANDY</h1>
     <div class="wm-version">Music Visualizer · Early Access</div>
 
     <p>
-      You're one of the first people to experience iKandy — and that genuinely means something.
+      You're one of the first people to experience IKANDY — and that genuinely means something.
       Thank you for your trust. This is a labor of love built for people who actually <em>feel</em> their music.
     </p>
 
     <p>
-      iKandy is free, always will be. If it moves you, tell someone. If something's broken or you want
+      IKANDY is free, always will be. If it moves you, tell someone. If something's broken or you want
       a feature, reach out — every request gets read.
     </p>
 
     <div class="wm-features">
-      <div class="wm-feat-title">✦ New · Mouse Interactions</div>
-      <div class="wm-feat"><span class="wm-feat-key">Click</span> Drop an expanding ripple anywhere on screen</div>
+      <div class="wm-feat-title">✦ Mouse Interactions</div>
+      <div class="wm-feat"><span class="wm-feat-key">Left drag</span> Draw glowing strokes on the canvas</div>
+      <div class="wm-feat"><span class="wm-feat-key">Both buttons</span> Clear the canvas instantly</div>
+      <div class="wm-feat"><span class="wm-feat-key">Click</span> Drop an expanding ripple (draw mode off)</div>
       <div class="wm-feat"><span class="wm-feat-key">Double-click</span> Burst particles from your cursor</div>
-      <div class="wm-feat"><span class="wm-feat-key">Hold</span> Charge a ring — release to explode it</div>
+      <div class="wm-feat"><span class="wm-feat-key">Hold click</span> Charge a ring — release to explode</div>
       <div class="wm-feat"><span class="wm-feat-key">Right-click</span> Implosion ring · double for strobe · hold for slow-mo</div>
-      <div class="wm-feat"><span class="wm-feat-key">Mouse</span> Aurora bends toward your cursor · Particles scatter from it</div>
+      <div class="wm-feat"><span class="wm-feat-key">Mouse move</span> Aurora bends · Particles scatter · Cursor trail</div>
     </div>
 
     <div class="wm-reddit">
@@ -10162,7 +10269,7 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
 <div id="src-help-modal" onclick="if(event.target===this)closeSourceHelp()">
   <div class="box">
     <h2>How sources work <button class="close-x" onclick="closeSourceHelp()" aria-label="Close">&times;</button></h2>
-    <p>iKandy can connect to four different sources. Each one offers a different feature set depending on what its underlying API exposes.</p>
+    <p>IKANDY can connect to four different sources. Each one offers a different feature set depending on what its underlying API exposes.</p>
 
     <h3><span class="tier-dot full"></span>Full features</h3>
     <p><b>Spotify Premium</b> &mdash; playlist browse, search, drill-in to tracks, all shuffle modes, transport controls, album art, lyrics. Requires a Premium subscription for transport control. Free accounts get track info only.</p>
@@ -10175,7 +10282,7 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
     <p><b>Now Playing</b> &mdash; reads whatever app is currently playing music on Windows (Spotify desktop, YouTube Music, Apple Music, Chrome/Edge tabs, etc.) via the system Media Controls. Transport works, but exact controls depend on what each source app supports &mdash; greyed-out buttons mean that app didn&rsquo;t expose that command. No browsing, no shuffle, no album art. Windows only.</p>
 
     <h3>What about volume?</h3>
-    <p>Volume control isn&rsquo;t exposed by iKandy &mdash; use the source app or your system mixer.</p>
+    <p>Volume control isn&rsquo;t exposed by IKANDY &mdash; use the source app or your system mixer.</p>
 
     <h3>Which one should I use?</h3>
     <p>If you have <b>Spotify Premium</b> or use <b>foobar2000</b>, pick those for the richest experience. If you mostly play music in a browser tab or another app, use <b>Now Playing</b>. <b>VLC</b> is best if you&rsquo;re playing local files in VLC specifically.</p>

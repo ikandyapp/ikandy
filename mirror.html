@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>IKANDY Mirror</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+  #v { width: 100%; height: 100%; object-fit: fill; display: block; }
+  #msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font: 13px/1.5 sans-serif; color: rgba(255,255,255,.3); letter-spacing: .06em; }
+</style>
+</head>
+<body>
+<video id="v" autoplay muted playsinline></video>
+<div id="msg">Connecting to IKANDY…</div>
+<script>
+  const params  = new URLSearchParams(window.location.search);
+  const spanRaw = params.get('span');
+  const span    = spanRaw ? JSON.parse(decodeURIComponent(spanRaw)) : null;
+
+  // Apply span crop via CSS transform on the video element
+  if (span) {
+    const { offsetX, offsetY, sliceW, sliceH, totalW, totalH } = span;
+    const scaleX = window.screen.width  / sliceW;
+    const scaleY = window.screen.height / sliceH;
+    const v = document.getElementById('v');
+    v.style.width     = (totalW * scaleX) + 'px';
+    v.style.height    = (totalH * scaleY) + 'px';
+    v.style.marginLeft = (-offsetX * scaleX) + 'px';
+    v.style.marginTop  = (-offsetY * scaleY) + 'px';
+    v.style.objectFit  = 'fill';
+  }
+
+  window.IKANDY.onMirrorSource(async (sourceId) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: sourceId,
+            minWidth: 1, maxWidth: 10000,
+            minHeight: 1, maxHeight: 10000,
+            minFrameRate: 30, maxFrameRate: 60,
+          }
+        }
+      });
+      document.getElementById('v').srcObject = stream;
+      document.getElementById('msg').style.display = 'none';
+    } catch (e) {
+      document.getElementById('msg').textContent = 'Mirror error: ' + e.message;
+    }
+  });
+</script>
+</body>
+</html>

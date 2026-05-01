@@ -75,6 +75,16 @@ contextBridge.exposeInMainWorld('IKANDY', {
 
   platform:      process.platform,
   rendererReady: ()    => ipcRenderer.send('renderer-ready'),
+
+  // Multi-monitor
+  getDisplays:    ()            => ipcRenderer.invoke('get-displays'),
+  openMirror:     (id, span)    => ipcRenderer.invoke('open-mirror', id, span),
+  closeMirror:    (id)          => ipcRenderer.invoke('close-mirror', id),
+  closeAllMirrors:()            => ipcRenderer.invoke('close-all-mirrors'),
+  sendMirrorAudio:(data)        => ipcRenderer.send('mirror-audio', data),
+  onMirrorClosed: (cb)          => { ipcRenderer.removeAllListeners('mirror-closed'); ipcRenderer.on('mirror-closed', (_e, id) => cb(id)); },
+  onMirrorAudio:  (cb)          => { ipcRenderer.removeAllListeners('mirror-audio');  ipcRenderer.on('mirror-audio',  (_e, d)  => cb(d));  },
+  onMirrorSource: (cb)          => { ipcRenderer.removeAllListeners('mirror-source'); ipcRenderer.on('mirror-source', (_e, id) => cb(id)); },
 });
 
 console.log('[IKANDY Preload] Ready. Platform:', process.platform);

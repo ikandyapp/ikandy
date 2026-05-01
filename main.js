@@ -2054,7 +2054,7 @@ ipcMain.handle('get-displays', () => {
   }));
 });
 
-ipcMain.handle('open-mirror', (_e, displayId, spanInfo) => {
+ipcMain.handle('open-mirror', async (_e, displayId, spanInfo) => {
   // Close existing mirror for this display if any
   mirrorWindows = mirrorWindows.filter(w => {
     if (w.displayId === displayId) { if (!w.win.isDestroyed()) w.win.close(); return false; }
@@ -2068,7 +2068,8 @@ ipcMain.handle('open-mirror', (_e, displayId, spanInfo) => {
     frame: false,
     fullscreen: true,
     skipTaskbar: true,
-    backgroundColor: '#060608',
+    focusable: false,
+    backgroundColor: '#000000',
     title: 'IKANDY Mirror',
     webPreferences: {
       autoplayPolicy:  'no-user-gesture-required',
@@ -2080,10 +2081,22 @@ ipcMain.handle('open-mirror', (_e, displayId, spanInfo) => {
     },
   });
   win.setMenu(null);
-  const query = spanInfo
-    ? { span: encodeURIComponent(JSON.stringify(spanInfo)) }
-    : { mirror: '1' };
-  win.loadFile(path.join(__dirname, 'IKANDY.html'), { query });
+  win.setIgnoreMouseEvents(true);
+
+  const query = spanInfo ? { span: encodeURIComponent(JSON.stringify(spanInfo)) } : {};
+  win.loadFile(path.join(__dirname, 'mirror.html'), { query });
+
+  // Once mirror is ready, find the main window's capture source and send it
+  win.webContents.once('did-finish-load', async () => {
+    try {
+      const sources = await desktopCapturer.getSources({ types: ['window'], fetchWindowIcons: false });
+      const src = sources.find(s => s.name === 'IKANDY') || sources[0];
+      if (src) win.webContents.send('mirror-source', src.id);
+    } catch (e) {
+      console.error('[IKANDY] Mirror source error:', e.message);
+    }
+  });
+
   win.on('closed', () => {
     mirrorWindows = mirrorWindows.filter(w => w.displayId !== displayId);
     mainWindow?.webContents.send('mirror-closed', displayId);
