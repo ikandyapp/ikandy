@@ -46,6 +46,11 @@ html, body {
   z-index: 17; pointer-events: none; opacity: 0; transition: opacity .4s;
   mix-blend-mode: overlay;
 }
+#click-ripple-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 18; pointer-events: none;
+  mix-blend-mode: screen;
+}
 #fx-canvas {
   /* FX Layer — chromatic aberration post-process.
      Reads #viz as a texture each frame, applies CA, displays here.
@@ -1318,6 +1323,79 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   #pnav       { display: none; }
   #controls   { bottom: 10px; left: 50%; transform: translateX(-50%); gap: 6px; }
 }
+
+/* ── Welcome modal ── */
+#welcome-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.85); z-index: 10000;
+  align-items: center; justify-content: center;
+  padding: 20px; backdrop-filter: blur(6px);
+}
+#welcome-modal.open { display: flex; }
+#welcome-modal .wm-box {
+  background: linear-gradient(160deg, #0d0d14 60%, #11091a);
+  border: 1px solid rgba(180,100,255,.25);
+  border-radius: 10px; max-width: 520px; width: 100%;
+  padding: 32px 30px 26px; color: #ccc;
+  font-size: 13px; line-height: 1.7;
+  box-shadow: 0 0 60px rgba(140,60,255,.15), 0 20px 60px rgba(0,0,0,.7);
+  position: relative; overflow: hidden;
+}
+#welcome-modal .wm-box::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 80% 10%, rgba(120,40,255,.12) 0%, transparent 60%);
+  pointer-events: none;
+}
+#welcome-modal .wm-logo {
+  font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+  color: rgba(180,100,255,.7); margin-bottom: 6px;
+}
+#welcome-modal h1 {
+  font-size: 26px; font-weight: 700; color: #fff;
+  margin: 0 0 4px 0; letter-spacing: -.02em; line-height: 1.15;
+}
+#welcome-modal .wm-version {
+  font-size: 11px; color: rgba(255,255,255,.25); margin-bottom: 20px;
+}
+#welcome-modal p { margin: 0 0 12px; color: rgba(200,190,220,.8); }
+#welcome-modal .wm-features {
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+  border-radius: 6px; padding: 12px 14px; margin: 16px 0;
+}
+#welcome-modal .wm-features .wm-feat-title {
+  font-size: 10px; letter-spacing: .15em; text-transform: uppercase;
+  color: rgba(180,100,255,.7); margin-bottom: 8px;
+}
+#welcome-modal .wm-feat {
+  display: flex; gap: 10px; align-items: baseline;
+  font-size: 12px; color: rgba(200,190,220,.75); margin-bottom: 5px;
+}
+#welcome-modal .wm-feat-key {
+  font-size: 10px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 3px; padding: 1px 6px; color: #fff; white-space: nowrap; flex-shrink: 0;
+}
+#welcome-modal .wm-reddit {
+  font-size: 11.5px; color: rgba(200,190,220,.55);
+  border-top: 1px solid rgba(255,255,255,.06); margin-top: 18px; padding-top: 14px;
+}
+#welcome-modal .wm-reddit a { color: rgba(180,100,255,.9); text-decoration: none; }
+#welcome-modal .wm-reddit a:hover { color: #c77dff; }
+#welcome-modal .wm-footer {
+  display: flex; gap: 10px; margin-top: 20px; align-items: center;
+}
+#welcome-modal .wm-btn {
+  flex: 1; padding: 9px 0; border-radius: 5px; border: none;
+  font-size: 12.5px; font-weight: 600; cursor: pointer; letter-spacing: .04em;
+  background: linear-gradient(135deg, #7b2fff, #b44fff);
+  color: #fff; transition: opacity .15s;
+}
+#welcome-modal .wm-btn:hover { opacity: .85; }
+#welcome-modal .wm-no-show {
+  font-size: 11px; color: rgba(255,255,255,.25); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+#welcome-modal .wm-no-show:hover { color: rgba(255,255,255,.5); }
 </style>
 </head>
 <body>
@@ -1415,6 +1493,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 
 <canvas id="vignette-canvas"></canvas>
 <canvas id="grain-canvas"></canvas>
+<canvas id="click-ripple-canvas"></canvas>
 <canvas id="scanline-canvas"></canvas>
 <canvas id="aurora-canvas"></canvas>
 <canvas id="pawrticles-canvas"></canvas>
@@ -1568,6 +1647,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <div class="ho-opt" id="ho-status" onclick="toggleHideKeep('status')">Connection status
     <span class="ho-show-toggle on" id="ho-show-status" onclick="event.stopPropagation(); toggleShowFeature('status')" title="Show connection status"></span>
   </div>
+  <div class="ho-opt on" id="ho-mouse-fx" onclick="toggleMouseFx()" style="border-top:1px solid rgba(255,255,255,.07);margin-top:4px;padding-top:8px;">Mouse effects</div>
 </div>
 
 <!-- PRESET PANEL (slides up from bottom) -->
@@ -1649,7 +1729,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
         </button>
       </div>
     </div>
-    <div id="app-tagline">Visual music &nbsp;·&nbsp; v1.0.5</div>
+    <div id="app-tagline">Visual music &nbsp;·&nbsp; v1.0.7</div>
     <a href="https://spotify.com" target="_blank" style="display:inline-flex;align-items:center;gap:6px;margin-top:6px;text-decoration:none;opacity:0.7;transition:opacity .2s;"
       onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="#1DB954" xmlns="http://www.w3.org/2000/svg">
@@ -2444,6 +2524,9 @@ function spawnPbBurst(intensity) {
   const cy = h * (0.25 + Math.random() * 0.5);
   // Pull current accent color from theme
   const accent = (getComputedStyle(document.documentElement).getPropertyValue('--sp') || '#fff').trim();
+  const colors = [
+    '#ff4d6d','#ff9f1c','#ffee32','#06d6a0','#00b4d8','#c77dff','#ff6b6b','#4cc9f0'
+  ];
   const count = Math.floor(18 + 22 * intensity * _pbDensity);
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -2454,8 +2537,8 @@ function spawnPbBurst(intensity) {
       vy: Math.sin(angle) * speed,
       life: 1.0,
       decay: 0.012 + Math.random() * 0.02,
-      size: 1.5 + Math.random() * 3,
-      color: accent
+      size: 3 + Math.random() * 5,
+      color: colors[Math.floor(Math.random() * colors.length)]
     });
   }
   // Soft cap — prevents runaway particle count on heavy density + dense kicks
@@ -2503,7 +2586,7 @@ function renderPb(bassRaw) {
     pbCtx.clearRect(0, 0, pbCanvas.width, pbCanvas.height);
   } else {
     pbCtx.globalCompositeOperation = 'destination-out';
-    pbCtx.fillStyle = 'rgba(0,0,0,0.32)';
+    pbCtx.fillStyle = 'rgba(0,0,0,0.55)';
     pbCtx.fillRect(0, 0, pbCanvas.width, pbCanvas.height);
   }
 
@@ -2516,6 +2599,10 @@ function renderPb(bassRaw) {
     p.vx *= 0.97;
     p.vy *= 0.97;
     p.vy += 0.06;       // slight gravity
+    // mouse repel
+    const mdx = p.x - _mouseX, mdy = p.y - _mouseY;
+    const mdist = Math.sqrt(mdx*mdx + mdy*mdy) || 1;
+    if (mdist < 200) { const f = (200 - mdist) / 200 * 3.5; p.vx += (mdx/mdist)*f; p.vy += (mdy/mdist)*f; }
     p.life -= p.decay;
     if (p.life <= 0 || p.x < -50 || p.x > pbCanvas.width + 50 || p.y > pbCanvas.height + 50) {
       _pbParticles.splice(i, 1);
@@ -2547,6 +2634,214 @@ function setPbEnabled(on) {
   }
 }
 function togglePb() { setPbEnabled(!_pbEnabled); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   CLICK RIPPLES — transparent overlay, always active
+   Click anywhere to spawn an expanding ring that fades out.
+   ═══════════════════════════════════════════════════════════════════ */
+const _crCanvas = document.getElementById('click-ripple-canvas');
+const _crCtx    = _crCanvas ? _crCanvas.getContext('2d') : null;
+let   _crRings  = [];
+let   _crRAF    = null;
+
+const CR_COLORS = ['#ff4d6d','#c77dff','#00b4d8','#06d6a0','#ffee32','#ff9f1c'];
+
+function _crSpawn(x, y) {
+  _crRings.push({ x, y, r: 0, maxR: 140 + Math.random() * 80, alpha: 0.8,
+    color: CR_COLORS[Math.floor(Math.random() * CR_COLORS.length)],
+    speed: 2.5 + Math.random() * 2 });
+  if (!_crRAF) _crLoop();
+}
+
+function _crLoop() {
+  const W = window.innerWidth, H = window.innerHeight;
+  if (_crCanvas.width !== W || _crCanvas.height !== H) {
+    _crCanvas.width = W; _crCanvas.height = H;
+  }
+  _crCtx.clearRect(0, 0, W, H);
+
+  // Cursor trail
+  for (let i = _trailPoints.length - 1; i >= 0; i--) {
+    const tp = _trailPoints[i];
+    tp.life -= 0.06;
+    if (tp.life <= 0) { _trailPoints.splice(i, 1); continue; }
+    const sz = tp.life * 4;
+    _crCtx.beginPath();
+    _crCtx.arc(tp.x, tp.y, sz, 0, Math.PI * 2);
+    _crCtx.fillStyle = tp.color;
+    _crCtx.globalAlpha = tp.life * 0.7;
+    _crCtx.fill();
+  }
+  _crCtx.globalAlpha = 1;
+
+  // Rings (expand or implode)
+  const timeScale = _slowMoActive ? 0.25 : 1;
+  for (let i = _crRings.length - 1; i >= 0; i--) {
+    const rp = _crRings[i];
+    if (rp.implode) {
+      rp.r    -= rp.speed * timeScale;
+      rp.alpha = 0.8 * (rp.r / rp.maxR);
+      if (rp.r <= 0) { _crRings.splice(i, 1); continue; }
+    } else {
+      rp.r    += rp.speed * timeScale;
+      rp.alpha = 0.8 * (1 - rp.r / rp.maxR);
+      if (rp.r >= rp.maxR) { _crRings.splice(i, 1); continue; }
+    }
+    _crCtx.beginPath();
+    _crCtx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+    _crCtx.strokeStyle = rp.color;
+    _crCtx.globalAlpha = rp.alpha;
+    _crCtx.lineWidth   = 2.5;
+    _crCtx.stroke();
+  }
+  _crCtx.globalAlpha = 1;
+  const hasActivity = _crRings.length || _trailPoints.length || _chargeRing;
+  _crRAF = hasActivity ? requestAnimationFrame(_crLoop) : null;
+}
+
+document.addEventListener('click', e => {
+  if (!_mouseFxEnabled) return;
+  if (e.target.closest('#sidebar, #top-bar, #transport-bar')) return;
+  _crSpawn(e.clientX, e.clientY);
+});
+
+/* ── DOUBLE-CLICK: particle burst at cursor ── */
+document.addEventListener('dblclick', e => {
+  if (!_mouseFxEnabled) return;
+  if (e.target.closest('#sidebar, #top-bar, #transport-bar')) return;
+  spawnPbBurst(1.0);
+  // Override spawn position to cursor — patch next burst's origin
+  const last = _pbParticles.slice(-40);
+  const cx = e.clientX, cy = e.clientY;
+  const W = pbCanvas.width, H = pbCanvas.height;
+  for (const p of last) { p.x = cx; p.y = cy; }
+});
+
+/* ── HOLD & CHARGE: ring grows on hold, explodes on release ── */
+let _mouseFxEnabled = true;
+
+function toggleMouseFx() {
+  _mouseFxEnabled = !_mouseFxEnabled;
+  const btn = document.getElementById('ho-mouse-fx');
+  if (btn) btn.classList.toggle('on', _mouseFxEnabled);
+  if (!_mouseFxEnabled) {
+    _crRings.length = 0; _trailPoints.length = 0; _chargeRing = null;
+    if (_crCtx) _crCtx.clearRect(0, 0, _crCanvas.width, _crCanvas.height);
+  }
+  localStorage.setItem('IKANDY-mouse-fx', _mouseFxEnabled ? '1' : '0');
+}
+
+let _chargeTimer = null, _chargeRing = null, _chargeRAF = null;
+
+function _chargeLoop() {
+  if (!_chargeRing) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  if (_crCanvas.width !== W || _crCanvas.height !== H) { _crCanvas.width = W; _crCanvas.height = H; }
+  _chargeRing.r = Math.min(_chargeRing.r + 1.5, 180);
+  const prog = _chargeRing.r / 180;
+  _crCtx.beginPath();
+  _crCtx.arc(_chargeRing.x, _chargeRing.y, _chargeRing.r, 0, Math.PI * 2);
+  _crCtx.strokeStyle = `hsl(${prog * 260}, 100%, 65%)`;
+  _crCtx.globalAlpha = 0.6 + prog * 0.3;
+  _crCtx.lineWidth = 2 + prog * 4;
+  _crCtx.stroke();
+  _crCtx.globalAlpha = 1;
+  _chargeRAF = requestAnimationFrame(_chargeLoop);
+}
+
+document.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  if (e.target.closest('#sidebar, #top-bar, #transport-bar')) return;
+  _chargeRing = { x: e.clientX, y: e.clientY, r: 0 };
+  _chargeTimer = setTimeout(() => { if (_chargeRAF) return; _chargeLoop(); }, 300);
+});
+
+document.addEventListener('mouseup', e => {
+  if (e.button !== 0) return;
+  clearTimeout(_chargeTimer);
+  if (_chargeRAF) { cancelAnimationFrame(_chargeRAF); _chargeRAF = null; }
+  if (_chargeRing && _chargeRing.r > 20) {
+    // Explode: spawn rings at increasing radii
+    const { x, y, r } = _chargeRing;
+    const steps = Math.floor(r / 30);
+    for (let i = 0; i < steps; i++) {
+      setTimeout(() => _crSpawn(x, y), i * 60);
+    }
+    spawnPbBurst(Math.min(1, r / 180));
+  }
+  _chargeRing = null;
+});
+
+/* ── CURSOR TRAIL ── */
+const _trailPoints = [];
+const _trailMax    = 28;
+
+document.addEventListener('mousemove', e => {
+  if (!_mouseFxEnabled) return;
+  if (e.target.closest('#sidebar, #top-bar, #transport-bar')) return;
+  _trailPoints.push({ x: e.clientX, y: e.clientY, life: 1.0,
+    color: CR_COLORS[Math.floor(Math.random() * CR_COLORS.length)] });
+  if (_trailPoints.length > _trailMax) _trailPoints.shift();
+  if (!_crRAF) _crLoop();
+});
+
+/* ── RIGHT-CLICK 1: implosion rings (collapse inward) ── */
+let _rcLastClick = 0;
+let _rcHoldTimer = null;
+let _slowMoActive = false;
+
+function _spawnImplosion(x, y) {
+  const maxR = 180 + Math.random() * 80;
+  _crRings.push({ x, y, r: maxR, maxR, alpha: 0.8, implode: true,
+    color: CR_COLORS[Math.floor(Math.random() * CR_COLORS.length)],
+    speed: 3 + Math.random() * 2 });
+  if (!_crRAF) _crLoop();
+}
+
+/* ── RIGHT-CLICK 2: strobe flash ── */
+function _strobeFlash() {
+  const flash = document.createElement('div');
+  flash.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;pointer-events:none;opacity:0.7;transition:opacity 0.35s';
+  document.body.appendChild(flash);
+  requestAnimationFrame(() => { flash.style.opacity = '0'; });
+  setTimeout(() => flash.remove(), 400);
+}
+
+/* ── RIGHT-CLICK 3: slow-mo hold ── */
+function _setSlowMo(on) {
+  _slowMoActive = on;
+  // Slow aurora time increment and particle physics
+}
+
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (!_mouseFxEnabled) return;
+  if (e.target.closest('#sidebar, #top-bar, #transport-bar')) return;
+  const now = Date.now();
+  if (now - _rcLastClick < 300) {
+    // Double right-click → strobe
+    _strobeFlash();
+  } else {
+    // Single right-click → implosion
+    _spawnImplosion(e.clientX, e.clientY);
+  }
+  _rcLastClick = now;
+});
+
+document.addEventListener('mousedown', e => {
+  if (e.button !== 2) return;
+  _rcHoldTimer = setTimeout(() => { _setSlowMo(true); }, 400);
+});
+
+document.addEventListener('mouseup', e => {
+  if (e.button !== 2) return;
+  clearTimeout(_rcHoldTimer);
+  _setSlowMo(false);
+});
+
+
+
+
 
 function setPbDensity(v) {
   _pbDensity = Math.max(0, Math.min(2, +v || 0));
@@ -5658,6 +5953,7 @@ const AURORA_FRAG = `
   uniform float u_treble;
   uniform float u_intensity;
   uniform vec2  u_res;
+  uniform vec2  u_mouse;
   varying vec2  v_uv;
 
   // ── Smooth noise helpers ──
@@ -5725,7 +6021,15 @@ const AURORA_FRAG = `
 
     // ── Curtain field — bass lifts the curtains higher ──
     float bassLift = u_bass * 0.35 * I;
-    float h = curtainHeight(suv * 0.6 + vec2(0.0, t * 0.04), t);
+
+    // Local mouse warp — pull UVs toward cursor based on distance
+    vec2 mouseNorm = vec2(u_mouse.x / u_res.x, u_mouse.y / u_res.y);
+    vec2 toMouse = mouseNorm - uv;
+    float mouseDist = length(toMouse);
+    float mouseWarp = smoothstep(0.24, 0.0, mouseDist) * 0.04;
+    vec2 warpedUV = suv + normalize(toMouse + vec2(0.001)) * mouseWarp * (u_res.x / u_res.y);
+
+    float h = curtainHeight(warpedUV * 0.6 + vec2(0.0, t * 0.04), t);
 
     // Vertical mask — aurora starts above screen, flows down into view
     // Bass pushes it further down
@@ -5831,7 +6135,7 @@ function buildSceneProgram(gl, vertSrc, fragSrc, label) {
   // Cache uniform locations
   gl.useProgram(prog);
   prog._u = {};
-  ['u_time','u_bass','u_mid','u_treble','u_intensity','u_res'].forEach(n => {
+  ['u_time','u_bass','u_mid','u_treble','u_intensity','u_res','u_mouse'].forEach(n => {
     prog._u[n] = gl.getUniformLocation(prog, n);
   });
   return prog;
@@ -5854,8 +6158,9 @@ function renderAurora() {
   gl.uniform1f(u.u_treble,    _aTreble);
   gl.uniform1f(u.u_intensity, _sceneIntensity);
   gl.uniform2f(u.u_res,       W, H);
+  gl.uniform2f(u.u_mouse,     _mouseX === -9999 ? W/2 : _mouseX, _mouseY === -9999 ? H/2 : H - _mouseY);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  _auroraTime += 0.016;
+  _auroraTime += _slowMoActive ? 0.004 : 0.016;
 }
 
 function startAuroraLoop() {
@@ -6072,6 +6377,7 @@ function renderSingularity() {
   gl.uniform1f(u.u_treble,    _aTreble);
   gl.uniform1f(u.u_intensity, _sceneIntensity);
   gl.uniform2f(u.u_res,       W, H);
+  gl.uniform2f(u.u_mouse,     _mouseX === -9999 ? W/2 : _mouseX, _mouseY === -9999 ? H/2 : H - _mouseY);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   _singularityTime += 0.016;
 }
@@ -6335,6 +6641,7 @@ function renderVoyager() {
   gl.uniform1f(u.u_treble,    _aTreble);
   gl.uniform1f(u.u_intensity, _sceneIntensity);
   gl.uniform2f(u.u_res,       W, H);
+  gl.uniform2f(u.u_mouse,     _mouseX === -9999 ? W/2 : _mouseX, _mouseY === -9999 ? H/2 : H - _mouseY);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   _voyagerTime += 0.016;
 }
@@ -6355,6 +6662,10 @@ function stopVoyagerLoop() {
    Bass = warp burst + radial bloom. Mid = color temp. Treble = shimmer.
    No edge bounce — stars fly off and respawn at center.
    ═══════════════════════════════════════════════════════════════════ */
+
+// Mouse repel tracking for Pawrticles
+let _mouseX = -9999, _mouseY = -9999;
+window.addEventListener('mousemove', e => { _mouseX = e.clientX; _mouseY = e.clientY; });
 
 const pawCanvas = document.getElementById('pawrticles-canvas');
 const pawCtx    = pawCanvas.getContext('2d');
@@ -9635,6 +9946,46 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
 </div>
 
 <!-- GitHub release update modal — shown on launch when newer release exists -->
+<!-- Welcome modal -->
+<div id="welcome-modal" onclick="if(event.target===this)closeWelcome()">
+  <div class="wm-box">
+    <div class="wm-logo">iKandy App</div>
+    <h1>Welcome to iKandy</h1>
+    <div class="wm-version">Music Visualizer · Early Access</div>
+
+    <p>
+      You're one of the first people to experience iKandy — and that genuinely means something.
+      Thank you for your trust. This is a labor of love built for people who actually <em>feel</em> their music.
+    </p>
+
+    <p>
+      iKandy is free, always will be. If it moves you, tell someone. If something's broken or you want
+      a feature, reach out — every request gets read.
+    </p>
+
+    <div class="wm-features">
+      <div class="wm-feat-title">✦ New · Mouse Interactions</div>
+      <div class="wm-feat"><span class="wm-feat-key">Click</span> Drop an expanding ripple anywhere on screen</div>
+      <div class="wm-feat"><span class="wm-feat-key">Double-click</span> Burst particles from your cursor</div>
+      <div class="wm-feat"><span class="wm-feat-key">Hold</span> Charge a ring — release to explode it</div>
+      <div class="wm-feat"><span class="wm-feat-key">Right-click</span> Implosion ring · double for strobe · hold for slow-mo</div>
+      <div class="wm-feat"><span class="wm-feat-key">Mouse</span> Aurora bends toward your cursor · Particles scatter from it</div>
+    </div>
+
+    <div class="wm-reddit">
+      Loving it? Drop a screenshot on
+      <a href="https://www.reddit.com/r/IKANDYAPP/" target="_blank">r/IKANDYAPP</a> —
+      the community is just getting started and your posts help others find it.
+      Share what you're seeing. No two sessions look the same.
+    </div>
+
+    <div class="wm-footer">
+      <button class="wm-btn" onclick="closeWelcome()">Let's go →</button>
+      <span class="wm-no-show" onclick="closeWelcomePermanent()">Don't show again</span>
+    </div>
+  </div>
+</div>
+
 <div id="gh-update-modal" onclick="if(event.target===this)el('gh-update-modal').classList.remove('open')">
   <div class="box">
     <h2>⬆ Update available</h2>
@@ -9679,6 +10030,18 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
 <script>
 function openSourceHelp() { el('src-help-modal').classList.add('open'); }
 function closeSourceHelp() { el('src-help-modal').classList.remove('open'); }
+
+/* ── Welcome modal ── */
+function closeWelcome() { el('welcome-modal').classList.remove('open'); }
+function closeWelcomePermanent() {
+  localStorage.setItem('IKANDY-welcome-seen', '1');
+  closeWelcome();
+}
+(function() {
+  if (localStorage.getItem('IKANDY-welcome-seen') !== '1') {
+    setTimeout(() => el('welcome-modal')?.classList.add('open'), 800);
+  }
+})();
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && el('src-help-modal')?.classList.contains('open')) closeSourceHelp();
 });
