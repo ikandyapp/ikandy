@@ -81,10 +81,13 @@ contextBridge.exposeInMainWorld('IKANDY', {
   openMirror:     (id, span)    => ipcRenderer.invoke('open-mirror', id, span),
   closeMirror:    (id)          => ipcRenderer.invoke('close-mirror', id),
   closeAllMirrors:()            => ipcRenderer.invoke('close-all-mirrors'),
+  setSpanDisplays:(ids)         => ipcRenderer.invoke('set-span-displays', ids),
   sendMirrorAudio:(data)        => ipcRenderer.send('mirror-audio', data),
   onMirrorClosed: (cb)          => { ipcRenderer.removeAllListeners('mirror-closed'); ipcRenderer.on('mirror-closed', (_e, id) => cb(id)); },
   onMirrorAudio:  (cb)          => { ipcRenderer.removeAllListeners('mirror-audio');  ipcRenderer.on('mirror-audio',  (_e, d)  => cb(d));  },
   onMirrorSource: (cb)          => { ipcRenderer.removeAllListeners('mirror-source'); ipcRenderer.on('mirror-source', (_e, id) => cb(id)); },
+  onMirrorError:  (cb)          => { ipcRenderer.removeAllListeners('mirror-error');  ipcRenderer.on('mirror-error',  (_e, d)  => cb(d));  },
+  reportMirrorError:(label, msg)=> ipcRenderer.send('mirror-error-report', { label, msg }),
 });
 
 console.log('[IKANDY Preload] Ready. Platform:', process.platform);

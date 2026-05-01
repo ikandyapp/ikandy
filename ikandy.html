@@ -1667,6 +1667,13 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <span class="ho-draw-color" id="hdc-white"  onclick="setDrawColor('white')"  title="White">●</span>
     <span class="ho-draw-color" id="hdc-accent" onclick="setDrawColor('accent')" title="Accent">◈</span>
   </div>
+  <div style="padding:2px 14px 8px 28px;display:flex;gap:8px;align-items:center;" id="ho-draw-width-row">
+    <span style="font-size:10px;color:rgba(255,255,255,.3);">Width</span>
+    <input type="range" min="1" max="40" value="3" step="1"
+      style="flex:1;accent-color:var(--acc);"
+      oninput="setDrawWidth(+this.value)">
+    <span id="ho-draw-width-v" style="font-size:10px;color:rgba(255,255,255,.3);width:16px;">3</span>
+  </div>
 </div>
 
 <!-- PRESET PANEL (slides up from bottom) -->
@@ -2713,16 +2720,27 @@ async function refreshMonitorList() {
     if (d.isPrimary) { btn.textContent = 'Primary'; btn.style.opacity = '0.35'; }
     btn.onclick = async () => {
       if (d.isPrimary) return;
-      if (_activeDisplayIds.has(d.id)) {
-        await window.IKANDY.closeMirror(d.id);
-        _activeDisplayIds.delete(d.id);
-      } else {
-        if (_monitorMode === 'span') {
-          await _openSpan(displays, d.id);
+      try {
+        if (_activeDisplayIds.has(d.id)) {
+          _activeDisplayIds.delete(d.id);
+          if (_monitorMode === 'span') {
+            const r = await window.IKANDY.setSpanDisplays(Array.from(_activeDisplayIds));
+            if (r?.error) debugLog('Span', r.error);
+          } else {
+            await window.IKANDY.closeMirror(d.id);
+          }
         } else {
-          await window.IKANDY.openMirror(d.id);
+          _activeDisplayIds.add(d.id);
+          if (_monitorMode === 'span') {
+            const r = await window.IKANDY.setSpanDisplays(Array.from(_activeDisplayIds));
+            if (r?.error) debugLog('Span', r.error);
+          } else {
+            await window.IKANDY.openMirror(d.id);
+          }
         }
-        _activeDisplayIds.add(d.id);
+      } catch (err) {
+        debugLog('Monitor', 'Toggle ' + d.label + ' failed: ' + (err?.message || err));
+        _activeDisplayIds.delete(d.id);
       }
       refreshMonitorList();
       document.getElementById('close-all-mirrors-btn').style.display =
@@ -2734,32 +2752,12 @@ async function refreshMonitorList() {
   });
 }
 
-async function _openSpan(allDisplays, targetId) {
-  // Bounding box = primary + ALL currently active + new target
-  const primary = allDisplays.find(d => d.isPrimary);
-  const target  = allDisplays.find(d => d.id === targetId);
-  if (!primary || !target) return;
-  const activeDisplays = allDisplays.filter(d =>
-    d.isPrimary || _activeDisplayIds.has(d.id) || d.id === targetId
-  );
-  const minX = Math.min(...activeDisplays.map(d => d.bounds.x));
-  const minY = Math.min(...activeDisplays.map(d => d.bounds.y));
-  const maxX = Math.max(...activeDisplays.map(d => d.bounds.x + d.bounds.width));
-  const maxY = Math.max(...activeDisplays.map(d => d.bounds.y + d.bounds.height));
-  const totalW = maxX - minX;
-  const totalH = maxY - minY;
-  const spanInfo = {
-    offsetX: target.bounds.x - minX,
-    offsetY: target.bounds.y - minY,
-    sliceW:  target.bounds.width,
-    sliceH:  target.bounds.height,
-    totalW, totalH
-  };
-  await window.IKANDY.openMirror(targetId, spanInfo);
-}
-
 async function closeAllMirrors() {
-  await window.IKANDY.closeAllMirrors();
+  if (_monitorMode === 'span') {
+    await window.IKANDY.setSpanDisplays([]);
+  } else {
+    await window.IKANDY.closeAllMirrors();
+  }
   _activeDisplayIds.clear();
   refreshMonitorList();
   document.getElementById('close-all-mirrors-btn').style.display = 'none';
@@ -2768,6 +2766,11 @@ async function closeAllMirrors() {
 window.IKANDY.onMirrorClosed((displayId) => {
   _activeDisplayIds.delete(displayId);
   refreshMonitorList();
+});
+
+// Surface any mirror/span errors into the user-visible debug panel
+window.IKANDY.onMirrorError(({ label, msg }) => {
+  debugLog(label || 'Monitor', msg);
 });
 
 // Audio forwarding
@@ -2818,6 +2821,7 @@ const _drawCanvas = document.getElementById('draw-canvas');
 const _drawCtx    = _drawCanvas ? _drawCanvas.getContext('2d') : null;
 let _drawEnabled  = true;
 let _drawColor    = 'random';
+let _drawWidth    = 3;
 let _isDrawing    = false;
 let _lastDrawX    = 0, _lastDrawY = 0;
 let _currentStrokeColor = '#ffffff';
@@ -2849,7 +2853,14 @@ function toggleDrawMode() {
   _drawEnabled = !_drawEnabled;
   document.getElementById('ho-draw-mode')?.classList.toggle('on', _drawEnabled);
   document.getElementById('ho-draw-color-row').style.opacity = _drawEnabled ? '1' : '0.3';
+  document.getElementById('ho-draw-width-row').style.opacity = _drawEnabled ? '1' : '0.3';
   if (!_drawEnabled) { _isDrawing = false; document.body.style.cursor = ''; }
+}
+
+function setDrawWidth(w) {
+  _drawWidth = w;
+  const lbl = document.getElementById('ho-draw-width-v');
+  if (lbl) lbl.textContent = w;
 }
 
 function setDrawColor(c) {
@@ -2879,7 +2890,7 @@ document.addEventListener('mousemove', e => {
   _drawCtx.moveTo(_lastDrawX, _lastDrawY);
   _drawCtx.lineTo(e.clientX, e.clientY);
   _drawCtx.strokeStyle = _currentStrokeColor;
-  _drawCtx.lineWidth   = 3;
+  _drawCtx.lineWidth   = _drawWidth;
   _drawCtx.lineCap     = 'round';
   _drawCtx.lineJoin    = 'round';
   _drawCtx.shadowColor = _currentStrokeColor;

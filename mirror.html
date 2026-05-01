@@ -5,53 +5,95 @@
 <title>IKANDY Mirror</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
-  #v { width: 100%; height: 100%; object-fit: fill; display: block; }
-  #msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    font: 13px/1.5 sans-serif; color: rgba(255,255,255,.3); letter-spacing: .06em; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; color: #fff; }
+  #v { width: 100%; height: 100%; object-fit: fill; display: block; background: #000; }
+  #status {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 12px;
+    background: #000; pointer-events: none;
+  }
+  #status h2 { font-size: 18px; font-weight: 400; letter-spacing: .15em; color: rgba(255,255,255,.7); }
+  #status p  { font-size: 13px; color: rgba(255,255,255,.4); max-width: 600px; text-align: center; padding: 0 40px; }
+  .err { color: #ff6b6b !important; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.3); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: .3; } 50% { opacity: 1; } }
 </style>
 </head>
 <body>
 <video id="v" autoplay muted playsinline></video>
-<div id="msg">Connecting to IKANDY…</div>
+<div id="status">
+  <div class="dot"></div>
+  <h2 id="status-title">IKANDY MIRROR</h2>
+  <p id="status-text">Connecting…</p>
+</div>
 <script>
   const params  = new URLSearchParams(window.location.search);
   const spanRaw = params.get('span');
   const span    = spanRaw ? JSON.parse(decodeURIComponent(spanRaw)) : null;
 
-  // Apply span crop via CSS transform on the video element
-  if (span) {
-    const { offsetX, offsetY, sliceW, sliceH, totalW, totalH } = span;
-    const scaleX = window.screen.width  / sliceW;
-    const scaleY = window.screen.height / sliceH;
-    const v = document.getElementById('v');
-    v.style.width     = (totalW * scaleX) + 'px';
-    v.style.height    = (totalH * scaleY) + 'px';
-    v.style.marginLeft = (-offsetX * scaleX) + 'px';
-    v.style.marginTop  = (-offsetY * scaleY) + 'px';
-    v.style.objectFit  = 'fill';
+  const statusEl = document.getElementById('status');
+  const titleEl  = document.getElementById('status-title');
+  const textEl   = document.getElementById('status-text');
+
+  function setStatus(title, text, isErr) {
+    titleEl.textContent = title;
+    textEl.textContent  = text;
+    titleEl.classList.toggle('err', !!isErr);
+    textEl.classList.toggle('err',  !!isErr);
   }
 
-  window.IKANDY.onMirrorSource(async (sourceId) => {
+  // Span: scale & shift video so this monitor shows its slice
+  if (span) {
+    const { offsetX, offsetY, sliceW, sliceH, totalW, totalH } = span;
+    const scaleX = window.innerWidth  / sliceW;
+    const scaleY = window.innerHeight / sliceH;
+    const v = document.getElementById('v');
+    v.style.position = 'absolute';
+    v.style.width  = (totalW * scaleX) + 'px';
+    v.style.height = (totalH * scaleY) + 'px';
+    v.style.left   = (-offsetX * scaleX) + 'px';
+    v.style.top    = (-offsetY * scaleY) + 'px';
+  }
+
+  async function start() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          mandatory: {
-            chromeMediaSource: 'desktop',
-            chromeMediaSourceId: sourceId,
-            minWidth: 1, maxWidth: 10000,
-            minHeight: 1, maxHeight: 10000,
-            minFrameRate: 30, maxFrameRate: 60,
-          }
-        }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        throw new Error('getDisplayMedia not available');
+      }
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 60 },
+        audio: false
       });
-      document.getElementById('v').srcObject = stream;
-      document.getElementById('msg').style.display = 'none';
+      const v = document.getElementById('v');
+      v.srcObject = stream;
+      v.onplaying = () => { statusEl.style.display = 'none'; };
+      v.onerror = (e) => {
+        setStatus('VIDEO ERROR', String(e), true);
+        try { window.IKANDY?.reportMirrorError('video', String(e)); } catch {}
+      };
+      stream.getVideoTracks().forEach(t => {
+        t.onended = () => {
+          setStatus('STREAM ENDED', 'IKANDY may have closed', true);
+          try { window.IKANDY?.reportMirrorError('stream-ended', 'Track ended'); } catch {}
+        };
+      });
+      setTimeout(() => {
+        if (statusEl.style.display !== 'none') {
+          setStatus('NO VIDEO', 'Stream connected but no frames received', true);
+          try { window.IKANDY?.reportMirrorError('no-frames', 'Stream connected but no frames after 5s'); } catch {}
+        }
+      }, 5000);
     } catch (e) {
-      document.getElementById('msg').textContent = 'Mirror error: ' + e.message;
+      console.error('[Mirror]', e);
+      setStatus('CAPTURE FAILED', e.message || String(e), true);
+      try { window.IKANDY?.reportMirrorError('capture-failed', e.message || String(e)); } catch {}
     }
+  }
+  // Catch any uncaught errors in the mirror window
+  window.addEventListener('error', (e) => {
+    try { window.IKANDY?.reportMirrorError('uncaught', e.message + ' @ ' + e.filename + ':' + e.lineno); } catch {}
   });
+  start();
 </script>
 </body>
 </html>

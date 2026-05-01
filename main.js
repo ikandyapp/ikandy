@@ -35,6 +35,20 @@ let   lastVolume    = null;
 // ── State ─────────────────────────────────────────────────────────────────────
 let mainWindow   = null;
 let mirrorWindows = []; // multi-monitor mirror windows
+const _mirrorWebContentsIds = new Set(); // tracks which webContents are mirrors
+let _spanActiveIds = new Set(); // displays currently in span mode (excluding primary)
+let _originalMainBounds = null;
+let _wasMainMaximized   = false;
+
+function _mirrorErr(label, msg) {
+  console.error('[IKANDY] ' + label + ':', msg);
+  mainWindow?.webContents.send('mirror-error', { label, msg: String(msg) });
+}
+
+// Forward error reports from mirror windows back to the main window's debug log
+ipcMain.on('mirror-error-report', (_e, { label, msg }) => {
+  _mirrorErr('Mirror[' + (label || 'unknown') + ']', msg);
+});
 let authServer   = null;
 let pollTimer    = null;
 let tokens       = {};        // { access_token, refresh_token, expires_at }
@@ -1405,33 +1419,56 @@ ipcMain.handle('pick-image-folder', async () => {
 // request from the renderer and uses Electron's desktopCapturer to provide
 // a real audio stream from any application on the system.
 function setupDesktopCapturer() {
-  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    // Must provide a video source — Electron requires it even for audio-only capture.
-    // We get the first screen source (silently, no picker) just to satisfy the requirement,
-    // then stop the video track in the renderer. Audio loopback is what we actually use.
-    desktopCapturer.getSources({ types: ['screen'] })
-      .then(sources => {
-        if (sources.length > 0) {
-          console.log('[IKANDY] desktopCapturer: using source', sources[0].name, '— audio: loopback');
-          callback({ video: sources[0], audio: 'loopback' });
-        } else {
-          // No screen sources — try window sources as fallback
-          console.warn('[IKANDY] desktopCapturer: no screen sources, trying windows...');
-          return desktopCapturer.getSources({ types: ['window'] }).then(windows => {
-            if (windows.length > 0) {
-              console.log('[IKANDY] desktopCapturer: fallback to window source', windows[0].name);
-              callback({ video: windows[0], audio: 'loopback' });
-            } else {
-              console.error('[IKANDY] desktopCapturer: no sources found — attempting audio-only loopback');
-              callback({ audio: 'loopback' });
-            }
-          });
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    const url = request.frame?.url || '';
+    const procId = request.frame?.processId;
+    const isMirror = (procId && _mirrorWebContentsIds.has(procId)) || url.includes('mirror.html');
+
+    if (isMirror) {
+      try {
+        console.log('[IKANDY] Mirror request from:', url);
+        const winSources = await desktopCapturer.getSources({ types: ['window'], fetchWindowIcons: false });
+        const ikandy = winSources.find(s => s.name === 'IKANDY');
+        if (ikandy) {
+          console.log('[IKANDY] Mirror capture: serving IKANDY window');
+          callback({ video: ikandy });
+          return;
         }
-      })
-      .catch(err => {
-        console.error('[IKANDY] desktopCapturer error:', err.message);
-        callback({ audio: 'loopback' }); // still attempt loopback even if source enum failed
-      });
+        _mirrorErr('Capture', 'IKANDY window not in source list. Found: ' + winSources.map(s => s.name).join(', '));
+        const screens = await desktopCapturer.getSources({ types: ['screen'] });
+        if (screens.length) {
+          console.log('[IKANDY] Mirror capture: fallback to primary screen');
+          callback({ video: screens[0] });
+        } else {
+          _mirrorErr('Capture', 'No screen or window sources available');
+          callback({});
+        }
+      } catch (err) {
+        _mirrorErr('Capture', err.message);
+        callback({});
+      }
+      return;
+    }
+
+    // Main window audio loopback path
+    try {
+      const sources = await desktopCapturer.getSources({ types: ['screen'] });
+      if (sources.length > 0) {
+        console.log('[IKANDY] desktopCapturer: using source', sources[0].name, '— audio: loopback');
+        callback({ video: sources[0], audio: 'loopback' });
+        return;
+      }
+      const windows = await desktopCapturer.getSources({ types: ['window'] });
+      if (windows.length > 0) {
+        console.log('[IKANDY] desktopCapturer: fallback to window source', windows[0].name);
+        callback({ video: windows[0], audio: 'loopback' });
+      } else {
+        callback({ audio: 'loopback' });
+      }
+    } catch (err) {
+      console.error('[IKANDY] desktopCapturer error:', err.message);
+      callback({ audio: 'loopback' });
+    }
   });
   console.log('[IKANDY] desktopCapturer / getDisplayMedia enabled');
 }
@@ -1554,6 +1591,9 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     globalShortcut.unregisterAll();
+    // Kill all mirror windows when main closes
+    mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
+    mirrorWindows = [];
     mainWindow = null;
   });
 
@@ -2066,7 +2106,11 @@ ipcMain.handle('open-mirror', async (_e, displayId, spanInfo) => {
   const win = new BrowserWindow({
     x, y, width, height,
     frame: false,
-    fullscreen: true,
+    transparent: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
     skipTaskbar: true,
     focusable: false,
     backgroundColor: '#000000',
@@ -2083,27 +2127,157 @@ ipcMain.handle('open-mirror', async (_e, displayId, spanInfo) => {
   win.setMenu(null);
   win.setIgnoreMouseEvents(true);
 
+  // Register webContents process ID so the displayMedia handler routes correctly
+  const procId = win.webContents.getOSProcessId?.() || win.webContents.id;
+  _mirrorWebContentsIds.add(procId);
+
   const query = spanInfo ? { span: encodeURIComponent(JSON.stringify(spanInfo)) } : {};
   win.loadFile(path.join(__dirname, 'mirror.html'), { query });
 
-  // Once mirror is ready, find the main window's capture source and send it
-  win.webContents.once('did-finish-load', async () => {
-    try {
-      const sources = await desktopCapturer.getSources({ types: ['window'], fetchWindowIcons: false });
-      const src = sources.find(s => s.name === 'IKANDY') || sources[0];
-      if (src) win.webContents.send('mirror-source', src.id);
-    } catch (e) {
-      console.error('[IKANDY] Mirror source error:', e.message);
-    }
-  });
+  // Always-on-top so it sits above the taskbar on the secondary display
+  win.setAlwaysOnTop(true, 'screen-saver');
 
   win.on('closed', () => {
+    _mirrorWebContentsIds.delete(procId);
     mirrorWindows = mirrorWindows.filter(w => w.displayId !== displayId);
     mainWindow?.webContents.send('mirror-closed', displayId);
   });
-  mirrorWindows.push({ displayId, win });
+  mirrorWindows.push({ displayId, win, mode: 'mirror' });
   return { ok: true };
 });
+
+// ── Span helpers ───────────────────────────────────────────────────────────
+function _saveOriginalBounds() {
+  if (_originalMainBounds || !mainWindow) return;
+  _wasMainMaximized   = mainWindow.isMaximized();
+  if (_wasMainMaximized) mainWindow.unmaximize();
+  _originalMainBounds = mainWindow.getBounds();
+}
+
+function _restoreOriginalBounds() {
+  if (!_originalMainBounds || !mainWindow) return;
+  try { mainWindow.setBounds(_originalMainBounds); } catch (e) { _mirrorErr('Restore bounds', e.message); }
+  if (_wasMainMaximized) mainWindow.maximize();
+  _originalMainBounds = null;
+  _wasMainMaximized   = false;
+}
+
+function _computeSpanBounds(activeIds) {
+  // Bounding box across primary + all active span displays
+  const all = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  const set = [primary, ...all.filter(d => activeIds.has(d.id) && d.id !== primary.id)];
+  const minX = Math.min(...set.map(d => d.bounds.x));
+  const minY = Math.min(...set.map(d => d.bounds.y));
+  const maxX = Math.max(...set.map(d => d.bounds.x + d.bounds.width));
+  const maxY = Math.max(...set.map(d => d.bounds.y + d.bounds.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY, displays: set };
+}
+
+function _closeAllSpanMirrors() {
+  const span = mirrorWindows.filter(w => w.mode === 'span');
+  span.forEach(w => { if (!w.win.isDestroyed()) w.win.close(); });
+  mirrorWindows = mirrorWindows.filter(w => w.mode !== 'span');
+}
+
+function _openSpanMirror(display, totalBounds) {
+  const { x, y, width, height } = display.bounds;
+  const win = new BrowserWindow({
+    x, y, width, height,
+    frame: false, transparent: false, resizable: false, movable: false,
+    minimizable: false, maximizable: false, skipTaskbar: true, focusable: false,
+    backgroundColor: '#000000', title: 'IKANDY Mirror',
+    webPreferences: {
+      autoplayPolicy:  'no-user-gesture-required',
+      nodeIntegration: false, contextIsolation: true, sandbox: false, webSecurity: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+  win.setMenu(null);
+  win.setIgnoreMouseEvents(true);
+  const procId = win.webContents.getOSProcessId?.() || win.webContents.id;
+  _mirrorWebContentsIds.add(procId);
+  const spanInfo = {
+    offsetX: display.bounds.x - totalBounds.x,
+    offsetY: display.bounds.y - totalBounds.y,
+    sliceW:  display.bounds.width,
+    sliceH:  display.bounds.height,
+    totalW:  totalBounds.width,
+    totalH:  totalBounds.height,
+  };
+  const query = { span: encodeURIComponent(JSON.stringify(spanInfo)) };
+  win.loadFile(path.join(__dirname, 'mirror.html'), { query });
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.on('closed', () => {
+    _mirrorWebContentsIds.delete(procId);
+    mirrorWindows = mirrorWindows.filter(w => w.displayId !== display.id);
+    mainWindow?.webContents.send('mirror-closed', display.id);
+  });
+  mirrorWindows.push({ displayId: display.id, win, mode: 'span' });
+}
+
+ipcMain.handle('set-span-displays', async (_e, displayIds) => {
+  if (!mainWindow) return { error: 'No main window' };
+  const ids = new Set((displayIds || []).map(Number));
+
+  // Empty set = exit span
+  if (ids.size === 0) {
+    _closeAllSpanMirrors();
+    _restoreOriginalBounds();
+    _spanActiveIds.clear();
+    return { ok: true, mode: 'exited' };
+  }
+
+  // Save bounds on first entry
+  if (_spanActiveIds.size === 0) _saveOriginalBounds();
+
+  // Close existing span mirrors (will reopen with fresh slice info)
+  _closeAllSpanMirrors();
+
+  // Compute new bounding box and resize main window to span everything
+  const total = _computeSpanBounds(ids);
+  try {
+    mainWindow.setBounds({ x: total.x, y: total.y, width: total.width, height: total.height });
+  } catch (e) {
+    _mirrorErr('Span resize', e.message);
+    _restoreOriginalBounds();
+    return { error: 'Resize failed: ' + e.message };
+  }
+
+  _spanActiveIds = ids;
+
+  // Open a span mirror on each non-primary display in the set
+  const primaryId = screen.getPrimaryDisplay().id;
+  for (const d of total.displays) {
+    if (d.id === primaryId) continue; // primary shows the window directly
+    _openSpanMirror(d, total);
+  }
+  return { ok: true, mode: 'span', count: _spanActiveIds.size };
+});
+
+// ── Display hot-plug: handle disconnect during span ──────────────────────────
+function _setupDisplayListeners() {
+  screen.on('display-removed', (_e, removed) => {
+    if (_spanActiveIds.has(removed.id)) {
+      _mirrorErr('Span', 'Display ' + removed.id + ' was disconnected — recomputing');
+      _spanActiveIds.delete(removed.id);
+      mainWindow?.webContents.send('mirror-closed', removed.id);
+      if (_spanActiveIds.size === 0) {
+        _closeAllSpanMirrors();
+        _restoreOriginalBounds();
+      } else {
+        _closeAllSpanMirrors();
+        const total = _computeSpanBounds(_spanActiveIds);
+        try { mainWindow.setBounds(total); } catch {}
+        const primaryId = screen.getPrimaryDisplay().id;
+        for (const d of total.displays) {
+          if (d.id === primaryId) continue;
+          _openSpanMirror(d, total);
+        }
+      }
+    }
+  });
+}
 
 ipcMain.handle('close-mirror', (_e, displayId) => {
   mirrorWindows = mirrorWindows.filter(w => {
@@ -2116,6 +2290,10 @@ ipcMain.handle('close-mirror', (_e, displayId) => {
 ipcMain.handle('close-all-mirrors', () => {
   mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.close(); });
   mirrorWindows = [];
+  if (_spanActiveIds.size) {
+    _spanActiveIds.clear();
+    _restoreOriginalBounds();
+  }
   return { ok: true };
 });
 
@@ -2138,6 +2316,7 @@ app.whenReady().then(() => {
   pingLaunch();
   setupDesktopCapturer();
   setupSession();
+  _setupDisplayListeners();
   loadTokens();
   loadSource();
   createWindow();
@@ -2219,5 +2398,14 @@ app.on('window-all-closed', () => {
   if (pollTimer) clearInterval(pollTimer);
   stopSMTCPoller();
   if (authServer) authServer.close();
+  // Force-close any orphan mirror windows
+  mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
+  mirrorWindows = [];
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Close mirrors when main window is closed (before window-all-closed fires)
+app.on('before-quit', () => {
+  mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
+  mirrorWindows = [];
 });
