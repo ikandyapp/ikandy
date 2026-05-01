@@ -2021,6 +2021,25 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     </div>
   </div>
 
+  <!-- MULTI-MONITOR -->
+  <div class="acc-hd" id="acc-monitors" onclick="accToggle(this)">
+    <span>Monitors</span><span class="chev">›</span>
+  </div>
+  <div class="acc-bd" id="acc-monitors-bd">
+    <div style="font-size:11px;color:var(--dim);margin-bottom:10px;line-height:1.5;">
+      Mirror duplicates the scene. Span stretches it wall-to-wall across all selected displays.
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px;">
+      <button id="mon-mode-mirror" class="vibe-btn" onclick="setMonitorMode('mirror')"
+        style="flex:1;font-size:11px;padding:5px 0;color:var(--sp);border-color:var(--sp);">⧉ Mirror</button>
+      <button id="mon-mode-span" class="vibe-btn" onclick="setMonitorMode('span')"
+        style="flex:1;font-size:11px;padding:5px 0;">⬛ Span</button>
+    </div>
+    <div id="monitor-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+    <button class="vibe-btn" onclick="refreshMonitorList()" style="width:100%;font-size:11px;padding:5px 0;">↺ Refresh displays</button>
+    <button class="vibe-btn" id="close-all-mirrors-btn" onclick="closeAllMirrors()" style="width:100%;font-size:11px;padding:5px 0;margin-top:6px;display:none;">✕ Close all mirrors</button>
+  </div>
+
   <!-- PERFORMANCE -->
   <div class="acc-hd" id="acc-performance" onclick="accToggle(this)">
     <span>Performance</span><span class="chev">›</span>
@@ -2636,7 +2655,143 @@ function setPbEnabled(on) {
 function togglePb() { setPbEnabled(!_pbEnabled); }
 
 /* ═══════════════════════════════════════════════════════════════════
-   CLICK RIPPLES — transparent overlay, always active
+   MULTI-MONITOR
+   ═══════════════════════════════════════════════════════════════════ */
+const _isMirror = new URLSearchParams(window.location.search).get('mirror') === '1';
+const _spanData = (() => { try { return JSON.parse(decodeURIComponent(new URLSearchParams(window.location.search).get('span') || 'null')); } catch { return null; } })();
+let _activeDisplayIds = new Set();
+let _monitorMode = 'mirror'; // 'mirror' | 'span'
+
+function setMonitorMode(mode) {
+  _monitorMode = mode;
+  document.getElementById('mon-mode-mirror').style.color = mode === 'mirror' ? 'var(--sp)' : '';
+  document.getElementById('mon-mode-mirror').style.borderColor = mode === 'mirror' ? 'var(--sp)' : '';
+  document.getElementById('mon-mode-span').style.color = mode === 'span' ? 'var(--sp)' : '';
+  document.getElementById('mon-mode-span').style.borderColor = mode === 'span' ? 'var(--sp)' : '';
+  // Close any open mirrors and reopen in new mode
+  if (_activeDisplayIds.size) { closeAllMirrors().then(refreshMonitorList); }
+}
+
+async function refreshMonitorList() {
+  if (_isMirror || _spanData) return;
+  const displays = await window.ipc?.invoke('get-displays') || [];
+  const list = document.getElementById('monitor-list');
+  if (!list) return;
+  list.innerHTML = '';
+  displays.forEach(d => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;';
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:11px;color:var(--txt);flex:1;';
+    label.textContent = (d.isPrimary ? '★ ' : '') + d.label;
+    const btn = document.createElement('button');
+    btn.className = 'vibe-btn';
+    btn.style.cssText = 'width:auto;padding:4px 12px;font-size:11px;';
+    const isActive = _activeDisplayIds.has(d.id);
+    btn.textContent = isActive ? '✕ Close' : '+ Add';
+    if (isActive) btn.style.color = 'var(--sp)';
+    btn.disabled = d.isPrimary;
+    if (d.isPrimary) { btn.textContent = 'Primary'; btn.style.opacity = '0.35'; }
+    btn.onclick = async () => {
+      if (d.isPrimary) return;
+      if (_activeDisplayIds.has(d.id)) {
+        await window.ipc?.invoke('close-mirror', d.id);
+        _activeDisplayIds.delete(d.id);
+      } else {
+        if (_monitorMode === 'span') {
+          await _openSpan(displays, d.id);
+        } else {
+          await window.ipc?.invoke('open-mirror', d.id);
+        }
+        _activeDisplayIds.add(d.id);
+      }
+      refreshMonitorList();
+      document.getElementById('close-all-mirrors-btn').style.display =
+        _activeDisplayIds.size ? '' : 'none';
+    };
+    row.appendChild(label);
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+
+async function _openSpan(allDisplays, targetId) {
+  // Bounding box = primary + ALL currently active + new target
+  const primary = allDisplays.find(d => d.isPrimary);
+  const target  = allDisplays.find(d => d.id === targetId);
+  if (!primary || !target) return;
+  const activeDisplays = allDisplays.filter(d =>
+    d.isPrimary || _activeDisplayIds.has(d.id) || d.id === targetId
+  );
+  const minX = Math.min(...activeDisplays.map(d => d.bounds.x));
+  const minY = Math.min(...activeDisplays.map(d => d.bounds.y));
+  const maxX = Math.max(...activeDisplays.map(d => d.bounds.x + d.bounds.width));
+  const maxY = Math.max(...activeDisplays.map(d => d.bounds.y + d.bounds.height));
+  const totalW = maxX - minX;
+  const totalH = maxY - minY;
+  const spanInfo = {
+    offsetX: target.bounds.x - minX,
+    offsetY: target.bounds.y - minY,
+    sliceW:  target.bounds.width,
+    sliceH:  target.bounds.height,
+    totalW, totalH
+  };
+  await window.ipc?.invoke('open-mirror', targetId, spanInfo);
+}
+
+async function closeAllMirrors() {
+  await window.ipc?.invoke('close-all-mirrors');
+  _activeDisplayIds.clear();
+  refreshMonitorList();
+  document.getElementById('close-all-mirrors-btn').style.display = 'none';
+}
+
+window.ipc?.on('mirror-closed', (displayId) => {
+  _activeDisplayIds.delete(displayId);
+  refreshMonitorList();
+});
+
+// Audio forwarding
+if (!_isMirror && !_spanData) {
+  let _mirrorForwardThrottle = 0;
+  window._mirrorForward = function(bass, mid, treble, intensity) {
+    const now = performance.now();
+    if (now - _mirrorForwardThrottle < 33) return;
+    _mirrorForwardThrottle = now;
+    if (_activeDisplayIds.size) window.ipc?.send('mirror-audio', { bass, mid, treble, intensity });
+  };
+} else {
+  // Mirror/span mode — receive audio, hide UI
+  window.ipc?.on('mirror-audio', ({ bass, mid, treble }) => {
+    window._mirrorBass    = bass;
+    window._mirrorMid     = mid;
+    window._mirrorTreble  = treble;
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    ['#sidebar','#top-bar','#transport-bar','#welcome-modal'].forEach(sel => {
+      const el = document.querySelector(sel);
+      if (el) el.style.display = 'none';
+    });
+  });
+  // Span mode — scale and offset the entire page to show only this slice
+  if (_spanData) {
+    const { offsetX, offsetY, sliceW, sliceH, totalW, totalH } = _spanData;
+    const style = document.createElement('style');
+    style.textContent = `
+      html, body { width: ${totalW}px !important; height: ${totalH}px !important; overflow: hidden; }
+      body { transform: translate(-${offsetX}px, -${offsetY}px); transform-origin: 0 0; }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+document.getElementById('acc-monitors')?.addEventListener('click', () => {
+  setTimeout(refreshMonitorList, 150);
+});
+
+
+
+/* ═══════════════════════════════════════════════════════════════════
    Click anywhere to spawn an expanding ring that fades out.
    ═══════════════════════════════════════════════════════════════════ */
 const _crCanvas = document.getElementById('click-ripple-canvas');
@@ -10028,8 +10183,8 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
 </div>
 
 <script>
-function openSourceHelp() { el('src-help-modal').classList.add('open'); }
-function closeSourceHelp() { el('src-help-modal').classList.remove('open'); }
+function openSourceHelp() { document.getElementById('src-help-modal').classList.add('open'); }
+function closeSourceHelp() { document.getElementById('src-help-modal').classList.remove('open'); }
 
 /* ── Welcome modal ── */
 function closeWelcome() { el('welcome-modal').classList.remove('open'); }

@@ -12,7 +12,7 @@
  * Audio:  Renderer captures system audio via getDisplayMedia for visual reactivity.
  */
 
-const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut, screen } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const http  = require('http');
 const https = require('https');
@@ -34,6 +34,7 @@ let   lastVolume    = null;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let mainWindow   = null;
+let mirrorWindows = []; // multi-monitor mirror windows
 let authServer   = null;
 let pollTimer    = null;
 let tokens       = {};        // { access_token, refresh_token, expires_at }
@@ -2043,6 +2044,73 @@ process.on('uncaughtException',      (e) => pingError(e.message, e.stack));
 process.on('unhandledRejection',     (e) => pingError(e?.message || e, e?.stack || ''));
 
 // IPC — renderer reports source mode and auto-cycle state
+// ── Multi-monitor mirror ───────────────────────────────────────────────────
+ipcMain.handle('get-displays', () => {
+  return screen.getAllDisplays().map(d => ({
+    id:     d.id,
+    label:  `Display ${d.id} — ${d.size.width}×${d.size.height}`,
+    bounds: d.bounds,
+    isPrimary: d.id === screen.getPrimaryDisplay().id,
+  }));
+});
+
+ipcMain.handle('open-mirror', (_e, displayId, spanInfo) => {
+  // Close existing mirror for this display if any
+  mirrorWindows = mirrorWindows.filter(w => {
+    if (w.displayId === displayId) { if (!w.win.isDestroyed()) w.win.close(); return false; }
+    return true;
+  });
+  const display = screen.getAllDisplays().find(d => d.id === displayId);
+  if (!display) return { error: 'Display not found' };
+  const { x, y, width, height } = display.bounds;
+  const win = new BrowserWindow({
+    x, y, width, height,
+    frame: false,
+    fullscreen: true,
+    skipTaskbar: true,
+    backgroundColor: '#060608',
+    title: 'IKANDY Mirror',
+    webPreferences: {
+      autoplayPolicy:  'no-user-gesture-required',
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      webSecurity: true,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+  win.setMenu(null);
+  const query = spanInfo
+    ? { span: encodeURIComponent(JSON.stringify(spanInfo)) }
+    : { mirror: '1' };
+  win.loadFile(path.join(__dirname, 'IKANDY.html'), { query });
+  win.on('closed', () => {
+    mirrorWindows = mirrorWindows.filter(w => w.displayId !== displayId);
+    mainWindow?.webContents.send('mirror-closed', displayId);
+  });
+  mirrorWindows.push({ displayId, win });
+  return { ok: true };
+});
+
+ipcMain.handle('close-mirror', (_e, displayId) => {
+  mirrorWindows = mirrorWindows.filter(w => {
+    if (w.displayId === displayId) { if (!w.win.isDestroyed()) w.win.close(); return false; }
+    return true;
+  });
+  return { ok: true };
+});
+
+ipcMain.handle('close-all-mirrors', () => {
+  mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.close(); });
+  mirrorWindows = [];
+  return { ok: true };
+});
+
+// Forward audio analysis from main window to all mirrors
+ipcMain.on('mirror-audio', (_e, data) => {
+  mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.webContents.send('mirror-audio', data); });
+});
+
 ipcMain.on('update-install', () => {
   autoUpdater.quitAndInstall();
 });
