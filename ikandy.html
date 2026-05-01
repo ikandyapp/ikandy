@@ -6251,11 +6251,25 @@ function toggleHideKeep(which) {
 
 /* ── KEYBOARD SHORTCUTS ── */
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   switch(e.key) {
     case 'ArrowRight': case 'n': nextPreset(); break;
     case 'ArrowLeft':  case 'p': prevPreset(); break;
     case 'r': randPreset(); break;
+    case 'Enter': {
+      // Random preset on Enter — but skip if a modal/dialog is open or focus is on a button
+      const ae = document.activeElement;
+      if (ae && (ae.tagName === 'BUTTON' || ae.tagName === 'A' || ae.isContentEditable)) break;
+      const modalOpen =
+        el('welcome-modal')?.classList.contains('open') ||
+        el('sp-guide-modal')?.style.display === 'flex' ||
+        el('sp-free-modal')?.style.display === 'flex' ||
+        el('src-help-modal')?.classList.contains('open') ||
+        el('seizure-modal')?.classList.contains('open');
+      if (modalOpen) break;
+      randPreset();
+      break;
+    }
     case 'b': openPresetPanel(); break;
     case 'Escape':
       if (document.fullscreenElement) document.exitFullscreen();

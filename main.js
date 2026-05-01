@@ -14,6 +14,15 @@
 
 const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut, screen } = require('electron');
 console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-01 r5');
+
+// Enable Windows Graphics Capture API for proper hardware-accelerated capture.
+// Without these flags, Electron uses BitBlt which silently returns black frames
+// for WebGL/Butterchurn content. Critical for mirror mode to work on Win 10+.
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('enable-features',
+    'AllowWGCScreenCapturer,AllowWGCDesktopCapturer,AllowWGCFrameSourceCapturer'
+  );
+}
 const { autoUpdater } = require('electron-updater');
 const http  = require('http');
 const https = require('https');
@@ -828,6 +837,41 @@ ipcMain.handle('set-source',  async (_e, mode) => {
       mainWindow?.webContents.send('spotify-state', { type: 'track', playing: false });
     }
   } catch(e) { /* best effort */ }
+  // If switching TO Spotify, try to restore saved auth so user doesn't have to re-login
+  if (mode === 'spotify' && prev !== 'spotify') {
+    try {
+      const valid = await ensureValidToken();
+      if (valid) {
+        console.log('[IKANDY] Switched to Spotify — restored saved session');
+        mainWindow?.webContents.send('auth-result', {
+          success: true,
+          restored: true,
+          product: lastKnownProduct || undefined,
+        });
+        // Background-confirm product
+        try {
+          const me = await httpsGet('https://api.spotify.com/v1/me',
+            { Authorization: 'Bearer ' + tokens.access_token });
+          if (me.status === 200) {
+            const parsed = JSON.parse(me.body);
+            if (parsed.product) {
+              lastKnownProduct = parsed.product;
+              mainWindow?.webContents.send('auth-result', {
+                success: true, restored: true,
+                product: parsed.product, productConfirmed: true,
+              });
+            }
+          }
+        } catch {}
+      } else if (!getClientId()) {
+        console.log('[IKANDY] Switched to Spotify — no client ID');
+        mainWindow?.webContents.send('auth-result', { success: false, needsSetup: true });
+      } else {
+        console.log('[IKANDY] Switched to Spotify — needs login');
+        mainWindow?.webContents.send('auth-result', { success: false });
+      }
+    } catch(e) { console.log('[IKANDY] Spotify restore failed:', e.message); }
+  }
   // Restart polling for new source
   startPolling();
   return { ok: true };
@@ -1447,49 +1491,99 @@ function setupDesktopCapturer() {
     if (isMirror) {
       try {
         console.log('[IKANDY] Mirror request from:', url);
-        const sources = await desktopCapturer.getSources({ types: ['window', 'screen'], fetchWindowIcons: false });
+        const sources = await desktopCapturer.getSources({
+          types: ['window', 'screen'],
+          fetchWindowIcons: false,
+          // Request thumbnail size 0 to avoid heavy thumbnail generation that
+          // can stall on multi-monitor systems
+          thumbnailSize: { width: 0, height: 0 },
+        });
 
-        // PREFER screen capture of the display the main window is on.
-        // Window capture on Windows uses BitBlt by default, which returns BLACK
-        // frames for hardware-accelerated content (WebGL/Butterchurn). Screen
-        // capture goes through DWM and works reliably.
-        // The mirror is on a different display, so no recursion.
+        // Diagnostic: dump all sources so we can see what the system reports
+        const screenSrcs = sources.filter(s => s.id.startsWith('screen:'));
+        const winSrcs = sources.filter(s => s.id.startsWith('window:'));
+        console.log('[IKANDY] Available screens:', screenSrcs.map(s =>
+          `${s.id} (display_id=${s.display_id || 'none'}, name="${s.name}")`
+        ).join(' | '));
+        console.log('[IKANDY] IKANDY windows:', winSrcs.filter(s =>
+          (s.name || '').toLowerCase().includes('ikandy')
+        ).map(s => `${s.id} ("${s.name}")`).join(' | '));
+
         let target = null;
+        let strategy = 'none';
+
+        // STRATEGY 1: Direct window ID match — works best when WGC is enabled
+        // because WGC properly captures hardware-accelerated content
         if (mainWindow) {
+          const wantedId = mainWindow.getMediaSourceId?.();
+          if (wantedId) {
+            target = sources.find(s => s.id === wantedId);
+            if (target) strategy = 'window-id';
+          }
+        }
+
+        // STRATEGY 2: Match screen by display_id (try Number, String, and Number(.id))
+        if (!target && mainWindow) {
           try {
             const mainBounds = mainWindow.getBounds();
             const mainDisplay = screen.getDisplayMatching(mainBounds);
             if (mainDisplay) {
-              // Match the screen source to the main window's display.
-              // Source IDs look like "screen:0:0" / "screen:1:0" — last segment
-              // matches Electron's display id when types include 'screen'.
-              const screenSources = sources.filter(s => s.id.startsWith('screen:'));
-              // Try to match by display_id field if available on the source
-              target = screenSources.find(s => s.display_id == mainDisplay.id) || screenSources[0];
-              if (target) console.log('[IKANDY] Mirror: capturing screen', target.name, 'for display', mainDisplay.id);
+              const targetId = mainDisplay.id;
+              target = screenSrcs.find(s => {
+                if (!s.display_id) return false;
+                return s.display_id == targetId ||
+                       Number(s.display_id) === Number(targetId) ||
+                       String(s.display_id) === String(targetId);
+              });
+              if (target) strategy = 'screen-display-id';
             }
           } catch (e) {
-            console.log('[IKANDY] Display match failed, falling back:', e.message);
+            console.log('[IKANDY] display_id match failed:', e.message);
           }
         }
 
-        // Fallback chain if screen capture didn't resolve:
-        // 1. Direct window ID match
-        // 2. Name match
-        // 3. First screen
-        if (!target) {
-          const wantedId = mainWindow?.getMediaSourceId?.();
-          target = wantedId ? sources.find(s => s.id === wantedId) : null;
+        // STRATEGY 3: Match by enumeration index — assume primary display
+        // is screen index 0 in BOTH Electron's display list AND Chromium's
+        // screen sources (mostly true on Windows)
+        if (!target && mainWindow) {
+          try {
+            const allDisplays = screen.getAllDisplays();
+            const primary = screen.getPrimaryDisplay();
+            const mainBounds = mainWindow.getBounds();
+            const mainDisplay = screen.getDisplayMatching(mainBounds);
+            // Find primary's index in allDisplays
+            const primaryIdx = allDisplays.findIndex(d => d.id === primary.id);
+            const mainIdx = allDisplays.findIndex(d => d.id === mainDisplay.id);
+            const desiredIdx = mainIdx >= 0 ? mainIdx : primaryIdx;
+            // screen source IDs look like "screen:N:0" — try matching N
+            target = screenSrcs.find(s => {
+              const m = s.id.match(/^screen:(\d+):/);
+              return m && parseInt(m[1]) === desiredIdx;
+            });
+            if (target) strategy = 'screen-index';
+          } catch (e) {
+            console.log('[IKANDY] index match failed:', e.message);
+          }
         }
-        if (!target) target = sources.find(s => s.name === 'IKANDY');
-        if (!target) target = sources.find(s => s.id.startsWith('screen:'));
+
+        // STRATEGY 4: Window name match
+        if (!target) {
+          target = sources.find(s => s.name === 'IKANDY');
+          if (target) strategy = 'window-name';
+        }
+
+        // STRATEGY 5: Last resort — first screen
+        if (!target && screenSrcs.length > 0) {
+          target = screenSrcs[0];
+          strategy = 'first-screen-fallback';
+        }
 
         if (target) {
-          console.log('[IKANDY] Mirror capture: serving', target.name || target.id);
+          console.log('[IKANDY] Mirror capture:', strategy, '→', target.id, '("' + (target.name || '') + '")');
           callback({ video: target });
           return;
         }
-        _mirrorErr('Capture', 'No IKANDY window or screen source found. available=' + sources.map(s => s.name || s.id).join(', '));
+        _mirrorErr('Capture', 'No source matched — screens=' + screenSrcs.length + ' windows=' + winSrcs.length);
         callback({});
       } catch (err) {
         _mirrorErr('Capture', err.message);
