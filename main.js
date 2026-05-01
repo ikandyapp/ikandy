@@ -1427,22 +1427,25 @@ function setupDesktopCapturer() {
     if (isMirror) {
       try {
         console.log('[IKANDY] Mirror request from:', url);
-        const winSources = await desktopCapturer.getSources({ types: ['window'], fetchWindowIcons: false });
-        const ikandy = winSources.find(s => s.name === 'IKANDY');
-        if (ikandy) {
-          console.log('[IKANDY] Mirror capture: serving IKANDY window');
-          callback({ video: ikandy });
+        const sources = await desktopCapturer.getSources({ types: ['window', 'screen'], fetchWindowIcons: false });
+        const wantedId = mainWindow?.getMediaSourceId?.();
+
+        // 1. Try direct ID match (most reliable — uses Electron's own window ID)
+        let target = wantedId ? sources.find(s => s.id === wantedId) : null;
+
+        // 2. Try name match
+        if (!target) target = sources.find(s => s.name === 'IKANDY');
+
+        // 3. Fall back to primary screen (will include desktop, but at least shows something)
+        if (!target) target = sources.find(s => s.id.startsWith('screen:'));
+
+        if (target) {
+          console.log('[IKANDY] Mirror capture: serving', target.name || target.id);
+          callback({ video: target });
           return;
         }
-        _mirrorErr('Capture', 'IKANDY window not in source list. Found: ' + winSources.map(s => s.name).join(', '));
-        const screens = await desktopCapturer.getSources({ types: ['screen'] });
-        if (screens.length) {
-          console.log('[IKANDY] Mirror capture: fallback to primary screen');
-          callback({ video: screens[0] });
-        } else {
-          _mirrorErr('Capture', 'No screen or window sources available');
-          callback({});
-        }
+        _mirrorErr('Capture', 'No IKANDY window or screen source found. wantedId=' + wantedId + ' available=' + sources.map(s => s.name || s.id).join(', '));
+        callback({});
       } catch (err) {
         _mirrorErr('Capture', err.message);
         callback({});
@@ -1526,6 +1529,7 @@ function createWindow() {
       sandbox:         false,
       webSecurity:     true,
       devTools:        !app.isPackaged,
+      backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -2107,6 +2111,7 @@ ipcMain.handle('open-mirror', async (_e, displayId, spanInfo) => {
     x, y, width, height,
     frame: false,
     transparent: false,
+    hasShadow: false,
     resizable: false,
     movable: false,
     minimizable: false,
@@ -2121,13 +2126,13 @@ ipcMain.handle('open-mirror', async (_e, displayId, spanInfo) => {
       contextIsolation: true,
       sandbox: false,
       webSecurity: true,
+      backgroundThrottling: false,
       preload: path.join(__dirname, 'preload.js'),
     },
   });
   win.setMenu(null);
   win.setIgnoreMouseEvents(true);
 
-  // Register webContents process ID so the displayMedia handler routes correctly
   const procId = win.webContents.getOSProcessId?.() || win.webContents.id;
   _mirrorWebContentsIds.add(procId);
 
@@ -2160,6 +2165,33 @@ function _restoreOriginalBounds() {
   if (_wasMainMaximized) mainWindow.maximize();
   _originalMainBounds = null;
   _wasMainMaximized   = false;
+}
+
+let _titleBarCover = null;
+function _coverTitleBar() {
+  if (_titleBarCover && !_titleBarCover.isDestroyed()) return;
+  if (!mainWindow) return;
+  const fb = mainWindow.getBounds();
+  const cb = mainWindow.getContentBounds();
+  const titleH = Math.max(0, cb.y - fb.y);
+  if (titleH === 0) return;
+  _titleBarCover = new BrowserWindow({
+    x: fb.x, y: fb.y,
+    width: fb.width, height: titleH + 2,
+    frame: false, transparent: false, resizable: false, movable: false,
+    skipTaskbar: true, focusable: false, hasShadow: false,
+    backgroundColor: '#000000', title: 'IKANDY Cover',
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
+  });
+  _titleBarCover.setMenu(null);
+  _titleBarCover.setIgnoreMouseEvents(true);
+  _titleBarCover.setAlwaysOnTop(true, 'screen-saver');
+  _titleBarCover.loadURL('data:text/html,<body style="margin:0;background:%23000;width:100vw;height:100vh;"></body>');
+  _titleBarCover.on('closed', () => { _titleBarCover = null; });
+}
+function _uncoverTitleBar() {
+  if (_titleBarCover && !_titleBarCover.isDestroyed()) _titleBarCover.destroy();
+  _titleBarCover = null;
 }
 
 function _computeSpanBounds(activeIds) {
@@ -2222,36 +2254,55 @@ ipcMain.handle('set-span-displays', async (_e, displayIds) => {
 
   // Empty set = exit span
   if (ids.size === 0) {
-    _closeAllSpanMirrors();
+    _closeAllSpanMirrors(); // safety, in case any are lingering
     _restoreOriginalBounds();
     _spanActiveIds.clear();
+    _uncoverTitleBar();
+    // Drop always-on-top, re-enable native fullscreen
+    try {
+      mainWindow.setAlwaysOnTop(false);
+      mainWindow.setFullScreenable(true);
+    } catch {}
     return { ok: true, mode: 'exited' };
   }
 
   // Save bounds on first entry
   if (_spanActiveIds.size === 0) _saveOriginalBounds();
 
-  // Close existing span mirrors (will reopen with fresh slice info)
-  _closeAllSpanMirrors();
+  // Exit any native fullscreen and disable it during span.
+  // Windows native fullscreen forces single-monitor exclusive mode which
+  // turns off the second monitor — completely incompatible with span.
+  try {
+    if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false);
+    mainWindow.setFullScreenable(false);
+  } catch {}
 
-  // Compute new bounding box and resize main window to span everything
+  // No mirror windows in span mode — main window IS the span.
+  // Just resize main window to cover the bounding box. Visualizer naturally
+  // fills all monitors. Sidebar stays anchored on primary monitor.
+  _closeAllSpanMirrors(); // clean any left over from older builds
   const total = _computeSpanBounds(ids);
   try {
-    mainWindow.setBounds({ x: total.x, y: total.y, width: total.width, height: total.height });
+    // Use setContentBounds so the visible content area covers the bounding box.
+    // Electron positions the window's frame around it — title bar ends up above
+    // the monitor edge automatically.
+    mainWindow.setContentBounds({
+      x: total.x,
+      y: total.y,
+      width:  total.width,
+      height: total.height
+    });
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.setMenuBarVisibility(false);
+    // Cover the title bar with a small black overlay window since Windows
+    // won't let us hide the frame at runtime.
+    setTimeout(_coverTitleBar, 100);
   } catch (e) {
     _mirrorErr('Span resize', e.message);
     _restoreOriginalBounds();
     return { error: 'Resize failed: ' + e.message };
   }
-
   _spanActiveIds = ids;
-
-  // Open a span mirror on each non-primary display in the set
-  const primaryId = screen.getPrimaryDisplay().id;
-  for (const d of total.displays) {
-    if (d.id === primaryId) continue; // primary shows the window directly
-    _openSpanMirror(d, total);
-  }
   return { ok: true, mode: 'span', count: _spanActiveIds.size };
 });
 
@@ -2408,4 +2459,5 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
   mirrorWindows = [];
+  _uncoverTitleBar();
 });

@@ -2696,6 +2696,24 @@ function setMonitorMode(mode) {
   document.getElementById('mon-mode-span').style.borderColor = mode === 'span' ? 'var(--sp)' : '';
   // Close any open mirrors and reopen in new mode
   if (_activeDisplayIds.size) { closeAllMirrors().then(refreshMonitorList); }
+  _updateFsButtonForSpan();
+}
+
+function _updateFsButtonForSpan() {
+  const btn = document.getElementById('fs-btn');
+  if (!btn) return;
+  const inSpan = (_monitorMode === 'span' && _activeDisplayIds.size > 0);
+  if (inSpan) {
+    btn.style.opacity = '0.3';
+    btn.style.cursor  = 'not-allowed';
+    btn.style.pointerEvents = 'none';
+    btn.title = 'Fullscreen disabled in span mode — window already covers all monitors';
+  } else {
+    btn.style.opacity = '';
+    btn.style.cursor  = '';
+    btn.style.pointerEvents = '';
+    btn.title = document.fullscreenElement ? 'Exit Fullscreen (Esc)' : 'Fullscreen (F)';
+  }
 }
 
 async function refreshMonitorList() {
@@ -2734,6 +2752,9 @@ async function refreshMonitorList() {
           if (_monitorMode === 'span') {
             const r = await window.IKANDY.setSpanDisplays(Array.from(_activeDisplayIds));
             if (r?.error) debugLog('Span', r.error);
+            else if (r?.megapixels > 8) {
+              debugLog('Span Performance', `Rendering ${r.megapixels} MP — heavy load. If you see stutter, lower the render scale in Performance settings.`);
+            }
           } else {
             await window.IKANDY.openMirror(d.id);
           }
@@ -2745,6 +2766,7 @@ async function refreshMonitorList() {
       refreshMonitorList();
       document.getElementById('close-all-mirrors-btn').style.display =
         _activeDisplayIds.size ? '' : 'none';
+      _updateFsButtonForSpan();
     };
     row.appendChild(label);
     row.appendChild(btn);
@@ -2761,17 +2783,22 @@ async function closeAllMirrors() {
   _activeDisplayIds.clear();
   refreshMonitorList();
   document.getElementById('close-all-mirrors-btn').style.display = 'none';
+  _updateFsButtonForSpan();
 }
 
-window.IKANDY.onMirrorClosed((displayId) => {
-  _activeDisplayIds.delete(displayId);
-  refreshMonitorList();
-});
+if (window.IKANDY?.onMirrorClosed) {
+  window.IKANDY.onMirrorClosed((displayId) => {
+    _activeDisplayIds.delete(displayId);
+    refreshMonitorList();
+  });
+}
 
 // Surface any mirror/span errors into the user-visible debug panel
-window.IKANDY.onMirrorError(({ label, msg }) => {
-  debugLog(label || 'Monitor', msg);
-});
+if (window.IKANDY?.onMirrorError) {
+  window.IKANDY.onMirrorError(({ label, msg }) => {
+    debugLog(label || 'Monitor', msg);
+  });
+}
 
 // Audio forwarding
 if (!_isMirror && !_spanData) {
@@ -3720,17 +3747,41 @@ function debugToggle(force) {
 }
 async function debugCopy() {
   const text = _debugEntries.join('\n\n');
+  const b = document.getElementById('debug-copy');
+  const orig = b.textContent;
+  let success = false;
+
+  // Method 1: modern clipboard API
   try {
     await navigator.clipboard.writeText(text);
-    const b = document.getElementById('debug-copy');
-    const orig = b.textContent;
+    success = true;
+  } catch(e) { /* fall through */ }
+
+  // Method 2: textarea + execCommand (works in Electron without permissions)
+  if (!success) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      success = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch(e) { /* fall through */ }
+  }
+
+  if (success) {
     b.textContent = '✓ Copied';
     setTimeout(() => b.textContent = orig, 1200);
-  } catch(e) {
-    // Fallback: select the text in the body so user can Ctrl+C
+  } else {
+    // Last resort — select the text so user can Ctrl+C manually
+    b.textContent = '⚠ Select & Ctrl+C';
     const bodyEl = document.getElementById('debug-body');
-    const r = document.createRange(); r.selectNodeContents(bodyEl);
-    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    if (bodyEl) {
+      const r = document.createRange(); r.selectNodeContents(bodyEl);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    }
+    setTimeout(() => b.textContent = orig, 2500);
   }
 }
 function debugClear() {
@@ -5982,6 +6033,10 @@ function toast(msg, dur = 3500) {
 
 /* ── FULLSCREEN ── */
 function toggleFullscreen() {
+  // Silently no-op in span mode — the button is visually disabled.
+  if (typeof _activeDisplayIds !== 'undefined' && _activeDisplayIds.size > 0 && _monitorMode === 'span') {
+    return;
+  }
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(() => {});
     el('fs-btn').textContent = '✕';
@@ -10245,6 +10300,14 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
       <div class="wm-feat"><span class="wm-feat-key">Mouse move</span> Aurora bends · Particles scatter · Cursor trail</div>
     </div>
 
+    <div class="wm-features">
+      <div class="wm-feat-title">✦ Multi-Monitor</div>
+      <div class="wm-feat"><span class="wm-feat-key">Mirror</span> Duplicate the scene on each selected display</div>
+      <div class="wm-feat"><span class="wm-feat-key">Span</span> Stretch the visualizer wall-to-wall across multiple displays</div>
+      <div class="wm-feat"><span class="wm-feat-key">Hot-plug</span> Disconnect a display mid-session and span auto-recovers</div>
+      <div class="wm-feat" style="color:rgba(180,100,255,.6);font-style:italic;">Find it in the sidebar under "Monitors"</div>
+    </div>
+
     <div class="wm-reddit">
       Loving it? Drop a screenshot on
       <a href="https://www.reddit.com/r/IKANDYAPP/" target="_blank">r/IKANDYAPP</a> —
@@ -10305,13 +10368,14 @@ function openSourceHelp() { document.getElementById('src-help-modal').classList.
 function closeSourceHelp() { document.getElementById('src-help-modal').classList.remove('open'); }
 
 /* ── Welcome modal ── */
+const WELCOME_VERSION = 'v2'; // bump this when modal content changes meaningfully
 function closeWelcome() { el('welcome-modal').classList.remove('open'); }
 function closeWelcomePermanent() {
-  localStorage.setItem('IKANDY-welcome-seen', '1');
+  localStorage.setItem('IKANDY-welcome-seen', WELCOME_VERSION);
   closeWelcome();
 }
 (function() {
-  if (localStorage.getItem('IKANDY-welcome-seen') !== '1') {
+  if (localStorage.getItem('IKANDY-welcome-seen') !== WELCOME_VERSION) {
     setTimeout(() => el('welcome-modal')?.classList.add('open'), 800);
   }
 })();
