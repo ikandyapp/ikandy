@@ -266,10 +266,12 @@ async function pollCurrentTrack() {
     // /me/player (full state) instead of /currently-playing because the
     // latter omits shuffle_state and smart_shuffle. Same item shape, plus
     // device/repeat_state/shuffle_state/smart_shuffle at the top level.
+    const _reqStart = Date.now();
     const res = await httpsGet(
       'https://api.spotify.com/v1/me/player',
       { Authorization: 'Bearer ' + tokens.access_token }
     );
+    const _rtt = Date.now() - _reqStart;
 
     if (res.status === 204) {
       mainWindow?.webContents.send('spotify-state', { type: 'idle' });
@@ -306,9 +308,12 @@ async function pollCurrentTrack() {
     const data = JSON.parse(res.body);
     if (!data?.item) { console.warn('[IKANDY] Poll: 200 but no item in response'); return; }
 
-    // Compensate for network latency — progress_ms is from when Spotify
-    // captured it, not when we receive it. Add ~200ms for typical latency.
-    const latencyMs = 200;
+    // Compensate for actual measured network latency. progress_ms reflects
+    // the playback position when Spotify generated the response; by the
+    // time we receive it, music has advanced by roughly the response
+    // (return) leg. Half-RTT approximates that one-way leg. Add ~25ms for
+    // IPC + render handoff. Clamp to sane bounds in case of an outlier.
+    const latencyMs = Math.max(50, Math.min(500, Math.round(_rtt / 2) + 25));
     const track = {
       type:      'track',
       id:        data.item.id,
@@ -486,30 +491,38 @@ function startAuthServer(pkceVerifier) {
     }
   });
 
-  // Try preferred port first, fall back to random OS-assigned port
-  function tryListen(port) {
-    authServer.listen(port, '127.0.0.1', () => {
-      const actualPort = authServer.address().port;
-      console.log('[IKANDY] Auth server ready on port', actualPort);
-      // If we got a different port, update the redirect URI used in auth flow
-      if (actualPort !== CALLBACK_PORT) {
-        console.log('[IKANDY] Port', CALLBACK_PORT, 'was busy — using', actualPort);
-        authServer._actualPort = actualPort;
-      }
-    });
-  }
-  authServer.on('error', e => {
-    if (e.code === 'EADDRINUSE') {
-      console.warn('[IKANDY] Port', CALLBACK_PORT, 'in use — trying random port');
-      tryListen(0);  // 0 = let OS assign a free port
-    } else {
-      console.error('[IKANDY] Auth server error:', e.message);
-      mainWindow?.webContents.send('auth-result', {
-        success: false, error: 'Auth server failed: ' + e.message
+  // Try preferred port first, fall back to random OS-assigned port.
+  // Returns a promise that resolves with the actual port once listening,
+  // or rejects on unrecoverable error. This lets start-auth detect the
+  // port-8888-busy case and fail loudly BEFORE opening Spotify's auth URL
+  // (the registered redirect_uri requires the exact port — falling back
+  // to a random port would just redirect the user to a closed port).
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (fn, val) => { if (!settled) { settled = true; fn(val); } };
+
+    function tryListen(port) {
+      authServer.listen(port, '127.0.0.1', () => {
+        const actualPort = authServer.address().port;
+        console.log('[IKANDY] Auth server ready on port', actualPort);
+        if (actualPort !== CALLBACK_PORT) {
+          console.log('[IKANDY] Port', CALLBACK_PORT, 'was busy — using', actualPort);
+          authServer._actualPort = actualPort;
+        }
+        done(resolve, actualPort);
       });
     }
+    authServer.on('error', e => {
+      if (e.code === 'EADDRINUSE') {
+        console.warn('[IKANDY] Port', CALLBACK_PORT, 'in use — trying random port');
+        tryListen(0);
+      } else {
+        console.error('[IKANDY] Auth server error:', e.message);
+        done(reject, e);
+      }
+    });
+    tryListen(CALLBACK_PORT);
   });
-  tryListen(CALLBACK_PORT);
 }
 
 function startPolling() {
@@ -605,7 +618,29 @@ ipcMain.handle('start-auth', async () => {
   const challenge = createHash('sha256').update(verifier).digest('base64url');
   const state     = randomBytes(16).toString('hex');
 
-  startAuthServer(verifier); // server knows verifier for token exchange
+  const _serverReady = startAuthServer(verifier); // server knows verifier for token exchange
+  // Wait for the auth server to actually be listening before opening the
+  // browser. If port 8888 is unavailable, the OS assigns a random one —
+  // but Spotify's registered redirect URI demands the exact port, so a
+  // random port = silent auth failure (browser hits a closed port). Abort
+  // with a clear message instead of stranding the user.
+  let actualPort;
+  try {
+    actualPort = await _serverReady;
+  } catch(e) {
+    mainWindow?.webContents.send('auth-result', {
+      success: false, error: 'Auth server failed to start: ' + e.message
+    });
+    return { ok: false, error: e.message };
+  }
+  if (actualPort !== CALLBACK_PORT) {
+    const msg = `Port ${CALLBACK_PORT} is in use by another app — Spotify auth requires this exact port. Close the app using port ${CALLBACK_PORT} (run "netstat -ano | findstr :${CALLBACK_PORT}" in cmd to identify it) and try again.`;
+    console.error('[IKANDY]', msg);
+    try { authServer && authServer.close(); } catch(_) {}
+    authServer = null;
+    mainWindow?.webContents.send('auth-result', { success: false, error: msg });
+    return { ok: false, error: msg };
+  }
 
   const params = new URLSearchParams({
     client_id:             getClientId(),

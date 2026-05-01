@@ -100,6 +100,12 @@ html, body {
   z-index: 8; pointer-events: none; opacity: 0; transition: opacity .6s;
   mix-blend-mode: screen;
 }
+/* VOYAGER — procedural gas giant + starfield, raymarched in fragment shader */
+#voyager-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 9; pointer-events: none; opacity: 0; transition: opacity .6s;
+  mix-blend-mode: screen;
+}
 #viz { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
 
 /* ─── FPS OVERLAY (toggled from Performance panel) ─── */
@@ -564,6 +570,13 @@ body.ui-hidden.hide-status #status-badge {
   pointer-events: none !important;
   transition: opacity .5s ease;
 }
+/* Hard-off — turns a feature OFF entirely regardless of hide state. Driven
+   by the per-row sliders in the hide-options menu. */
+body.force-hide-ctrl   #controls,
+body.force-hide-hud    #hud,
+body.force-hide-status #status-badge {
+  display: none !important;
+}
 /* Restore on mouse move — handled in JS */
 #pnav, #ptab, #ltab, #controls, #hud, #lyric-wrap, #status-badge {
   transition: opacity .5s ease;
@@ -605,6 +618,24 @@ body.ui-hidden.hide-status #status-badge {
   width: 11px; margin-right: 10px; font-size: 11px;
 }
 .ho-opt.on::before { content: '✓'; }
+/* Per-row slider toggle — hard on/off for the feature itself. */
+.ho-show-toggle {
+  margin-left: auto;
+  width: 32px; height: 16px;
+  border-radius: 16px;
+  background: rgba(255,255,255,.14);
+  position: relative; cursor: pointer; flex-shrink: 0;
+  transition: background .15s;
+}
+.ho-show-toggle.on { background: var(--sp); }
+.ho-show-toggle::after {
+  content: ''; position: absolute;
+  width: 12px; height: 12px;
+  border-radius: 50%; background: #fff;
+  top: 2px; left: 2px;
+  transition: left .15s;
+}
+.ho-show-toggle.on::after { left: 18px; }
 
 /* ─── LEFT TAB ─── */
 #ltab {
@@ -1391,6 +1422,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <canvas id="waveray-canvas"></canvas>
 <canvas id="fire-canvas"></canvas>
 <canvas id="singularity-canvas"></canvas>
+<canvas id="voyager-canvas"></canvas>
 
 <input type="file" id="bg-file-input" accept="image/*" style="display:none" onchange="onBgFileChange(this)">
 <div id="drop"><p>DROP AUDIO HERE</p></div>
@@ -1465,6 +1497,13 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.06em;white-space:nowrap;">
     Controls require Spotify Premium
   </div>
+  <div id="press-play-hint" style="display:none;position:fixed;bottom:60px;left:50%;transform:translateX(-50%);
+    font-size:11px;color:rgba(255,200,100,.92);background:rgba(20,20,28,.94);
+    border:1px solid rgba(255,200,100,.35);padding:7px 14px;border-radius:6px;
+    letter-spacing:.04em;white-space:nowrap;pointer-events:none;
+    box-shadow:0 4px 14px rgba(0,0,0,.55);transition:opacity .25s;z-index:50;">
+    ▶ Press Play in your source app
+  </div>
 
   <!-- Shuffle (routes per-source) -->
   <button class="cb" id="cb-shuf" onclick="onShuffleClick(event)" title="Shuffle">
@@ -1519,10 +1558,16 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <!-- Shuffle / playback-order popup -->
 <div id="shuf-menu" role="menu"></div>
 <div id="hide-opts-menu" role="menu">
-  <div class="ho-hd">Keep visible while hidden</div>
-  <div class="ho-opt" id="ho-ctrl"   onclick="toggleHideKeep('ctrl')">User controls</div>
-  <div class="ho-opt" id="ho-hud"    onclick="toggleHideKeep('hud')">Album art &amp; progress</div>
-  <div class="ho-opt" id="ho-status" onclick="toggleHideKeep('status')">Connection status</div>
+  <div class="ho-hd">Keep visible while hidden &nbsp;·&nbsp; Show feature</div>
+  <div class="ho-opt" id="ho-ctrl"   onclick="toggleHideKeep('ctrl')">User controls
+    <span class="ho-show-toggle on" id="ho-show-ctrl"   onclick="event.stopPropagation(); toggleShowFeature('ctrl')"   title="Show user controls"></span>
+  </div>
+  <div class="ho-opt" id="ho-hud"    onclick="toggleHideKeep('hud')">Album art &amp; progress
+    <span class="ho-show-toggle on" id="ho-show-hud"    onclick="event.stopPropagation(); toggleShowFeature('hud')"    title="Show album art &amp; progress"></span>
+  </div>
+  <div class="ho-opt" id="ho-status" onclick="toggleHideKeep('status')">Connection status
+    <span class="ho-show-toggle on" id="ho-show-status" onclick="event.stopPropagation(); toggleShowFeature('status')" title="Show connection status"></span>
+  </div>
 </div>
 
 <!-- PRESET PANEL (slides up from bottom) -->
@@ -1837,6 +1882,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <button class="vibe-btn" id="scene-aurora"     onclick="selectScene('aurora')">Aurora</button>
       <button class="vibe-btn" id="scene-pawrticles" onclick="selectScene('pawrticles')">Starfield</button>
       <button class="vibe-btn" id="scene-singularity" onclick="selectScene('singularity')">Singularity</button>
+      <button class="vibe-btn" id="scene-voyager"     onclick="selectScene('voyager')">Voyager</button>
     </div>
     <span class="lbl">Intensity</span>
     <div class="svr">
@@ -1963,6 +2009,10 @@ let autoCycle = true, cycleTimer = null;
 /* ── AUDIO ── */
 let audioCtx = null, analyserNode = null, gainNode = null;
 let _systemAudioStream = null, _systemAudioSrc = null;
+// True once we've seen real audio signal at any point this session. Lets us
+// distinguish first-time-user-hasn't-pressed-play (helpful flyout) from
+// just-paused-and-reconnected (no flyout needed — user already knows).
+let _hasSeenAudio = false;
 
 /* ── PLAYBACK STATE (fed by main.js via IPC) ── */
 let trackId = null, trackProgress = 0, trackDuration = 0;
@@ -2290,6 +2340,23 @@ function renderFxLayer(bassRaw) {
 }
 
 function setFxLayerEnabled(on) {
+  if (on) {
+    // Mutual exclusion: chromatic operates on viz/waveform pixels and is
+    // incompatible with image FX (vibe). Activating chromatic turns vibe
+    // off — same rule as waveform activation in toggleViz.
+    if (typeof _fxModeEnabled !== 'undefined' && _fxModeEnabled) {
+      _fxModeEnabled = false;
+      if (typeof setFxMode === 'function') setFxMode('viz');
+      const fxbtn = el('fx-toggle-btn');
+      if (fxbtn) { fxbtn.textContent = '○ Off'; fxbtn.classList.remove('active'); }
+    }
+    // CA is a post-process on the waveform/viz canvas. If waveform is off,
+    // there's nothing to process — auto-enable it so the user actually
+    // sees the effect they just turned on.
+    if (typeof _vizEnabled !== 'undefined' && !_vizEnabled && typeof toggleViz === 'function') {
+      toggleViz();
+    }
+  }
   _fxLayerEnabled = !!on;
   syncFxLayerVisibility();
   localStorage.setItem('IKANDY-fxlayer-enabled', _fxLayerEnabled ? '1' : '0');
@@ -2358,6 +2425,7 @@ if (!isFinite(_pbDensity)) _pbDensity = 1.0;
 
 let _pbParticles = [];
 let _pbPrevBass  = 0;        // last frame's bass — for rise detection
+let _pbBassAvg   = 0;        // slow rolling baseline (the "quiet" level)
 let _pbBassPeak  = 0;        // fast-attack/slow-release envelope (peak tracker)
 let _pbCooldown  = 0;        // frames since last burst
 const PB_COOLDOWN = 4;       // min frames between bursts (~45ms at 95Hz)
@@ -2397,21 +2465,35 @@ function spawnPbBurst(intensity) {
 function renderPb(bassRaw) {
   if (!_pbEnabled || !pbCtx || !pbCanvas) return;
 
-  // Beat detection: onset (rise) detection, NOT level threshold.
-  // Triggers on the moment bass JUMPS — catches kicks even when bassline is sustained.
+  // Beat detection: adaptive onset detector.
+  // Tracks a slow rolling baseline (the "quiet" level of this song) and
+  // a fast-attack/slow-release peak (the recent loud hits). Dynamic range
+  // = peak - baseline. A kick = a rise that's a meaningful fraction of
+  // that dynamic range AND lifts bass meaningfully above the baseline.
+  // This auto-calibrates: works at any audio chain gain, any song
+  // loudness, soft acoustic or hard EDM. No magic numbers tuned to the
+  // boost level.
   const bass = bassRaw || 0;
   const rise = bass - _pbPrevBass;
   _pbPrevBass = bass;
-  // Fast-attack, slow-release peak follower — tracks "what was loud recently"
-  _pbBassPeak = Math.max(bass, _pbBassPeak * 0.92);
+  // Slow rolling baseline — ~3-second time constant at 60fps
+  _pbBassAvg  = _pbBassAvg  * 0.99  + bass * 0.01;
+  // Fast attack, slow release peak
+  _pbBassPeak = Math.max(bass, _pbBassPeak * 0.985);
   _pbCooldown++;
-  const RISE_MIN = 0.04;     // minimum jump magnitude to count as onset
-  const FLOOR    = 0.08;     // ignore quiet sections
-  const isOnset  = rise > RISE_MIN && bass > FLOOR && bass >= _pbBassPeak * 0.85;
+  // Floor protects against firing in true silence (clamp ensures the
+  // detector still works before history has built up).
+  const dynRange = Math.max(0.015, _pbBassPeak - _pbBassAvg);
+  const riseGate = dynRange * 0.22;
+  const levelGate = _pbBassAvg + dynRange * 0.35;
+  const isOnset = rise > riseGate && bass > levelGate;
   if (isOnset && _pbCooldown >= PB_COOLDOWN) {
-    spawnPbBurst(Math.min(2, bass * 1.6 + rise * 2));
+    // Intensity scales with how much above baseline this kick was, normalized
+    // by the song's own dynamic range — feels consistent across loudness.
+    const punch = Math.min(2, (bass - _pbBassAvg) / Math.max(0.05, dynRange) * 1.2);
+    spawnPbBurst(Math.max(0.4, punch));
     _pbCooldown = 0;
-    if (window._pbDebug) console.log(`[iKandy] PB burst: bass=${bass.toFixed(2)} rise=${rise.toFixed(2)} peak=${_pbBassPeak.toFixed(2)}`);
+    if (window._pbDebug) console.log(`[iKandy] PB burst: bass=${bass.toFixed(3)} rise=${rise.toFixed(3)} avg=${_pbBassAvg.toFixed(3)} peak=${_pbBassPeak.toFixed(3)} dyn=${dynRange.toFixed(3)}`);
   }
 
   // Trail fade — destination-out preserves canvas transparency while fading existing pixels.
@@ -3117,8 +3199,9 @@ window.addEventListener('unhandledrejection', e => {
   };
   console.warn = function(...args) {
     const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
-    // Skip noisy debug stream relays — they're not bugs
-    if (!/AUDIO DIAGNOSTICS/i.test(msg)) {
+    // Skip noisy debug stream relays and benign recovery-flow warns —
+    // these are status info about the audio reconnect path, not bugs.
+    if (!/AUDIO DIAGNOSTICS|self-heal|re-acquire|sample rate mismatch|stereo[- ]?mix fallback|auto-connect/i.test(msg)) {
       try { debugLog('console.warn', msg); } catch(e) {}
     }
     _warn.apply(console, args);
@@ -3215,7 +3298,7 @@ async function captureAudioDiagnostics(stream, reason = 'manual') {
 }
 window.ikandyDiag = () => captureAudioDiagnostics(_systemAudioStream, 'manual');
 
-async function connectAudioStream(stream, label, silent = false, _isRetry = false) {
+async function connectAudioStream(stream, label, silent = false, _isRetry = false, _acquireAttempted = false) {
   // ─── Realtek non-default-format fix ─────────────────────────────────────
   // If the captured track's sample rate doesn't match audioCtx, Chromium's
   // implicit resampler can deliver silent buffers (esp. 24-bit / 96k / 192k
@@ -3263,7 +3346,11 @@ async function connectAudioStream(stream, label, silent = false, _isRetry = fals
   if (audioCtx.state !== 'running') await audioCtx.resume();
   _systemAudioSrc = audioCtx.createMediaStreamSource(stream);
   const boostGain = audioCtx.createGain();
-  boostGain.gain.value = 4.0;
+  // Was 4.0, then 2.2 — both clipped. Loopback from Spotify / Windows mix
+  // is already volume-normalized loud, so any positive boost slams the
+  // analyser rails. 1.0 = unity. Visibility tuning lives in the FX panel
+  // (Reactivity slider) and per-scene intensity, not the audio chain.
+  boostGain.gain.value = 1.0;
   // Single downmix point: 5.1/7.1 input → stereo via standard speakers formula
   // (L + 0.7071·C + 0.7071·Ls, etc). Analyser then receives a clean stereo
   // signal regardless of source channel count. One node, one job.
@@ -3271,9 +3358,27 @@ async function connectAudioStream(stream, label, silent = false, _isRetry = fals
   boostGain.channelCountMode = 'explicit';
   boostGain.channelInterpretation = 'speakers';
   window._boostGainNode = boostGain;
+
+  // Soft-clipper — gentle tanh. Drive=0.7 means the curve is almost linear
+  // through ±0.7 input and only softly bends near the rails. Earlier 1.5
+  // was way too aggressive — it started compressing from x≈0.3, producing
+  // visible flat tops on the waveform. Insurance against rail-slamming
+  // without audibly/visually squashing dynamics.
+  const softClip = audioCtx.createWaveShaper();
+  const _curveLen = 4096;
+  const _curve    = new Float32Array(_curveLen);
+  const _drive    = 0.7;
+  for (let i = 0; i < _curveLen; i++) {
+    const x = (i / (_curveLen - 1)) * 2 - 1;
+    _curve[i] = Math.tanh(x * _drive) / Math.tanh(_drive);
+  }
+  softClip.curve      = _curve;
+  softClip.oversample = '2x';
+
   _systemAudioSrc.connect(boostGain);
-  boostGain.connect(analyserNode);
-  console.log('[IKANDY] Audio chain: stream(' + (_trackCh || '?') + 'ch) → boost(4x, →2ch) → analyser');
+  boostGain.connect(softClip);
+  softClip.connect(analyserNode);
+  console.log('[IKANDY] Audio chain: stream(' + (_trackCh || '?') + 'ch) → boost(1.0x, →2ch) → softclip(tanh d=0.7) → analyser');
   if (!silent) {
     setTimeout(() => {
       const data = new Uint8Array(analyserNode.frequencyBinCount);
@@ -3315,7 +3420,7 @@ async function connectAudioStream(stream, label, silent = false, _isRetry = fals
                 }
               }
               try { await oldCtx2.close(); } catch(e) {}
-              await connectAudioStream(stream, label, silent, true);
+              await connectAudioStream(stream, label, silent, true, _acquireAttempted);
             } catch(e) {
               console.error('[IKANDY] Self-heal failed:', e);
               await captureAudioDiagnostics(stream, 'silent-after-self-heal-error');
@@ -3324,11 +3429,82 @@ async function connectAudioStream(stream, label, silent = false, _isRetry = fals
           })();
         } else {
           (async () => {
-            await captureAudioDiagnostics(stream, 'silent-after-self-heal-retry');
-            toast('⚠ No audio signal — click the BUG button (top nav or sidebar header), hit Copy, paste in chat.');
+            // ─── Third attempt: fresh getDisplayMedia re-acquire ───────────
+            // After self-heal retry still silent: the loopback is bound to a
+            // device that isn't producing audio (e.g. Windows default output
+            // doesn't match what's actually playing music — common with USB
+            // DACs, headsets, or Focusrite when default is set elsewhere).
+            // A fresh getDisplayMedia re-binds to the *current* default and
+            // often resolves it. SKIP for Stereo Mix path — that path is for
+            // the 5.1/7.1 loopback bug and re-running getDisplayMedia would
+            // re-trigger the original failure. Gate on _acquireAttempted to
+            // guarantee a single fresh attempt — no infinite loops if the
+            // fresh stream is also silent.
+            const isStereoMixPath = typeof label === 'string' && label.indexOf('Stereo Mix') === 0;
+            if (!_acquireAttempted && !isStereoMixPath) {
+              try {
+                console.warn('[IKANDY] Self-heal retry silent — attempting fresh getDisplayMedia re-acquire');
+                const freshStream = await navigator.mediaDevices.getDisplayMedia({
+                  video: { width: 1, height: 1, frameRate: 1 },
+                  audio: {
+                    echoCancellation: false, noiseSuppression: false, autoGainControl: false,
+                    sampleRate: { ideal: 48000 }, channelCount: { ideal: 2 },
+                  },
+                });
+                freshStream.getVideoTracks().forEach(t => t.stop());
+                if (freshStream.getAudioTracks().length) {
+                  try { stream.getTracks().forEach(t => t.stop()); } catch(_) {}
+                  // _isRetry=true, _acquireAttempted=true → fresh stream
+                  // skips both self-heal AND another re-acquire, falling
+                  // through to the give-up branch if also silent. Bounded.
+                  await connectAudioStream(freshStream, label, false, true, true);
+                  return;
+                }
+              } catch(e) {
+                console.error('[IKANDY] Fresh re-acquire failed:', e);
+              }
+            }
+            // Benign no-audio case: don't pop the BUG panel, don't treat
+            // as a fault. The user just hasn't pressed play in their source.
+            // Quiet log entry only — keeps the diagnostic available via
+            // window.ikandyDiag() if the user actually wants to inspect.
+            console.log('[IKANDY] Reconnect: no audio detected (source likely paused)');
+            updateBadge(true, 'Connected · waiting for audio');
+            // Show flyout above the play button — but ONLY the first time
+            // (before audio has ever flowed). Once the user has played
+            // something this session, silent = "they paused", not "they
+            // forgot to press play" — no hand-holding needed.
+            const hint = document.getElementById('press-play-hint');
+            if (hint && !_hasSeenAudio) {
+              hint.style.display = 'block';
+              hint.style.opacity = '1';
+              clearTimeout(hint._fadeTimer);
+              clearInterval(hint._pollTimer);
+              hint._fadeTimer = setTimeout(() => {
+                hint.style.opacity = '0';
+                setTimeout(() => { hint.style.display = 'none'; }, 300);
+                clearInterval(hint._pollTimer);
+              }, 10000);
+              // Poll the analyser; hide instantly when audio starts flowing
+              hint._pollTimer = setInterval(() => {
+                try {
+                  if (!analyserNode) return;
+                  const data = new Uint8Array(analyserNode.frequencyBinCount);
+                  analyserNode.getByteFrequencyData(data);
+                  if (Math.max.apply(null, data) > 5) {
+                    _hasSeenAudio = true;
+                    hint.style.opacity = '0';
+                    setTimeout(() => { hint.style.display = 'none'; }, 300);
+                    clearInterval(hint._pollTimer);
+                    clearTimeout(hint._fadeTimer);
+                  }
+                } catch(_) {}
+              }, 400);
+            }
           })();
         }
       } else {
+        _hasSeenAudio = true;
         toast('✓ Audio signal active — visuals reacting to music');
       }
     }, 3000);
@@ -3470,9 +3646,15 @@ function setupSpotifyIPC() {
       const _trackChanged = state.id !== trackId;
       const _playFlipped  = state.playing !== _wasPlaying;
       if (_trackChanged || _playFlipped || _drift > 1500 || _pollAnchorTime === 0) {
+        // Anchor at the moment main.js generated the state, not when the
+        // renderer received it. state.timestamp is Date.now() at send;
+        // converting to performance.now() removes IPC + handler delay
+        // (typically 5–30ms) from the lyric clock. Falls back to "now" if
+        // a source doesn't supply a timestamp.
+        const _ipcOffset = (state.timestamp ? Date.now() - state.timestamp : 0);
         _pollAnchorProgress = state.progress;
-        _pollAnchorTime     = performance.now();
-        trackProgress       = state.progress;
+        _pollAnchorTime     = performance.now() - _ipcOffset;
+        trackProgress       = state.progress + _ipcOffset;
       }
       _wasPlaying = state.playing;
       updateHUD(state.title, state.artist, state.album, state.art, trackProgress, state.duration);
@@ -5277,6 +5459,42 @@ let _hideKeepCtrl   = localStorage.getItem('IKANDY-hide-keep-ctrl')   === '1';
 let _hideKeepHud    = localStorage.getItem('IKANDY-hide-keep-hud')    === '1';
 let _hideKeepStatus = localStorage.getItem('IKANDY-hide-keep-status') === '1';
 
+// Hard show/hide per feature — independent of UI hide mode. Defaults true
+// (everything visible). Persisted via localStorage. When false, the feature
+// is removed entirely (display:none) regardless of any other state.
+let _showCtrl   = localStorage.getItem('IKANDY-show-ctrl')   !== '0';
+let _showHud    = localStorage.getItem('IKANDY-show-hud')    !== '0';
+let _showStatus = localStorage.getItem('IKANDY-show-status') !== '0';
+
+function applyShowFeatureState() {
+  const b = document.body.classList;
+  b.toggle('force-hide-ctrl',   !_showCtrl);
+  b.toggle('force-hide-hud',    !_showHud);
+  b.toggle('force-hide-status', !_showStatus);
+  // Sync slider toggle visuals
+  const setTog = (id, on) => { const e = el(id); if (e) e.classList.toggle('on', on); };
+  setTog('ho-show-ctrl',   _showCtrl);
+  setTog('ho-show-hud',    _showHud);
+  setTog('ho-show-status', _showStatus);
+}
+
+function toggleShowFeature(which) {
+  if (which === 'ctrl') {
+    _showCtrl = !_showCtrl;
+    localStorage.setItem('IKANDY-show-ctrl', _showCtrl ? '1' : '0');
+  } else if (which === 'hud') {
+    _showHud = !_showHud;
+    localStorage.setItem('IKANDY-show-hud', _showHud ? '1' : '0');
+  } else if (which === 'status') {
+    _showStatus = !_showStatus;
+    localStorage.setItem('IKANDY-show-status', _showStatus ? '1' : '0');
+  }
+  applyShowFeatureState();
+}
+
+// Apply once at script load so saved prefs take effect immediately
+applyShowFeatureState();
+
 function applyHideState(lifted) {
   // lifted = mouse-move temporarily restored everything, ignore prefs.
   const b = document.body.classList;
@@ -5329,6 +5547,9 @@ function openHideOptsMenu(ev) {
   el('ho-ctrl'  ).classList.toggle('on', _hideKeepCtrl);
   el('ho-hud'   ).classList.toggle('on', _hideKeepHud);
   el('ho-status').classList.toggle('on', _hideKeepStatus);
+  el('ho-show-ctrl'  )?.classList.toggle('on', _showCtrl);
+  el('ho-show-hud'   )?.classList.toggle('on', _showHud);
+  el('ho-show-status')?.classList.toggle('on', _showStatus);
   // Position above the button, right-aligned to it (top nav has limited space below)
   menu.classList.add('open');
   const r = btn.getBoundingClientRect();
@@ -5578,17 +5799,28 @@ const AURORA_FRAG = `
 // ── Shared WebGL scene builder ──
 function buildSceneProgram(gl, vertSrc, fragSrc, label) {
   if (!gl) return null;
+  let _compileFailed = false;
   function makeShader(type, src) {
     const s = gl.createShader(type);
     gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
-      console.error('[IKANDY ' + label + '] Shader error:', gl.getShaderInfoLog(s));
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error('[IKANDY ' + label + '] Shader compile error:', gl.getShaderInfoLog(s));
+      _compileFailed = true;
+    }
     return s;
   }
   const prog = gl.createProgram();
   gl.attachShader(prog, makeShader(gl.VERTEX_SHADER,   vertSrc));
   gl.attachShader(prog, makeShader(gl.FRAGMENT_SHADER, fragSrc));
   gl.linkProgram(prog);
+  // Surface link failures — without this check a failed link leaves a
+  // non-null but unusable program, producing a flood of runtime
+  // "no valid shader program in use" errors at every drawArrays.
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error('[IKANDY ' + label + '] Program link error:', gl.getProgramInfoLog(prog));
+    return null;
+  }
+  if (_compileFailed) return null;
   // Upload quad once — never again
   const buf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -5852,6 +6084,269 @@ function startSingularityLoop() {
 function stopSingularityLoop() {
   if (_singularityRAF) { cancelAnimationFrame(_singularityRAF); _singularityRAF = null; }
   const gl = singularityGl; if (gl) gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   VOYAGER — procedural gas giant + starfield
+   Raymarched sphere in a single fragment shader. Surface is bands of
+   fbm-modulated noise in a violet/teal/cream palette. Atmospheric rim
+   glow via Fresnel. Background nebula + sub-cell pinpoint stars.
+   Bass = atmosphere glow intensity. Mid = cloud band scroll speed.
+   Single full-screen quad — no geometry, no textures, no asset weight.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const voyagerCanvas = document.getElementById('voyager-canvas');
+const voyagerGl     = voyagerCanvas ? voyagerCanvas.getContext('webgl') : null;
+let _voyagerRAF     = null;
+let _voyagerTime    = 0;
+
+const VOYAGER_FRAG = `
+  precision highp float;
+  uniform float u_time;
+  uniform float u_bass;
+  uniform float u_mid;
+  uniform float u_treble;
+  uniform float u_intensity;
+  uniform vec2  u_res;
+  varying vec2  v_uv;
+
+  // ── 3D hash + value noise + fbm ──
+  float h31(vec3 p) {
+    p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+  }
+  float n3(vec3 p) {
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(mix(h31(i + vec3(0.0, 0.0, 0.0)), h31(i + vec3(1.0, 0.0, 0.0)), f.x),
+          mix(h31(i + vec3(0.0, 1.0, 0.0)), h31(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+      mix(mix(h31(i + vec3(0.0, 0.0, 1.0)), h31(i + vec3(1.0, 0.0, 1.0)), f.x),
+          mix(h31(i + vec3(0.0, 1.0, 1.0)), h31(i + vec3(1.0, 1.0, 1.0)), f.x), f.y),
+      f.z);
+  }
+  float fbm3(vec3 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 5; i++) {
+      v += a * n3(p);
+      p = p * 2.05 + vec3(1.7, 9.2, 4.3);
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  // ── 2D hash for stars ──
+  float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+  // ── Analytic sphere intersection — returns nearest t (>0) or -1 on miss ──
+  float sphereHit(vec3 ro, vec3 rd, vec3 sc, float sr) {
+    vec3 oc = ro - sc;
+    float b = dot(oc, rd);
+    float c = dot(oc, oc) - sr * sr;
+    float h = b * b - c;
+    if (h < 0.0) return -1.0;
+    return -b - sqrt(h);
+  }
+
+  // ── Shooting stars ──
+  // 4 simultaneous tracks with staggered periods so 1-2 are always active.
+  // Each track's seed (changes every period) randomizes origin, direction,
+  // and color. Sharp distance-to-line falloff gives a clean streak with a
+  // short tail. Pure decoration — no audio reactivity, just ambient drama.
+  vec3 shootingStars(vec2 uv, float t) {
+    vec3 acc = vec3(0.0);
+    for (int i = 0; i < 4; i++) {
+      float fi = float(i);
+      float period = 5.0 + fi * 1.7;
+      float phase  = (t + fi * 2.3) / period;
+      float lt     = fract(phase);                  // 0..1 lifetime
+      float seed   = floor(phase) * 7.13 + fi * 31.0;
+
+      vec2  origin = vec2(h21(vec2(seed, 0.0)), h21(vec2(seed, 1.0))) * 2.4 - 1.2;
+      float angle  = h21(vec2(seed, 2.0)) * 6.2832;
+      vec2  dir    = vec2(cos(angle), sin(angle));
+
+      vec2 head = origin + dir * lt * 2.6;
+      vec2 tail = head - dir * 0.18;
+
+      // Closest distance from current pixel to head→tail segment
+      vec2  hp = uv - tail;
+      vec2  hd = head - tail;
+      float ph = clamp(dot(hp, hd) / max(dot(hd, hd), 1e-5), 0.0, 1.0);
+      float d  = length(hp - hd * ph);
+
+      float life   = smoothstep(0.0, 0.05, lt) * (1.0 - smoothstep(0.85, 1.0, lt));
+      // Sharp perpendicular falloff (~1px streak width), plus a head-to-
+      // tail taper — ph=0 at tail, ph=1 at head — squared so the head is
+      // bright and the tail dies fast. Reads as a proper meteor streak
+      // instead of a solid line.
+      float taper  = ph * ph;
+      float bright = exp(-d * 1400.0) * life * taper;
+
+      // Three-color palette pick — cyan-white, magenta-rose, gold
+      float pick   = h21(vec2(seed, 4.0));
+      vec3  starCol;
+      if      (pick < 0.40) starCol = vec3(0.70, 0.90, 1.00);
+      else if (pick < 0.75) starCol = vec3(1.00, 0.70, 0.90);
+      else                  starCol = vec3(1.00, 0.85, 0.45);
+
+      acc += starCol * bright;
+    }
+    return acc;
+  }
+
+  void main() {
+    vec2 uv = (gl_FragCoord.xy - 0.5 * u_res) / u_res.y;
+
+    // Camera and ray. Planet sits slightly right-of-center.
+    vec3 ro = vec3(0.0, 0.0, -3.2);
+    vec3 rd = normalize(vec3(uv, 1.4));
+
+    // Background nebula tint — extremely subtle
+    float neb = fbm3(vec3(uv * 0.7, u_time * 0.02));
+    vec3 col  = mix(vec3(0.0, 0.0, 0.02), vec3(0.06, 0.02, 0.10), neb * 0.55);
+
+    // Stars — sub-cell pinpoint with twinkle
+    vec2 starGrid = floor(gl_FragCoord.xy * 0.85);
+    float h = h21(starGrid);
+    if (h > 0.991) {
+      vec2 sub = fract(gl_FragCoord.xy * 0.85);
+      vec2 starPos = vec2(h21(starGrid + vec2(0.13, 0.71)),
+                          h21(starGrid + vec2(0.57, 0.29)));
+      float d = length(sub - starPos);
+      float twinkle = 0.65 + 0.35 * sin(u_time * 2.4 + h * 28.0);
+      col += smoothstep(0.10, 0.0, d) * (h - 0.991) * 95.0 * twinkle * vec3(0.85, 0.92, 1.0);
+    }
+
+    // Shooting stars — applied before planet check so they pass behind
+    // the planet (which reads like deep-space photography).
+    col += shootingStars(uv, u_time);
+
+    // Planet — slight offset from center
+    vec3  sc = vec3(0.55, -0.05, 0.0);
+    float sr = 1.05;
+    float t  = sphereHit(ro, rd, sc, sr);
+
+    if (t > 0.0) {
+      vec3 hit = ro + rd * t;
+      vec3 nrm = normalize(hit - sc);
+
+      // Spin around Y axis
+      float spin = u_time * 0.07;
+      float cs = cos(spin), sn = sin(spin);
+      vec3 rn = vec3(nrm.x * cs - nrm.z * sn, nrm.y, nrm.x * sn + nrm.z * cs);
+
+      // Banded gas-giant surface. lat drives bands; fbm warps them so they
+      // swirl rather than sit as straight stripes. Cloud motion is now
+      // constant-rate — keeping audio out of the noise time-base prevents
+      // the "shaking" effect that came from u_mid retroactively shifting
+      // where we sample noise space. Audio reactivity now lives in the
+      // lightning storms below instead.
+      float lat   = rn.y;
+      float warp  = fbm3(rn * 2.5 + vec3(0.0, 0.0, u_time * 0.12));
+      float band  = sin(lat * 9.0 + warp * 2.6);
+      float fine  = fbm3(rn * 6.0 + vec3(0.0, 0.0, u_time * 0.05));
+
+      // Palette — alien gas giant: deep violet → teal → cream highlights
+      vec3 cBand1     = vec3(0.18, 0.06, 0.32); // deep violet base
+      vec3 cBand2     = vec3(0.40, 0.18, 0.55); // mid violet
+      vec3 cBand3     = vec3(0.20, 0.55, 0.62); // teal accent
+      vec3 cHighlight = vec3(0.95, 0.85, 0.70); // cream
+
+      vec3 surface = mix(cBand1, cBand2, band * 0.5 + 0.5);
+      surface = mix(surface, cBand3, smoothstep(0.55, 0.95, fine));
+      surface += smoothstep(0.85, 1.0, band * 0.5 + 0.5 + fine * 0.3) * cHighlight * 0.55;
+
+      // Lighting — proper ambient + diffuse. The previous model used a
+      // multiplier that drove the night side to zero, blacking out the
+      // planet entirely. Now the night side stays dimly visible (ambient
+      // 0.18) so storms read against it.
+      vec3  lightDir = normalize(vec3(0.55, 0.40, -0.70));
+      float ndotl    = dot(rn, lightDir);
+      float diff     = max(0.0, ndotl);
+      vec3  lit      = surface * (0.18 + diff * 1.25);
+
+      // Atmospheric Fresnel rim — bass-pulsed, gentle
+      float fres = pow(1.0 - max(0.0, dot(-rd, nrm)), 2.2);
+      vec3  atmo = vec3(0.45, 0.65, 1.0) * fres * (0.55 + u_bass * 0.85 * u_intensity);
+
+      // Specular highlight (atmospheric scattering hint near terminator)
+      float spec = pow(max(0.0, dot(reflect(-lightDir, rn), -rd)), 30.0);
+
+      // ── Lightning storms on the night side ──
+      // Storm regions are smooth blobs (low-freq fbm threshold). Within
+      // those blobs, sparkle is high-freq fbm that scrolls fast — no
+      // cubic-cell hash, so no axis-aligned block artifacts. Bass kicks
+      // amplify quadratically (u_bass²) so quiet sections sparkle subtly
+      // and drops light up the dark hemisphere with a white-hot flash.
+      float nightSide = 1.0 - smoothstep(-0.05, 0.30, ndotl);
+      vec3  stormSample = rn * 3.5 + vec3(0.0, 0.0, u_time * 0.10);
+      float stormField  = fbm3(stormSample);
+      float storms      = smoothstep(0.55, 0.85, stormField);
+      // High-frequency sparkle that shifts fast — natural noise shapes,
+      // not cubic cells. This is what makes storms feel alive.
+      float sparkle = fbm3(rn * 22.0 + vec3(0.0, 0.0, u_time * 7.0));
+      sparkle = pow(smoothstep(0.50, 0.85, sparkle), 2.0);
+      // Bass response is quadratic — small kicks barely register, big
+      // drops produce a global white-out flash across all storm regions.
+      float bassFlash = u_bass * u_bass * u_intensity * 2.5;
+      float bolt      = storms * (sparkle * (0.4 + bassFlash) + bassFlash * 0.30);
+      // Idle color is electric blue, shifts to white-hot on heavy bass
+      vec3  boltCol = mix(vec3(0.45, 0.75, 1.0),
+                          vec3(0.95, 0.95, 1.0),
+                          clamp(bassFlash * 0.8, 0.0, 1.0));
+      lit += boltCol * bolt * nightSide * 1.4;
+
+      col = lit + atmo + spec * 0.15;
+    } else {
+      // Outer atmospheric halo when ray passes near the planet but misses.
+      // closest distance from sphere center to ray = sqrt(|oc|^2 - b^2).
+      vec3  oc = ro - sc;
+      float b  = dot(oc, rd);
+      if (b < 0.0) { // sphere is in front of camera along ray direction
+        float closestSq = dot(oc, oc) - b * b;
+        float closest   = sqrt(max(0.0, closestSq));
+        float halo = smoothstep(sr * 1.30, sr, closest)
+                   * (1.0 - smoothstep(sr, sr * 1.02, closest));
+        col += vec3(0.40, 0.62, 1.0) * halo * (0.40 + u_bass * 0.70 * u_intensity);
+      }
+    }
+
+    gl_FragColor = vec4(clamp(col * (0.5 + u_intensity), 0.0, 1.0), 1.0);
+  }
+`;
+
+const _voyagerProgram = voyagerGl ? buildSceneProgram(voyagerGl, AURORA_VERT, VOYAGER_FRAG, 'Voyager') : null;
+
+function renderVoyager() {
+  const gl = voyagerGl; if (!gl || !_voyagerProgram) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  if (voyagerCanvas.width !== W || voyagerCanvas.height !== H) {
+    voyagerCanvas.width = W; voyagerCanvas.height = H;
+    gl.viewport(0, 0, W, H);
+  }
+  gl.useProgram(_voyagerProgram);
+  const u = _voyagerProgram._u;
+  gl.uniform1f(u.u_time,      _voyagerTime);
+  gl.uniform1f(u.u_bass,      _aBass);
+  gl.uniform1f(u.u_mid,       _aMid);
+  gl.uniform1f(u.u_treble,    _aTreble);
+  gl.uniform1f(u.u_intensity, _sceneIntensity);
+  gl.uniform2f(u.u_res,       W, H);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  _voyagerTime += 0.016;
+}
+
+function startVoyagerLoop() {
+  if (_voyagerRAF) return;
+  function loop() { renderVoyager(); _voyagerRAF = requestAnimationFrame(loop); }
+  loop();
+}
+function stopVoyagerLoop() {
+  if (_voyagerRAF) { cancelAnimationFrame(_voyagerRAF); _voyagerRAF = null; }
+  const gl = voyagerGl; if (gl) gl.clear(gl.COLOR_BUFFER_BIT);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -6544,8 +7039,8 @@ function renderWaveray() {
 
   // ── SEARCHLIGHTS — independent sweeping beams, club style ──
   const beamCount = 7; // reduced from 10 — each beam draws 2 gradient paths, keep it lean
-  const beamLen   = Math.max(W, H) * 1.1;
-  const bassFlare = 1 + _wrBass * 2.0 * I;
+  const beamLen   = Math.max(W, H) * 1.15;
+  const bassFlare = 1 + _wrBass * 0.8 * I; // gentler than before — width handles the bass response
 
   for (let i = 0; i < beamCount; i++) {
     // Each beam has its own speed, phase, and hue offset
@@ -6558,38 +7053,57 @@ function renderWaveray() {
 
     // Beam brightness pulses with bass, each beam independently
     const pulse   = 0.5 + 0.5 * Math.sin(_waverayTime * (1.1 + i * 0.3) + i);
-    const alpha   = (0.25 + pulse * 0.35 + _wrBass * 0.4 * I) * I;
-    const width   = (3 + pulse * 4 + _wrBass * 8 * I) * bassFlare;
+    const alpha   = (0.30 + pulse * 0.30 + _wrBass * 0.45 * I) * I;
+    // Tighter width — laser-like rather than spotlight. Was up to ~45px at
+    // bass peaks; now caps near ~12px which reads as a beam of light.
+    const width   = (1.6 + pulse * 1.8 + _wrBass * 3.2 * I) * bassFlare;
 
     const endX = cx + Math.cos(angle) * beamLen;
     const endY = cy + Math.sin(angle) * beamLen;
 
+    // Outer haze pass — soft, wider, low-alpha glow around the beam axis.
+    // Drawn first so the bright core overlays it cleanly.
+    const haze = ctx.createLinearGradient(cx, cy, endX, endY);
+    haze.addColorStop(0,    `hsla(${beamHue},90%,70%,${alpha * 0.45})`);
+    haze.addColorStop(0.25, `hsla(${beamHue},85%,55%,${alpha * 0.18})`);
+    haze.addColorStop(0.7,  `hsla(${beamHue},80%,45%,${alpha * 0.05})`);
+    haze.addColorStop(1,    `hsla(${beamHue},75%,40%,0)`);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = haze;
+    ctx.lineWidth   = width * 3.2;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    // Bright core — the laser line itself. Sharp falloff so it reads thin.
     const grad = ctx.createLinearGradient(cx, cy, endX, endY);
-    grad.addColorStop(0,    `hsla(${beamHue},100%,90%,${Math.min(0.95, alpha * 1.8)})`);
-    grad.addColorStop(0.08, `hsla(${beamHue},95%,70%,${alpha})`);
-    grad.addColorStop(0.5,  `hsla(${beamHue},85%,50%,${alpha * 0.4})`);
-    grad.addColorStop(1,    `hsla(${beamHue},80%,35%,0)`);
+    grad.addColorStop(0,    `hsla(${beamHue},100%,98%,${Math.min(1, alpha * 2.0)})`);
+    grad.addColorStop(0.04, `hsla(${beamHue},100%,88%,${alpha * 1.4})`);
+    grad.addColorStop(0.30, `hsla(${beamHue},95%,65%,${alpha * 0.6})`);
+    grad.addColorStop(0.75, `hsla(${beamHue},85%,50%,${alpha * 0.15})`);
+    grad.addColorStop(1,    `hsla(${beamHue},80%,40%,0)`);
 
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(endX, endY);
     ctx.strokeStyle = grad;
     ctx.lineWidth   = width;
-    ctx.lineCap     = 'round';
     ctx.stroke();
 
-    // Mirror beam — opposite direction, thinner
+    // Mirror beam — opposite direction, thinner, hazier
     const endX2 = cx + Math.cos(angle + Math.PI) * beamLen * 0.85;
     const endY2 = cy + Math.sin(angle + Math.PI) * beamLen * 0.85;
     const grad2 = ctx.createLinearGradient(cx, cy, endX2, endY2);
-    grad2.addColorStop(0,   `hsla(${beamHue},100%,80%,${alpha * 0.6})`);
-    grad2.addColorStop(0.4, `hsla(${beamHue},90%,55%,${alpha * 0.2})`);
-    grad2.addColorStop(1,   `hsla(${beamHue},80%,35%,0)`);
+    grad2.addColorStop(0,    `hsla(${beamHue},100%,90%,${alpha * 0.7})`);
+    grad2.addColorStop(0.05, `hsla(${beamHue},95%,75%,${alpha * 0.5})`);
+    grad2.addColorStop(0.5,  `hsla(${beamHue},85%,55%,${alpha * 0.15})`);
+    grad2.addColorStop(1,    `hsla(${beamHue},80%,40%,0)`);
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(endX2, endY2);
     ctx.strokeStyle = grad2;
-    ctx.lineWidth   = width * 0.5;
+    ctx.lineWidth   = width * 0.55;
     ctx.stroke();
   }
 
@@ -6624,7 +7138,14 @@ function renderWaveray() {
     const timeData = new Uint8Array(bufLen);
     analyserNode.getByteTimeDomainData(timeData);
 
-    const amp  = H * 0.38 * (0.7 + _wrBass * 1.0 * I);
+    // Amp clamped so peaks always stay inside the unfaded center band.
+    // Edge fades cover the top/bottom 32% each, leaving 36% per side from
+    // center as the visible band. Cap peak at 0.30·H so even at full bass
+    // the wave breathes within that band. Intensity now scales the *entire*
+    // wave (with a floor of 0.25 so the wave never vanishes), not just the
+    // bass-reactive component — so the slider actually changes what you see.
+    const ampI = 0.25 + 0.75 * I;
+    const amp  = Math.min(H * 0.30, H * 0.18 * (1 + _wrBass * 1.4 * I) * ampI);
     const step = 3; // sample every 3px — visually identical, 3x fewer points
 
     // Pre-build point array once, reuse across passes
@@ -6941,8 +7462,8 @@ function selectScene(name) {
     const btn = el('scene-toggle-btn');
     if (btn) { btn.textContent = '● On'; btn.classList.add('active'); }
   }
-  // Turn off waveform — scenes work best on their own
-  if (_vizEnabled) toggleViz();
+  // Waveform stays under user control. It only gets auto-disabled by
+  // image/folder upload or Vibe FX activation — not by scene selection.
   setScene(name);
 }
 
@@ -6957,6 +7478,20 @@ function _deferStop(fn) {
 function setScene(name) {
   _clearSceneStopTimers(); // cancel any pending stops from previous click
   _currentScene = name;
+  // Restore this scene's remembered intensity. Skip 'none' (no scene
+  // active). Fall back to the legacy global value, then 1.0, if this
+  // scene has never been individually tuned.
+  if (name !== 'none') {
+    const fallback = parseFloat(localStorage.getItem('IKANDY-scene-intensity') || '1');
+    const remembered = (typeof _sceneIntensityByScene[name] === 'number')
+      ? _sceneIntensityByScene[name]
+      : (isFinite(fallback) ? fallback : 1.0);
+    _sceneIntensity = remembered;
+    const sl = el('scene-intensity-sl');
+    if (sl) sl.value = remembered;
+    const sv = el('scene-intensity-v');
+    if (sv) sv.textContent = remembered.toFixed(1);
+  }
   // Update scene selection buttons only (exclude toggle btn)
   document.querySelectorAll('[id^="scene-"]:not(#scene-toggle-btn)').forEach(b => b.classList.remove('active'));
   const btn = el('scene-' + name);
@@ -6985,6 +7520,7 @@ function setScene(name) {
     rippleCanvas.style.opacity = '0'; _deferStop(() => stopSceneRippleLoop());
     waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
   } else if (name === 'pawrticles') {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
@@ -6994,6 +7530,7 @@ function setScene(name) {
     rippleCanvas.style.opacity = '0'; _deferStop(() => stopSceneRippleLoop());
     waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
   } else if (name === 'ripple') {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
@@ -7003,6 +7540,7 @@ function setScene(name) {
     fireCanvas.style.opacity = '0';  _deferStop(() => stopFireLoop());
     waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
   } else if (name === 'waveray') {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
@@ -7012,6 +7550,7 @@ function setScene(name) {
     startWaverayLoop();
     fireCanvas.style.opacity = '0';  _deferStop(() => stopFireLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
   } else if (name === 'fire') {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
@@ -7020,6 +7559,7 @@ function setScene(name) {
     waverayCanvas.style.opacity = '0';  _deferStop(() => stopWaverayLoop());
     fireCanvas.style.opacity = '1';     startFireLoop();
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
   } else if (name === 'singularity') {
     // PATCH 11: black hole scene — turn off all others, fire up the singularity
     _auroraActive = false;
@@ -7030,6 +7570,18 @@ function setScene(name) {
     fireCanvas.style.opacity = '0';     _deferStop(() => stopFireLoop());
     singularityCanvas.style.opacity = '1';
     startSingularityLoop();
+    voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
+  } else if (name === 'voyager') {
+    // Voyager — gas giant + starfield, raymarched in fragment shader
+    _auroraActive = false;
+    auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';      _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0';   _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0';  _deferStop(() => stopWaverayLoop());
+    fireCanvas.style.opacity = '0';     _deferStop(() => stopFireLoop());
+    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '1';
+    startVoyagerLoop();
   } else {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
@@ -7038,13 +7590,33 @@ function setScene(name) {
     waverayCanvas.style.opacity = '0';  _deferStop(() => stopWaverayLoop());
     fireCanvas.style.opacity = '0';     _deferStop(() => stopFireLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
   }
   localStorage.setItem('IKANDY-scene', name);
+}
+
+// Per-scene intensity memory. Each scene (fire, voyager, etc.) remembers
+// its own intensity so switching between them doesn't bleed settings
+// across. Old global IKANDY-scene-intensity is used as a fallback for
+// scenes that haven't been individually tuned yet.
+let _sceneIntensityByScene = {};
+try {
+  const raw = localStorage.getItem('IKANDY-scene-intensities');
+  if (raw) _sceneIntensityByScene = JSON.parse(raw) || {};
+} catch(_) { _sceneIntensityByScene = {}; }
+function _saveSceneIntensities() {
+  try { localStorage.setItem('IKANDY-scene-intensities', JSON.stringify(_sceneIntensityByScene)); } catch(_) {}
 }
 
 function setSceneIntensity(v) {
   _sceneIntensity = v;
   el('scene-intensity-v').textContent = v.toFixed(1);
+  // Save under the currently-active scene (skip 'none' — meaningless there)
+  if (typeof _currentScene === 'string' && _currentScene && _currentScene !== 'none') {
+    _sceneIntensityByScene[_currentScene] = v;
+    _saveSceneIntensities();
+  }
+  // Keep legacy global key updated as fallback for older builds / new scenes
   localStorage.setItem('IKANDY-scene-intensity', v);
 }
 
@@ -7175,6 +7747,13 @@ function toggleViz() {
     v.style.display = 'none';
     btn.textContent = '○ Off';
     btn.classList.remove('active');
+    // Cascade: chromatic depends on waveform pixels — if waveform is off,
+    // chromatic has no input. Turn it off too so the toggle button's
+    // state always matches reality.
+    if (typeof _fxLayerEnabled !== 'undefined' && _fxLayerEnabled
+        && typeof setFxLayerEnabled === 'function') {
+      setFxLayerEnabled(false);
+    }
   }
   // Sync FX Layer canvas — hide it when viz is off (no source pixels)
   if (typeof syncFxLayerVisibility === 'function') syncFxLayerVisibility();
@@ -7254,12 +7833,28 @@ const bgGl     = bgCanvas.getContext('webgl');
 let _bgTexture = null, _bgImage = null, _fxTime = 0;
 let _rippleRAF = null, _rippleAmp = 0, _currentFx = 'raindrops', _fxStrength = 1.0;
 
+// Per-FX strength memory. Each FX type (rain, fog, etc.) remembers its
+// own strength so switching between them doesn't bleed settings across.
+let _fxStrengthByFx = {};
+try {
+  const raw = localStorage.getItem('IKANDY-fx-strengths');
+  if (raw) _fxStrengthByFx = JSON.parse(raw) || {};
+} catch(_) { _fxStrengthByFx = {}; }
+function _saveFxStrengths() {
+  try { localStorage.setItem('IKANDY-fx-strengths', JSON.stringify(_fxStrengthByFx)); } catch(_) {}
+}
+
 function showRainVideo() { /* rain is a shader — no video */ }
 function hideRainVideo() {}
 
 function setFxStrength(v) {
   _fxStrength = v;
   el('fx-strength-v').textContent = v.toFixed(2);
+  // Save under the currently-active FX key
+  if (_currentFx) {
+    _fxStrengthByFx[_currentFx] = v;
+    _saveFxStrengths();
+  }
 }
 
 const VERT = `
@@ -7378,12 +7973,15 @@ const FRAG = {
       vec2  fUV = clamp(uv + vec2(fog*0.004, fog*0.002), 0., 1.);
       col = mix(col, texture2D(u_tex, fUV).rgb * 0.93, fog);
 
-      /* ── Static condensation beads ── */
-      /* Grid: each cell may have a tiny bead that never slides */
+      /* ── Static condensation beads ──
+         3×3 neighborhood scan — a drop's footprint can extend past its
+         own cell, so we have to check all 8 surrounding cells too. The
+         old 2×2 forward-only scan caused visible rectangular cutoffs
+         where a drop's circle crossed a cell boundary. */
       vec2 gA = uv * vec2(28., 20.);
       vec2 cell = floor(gA);
       vec2 frac = fract(gA);
-      for(int dy=0;dy<=1;dy++) for(int dx=0;dx<=1;dx++){
+      for(int dy=-1;dy<=1;dy++) for(int dx=-1;dx<=1;dx++){
         vec2  nb  = cell + vec2(dx,dy);
         vec2  rnd = h22(nb);
         if(rnd.x > 0.5) continue;
@@ -7637,131 +8235,77 @@ const FRAG = {
     uniform vec2  u_res;
     varying vec2  v_uv;
 
-    float h11(float n){ return fract(sin(n*127.1)*43758.5453); }
     float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-    vec2  h22(vec2 p){
-      p=vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)));
-      return fract(sin(p)*43758.5453);
-    }
     float vnoise(vec2 p){
       vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
       return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),
                  mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);
     }
-
-    /* ── One fog bank: soft ellipse that drifts ──
-       Returns density [0,1] at uv for a fog blob
-       centered at pos, with given width/height     */
-    float fogBank(vec2 uv, vec2 pos, float w, float h2){
-      float AR = u_res.x / u_res.y;
-      vec2  d  = (uv - pos) * vec2(AR, 1.0);
-      /* ellipse SDF */
-      float e  = length(d / vec2(w*AR, h2));
-      return smoothstep(1.0, 0.0, e);
-    }
-
-    /* ── Wisp: thin elongated tendril ── */
-    float wisp(vec2 uv, vec2 pos, float len, float width, float angle){
-      float AR   = u_res.x / u_res.y;
-      float ca   = cos(angle), sa = sin(angle);
-      vec2  d    = uv - pos;
-      d.x       *= AR;
-      /* rotate into wisp local space */
-      vec2  ld   = vec2(d.x*ca + d.y*sa, -d.x*sa + d.y*ca);
-      /* capsule shape */
-      float lc   = clamp(ld.x, -len, len);
-      float dist = length(vec2(ld.x - lc, ld.y));
-      return smoothstep(width, 0., dist);
+    /* 4-octave fbm — enough detail to look like fog without burning fps */
+    float fbm(vec2 p){
+      float v=0., a=0.5;
+      for(int i=0;i<4;i++){ v+=a*vnoise(p); p=p*2.03+vec2(11.7,7.3); a*=0.5; }
+      return v;
     }
 
     void main(){
-      vec2  uv  = v_uv;
-      float s   = u_strength;
-      float t   = u_time;
-      float AR  = u_res.x / u_res.y;
+      vec2  uv = v_uv;
+      float s  = u_strength;
+      float t  = u_time;
+      float AR = u_res.x / u_res.y;
 
-      /* Always show the image */
       vec4 col = texture2D(u_tex, uv);
-      float fogDensity = 0.0;
-      vec3  fogColor   = vec3(0.0);
 
-      /* ── GROUND FOG BANKS (large, slow, hug bottom) ──
-         6 large elliptical banks drift slowly left/right */
-      for(int i = 0; i < 6; i++){
-        float fi    = float(i);
-        vec2  rnd   = h22(vec2(fi*3.1, fi*7.3));
-        float speed = (rnd.x - 0.5) * 0.012; /* left or right drift */
-        float bobS  = 0.003 + rnd.y * 0.004;  /* gentle vertical bob */
+      /* ── Domain-warped flowing fog ──
+         Three layers of fbm at different scales/speeds for parallax depth.
+         Each layer's sample point is *warped* by a second fbm — that's the
+         curling, rolling motion of real fog. No discrete primitives, just
+         a continuous medium that flows. */
+      vec2 p = vec2(uv.x * AR, uv.y);
 
-        vec2  pos;
-        pos.x = fract(rnd.x + t * speed);     /* wraps 0→1 */
-        pos.y = 0.05 + rnd.y * 0.35;          /* bottom 35% of screen */
-        pos.y += sin(t * bobS + rnd.x * 6.28) * 0.02;
+      /* Layer 1 — far back, slow, large scale */
+      vec2  q1 = p * 1.6 + vec2(t * 0.022, t * 0.006);
+      vec2  w1 = vec2(fbm(q1 + vec2(0.0, 0.0)),
+                      fbm(q1 + vec2(5.2, 1.3))) * 0.55;
+      float n1 = fbm(q1 + w1);
 
-        float w  = 0.18 + rnd.x * 0.22;       /* wide fog bank */
-        float h2 = 0.06 + rnd.y * 0.08;       /* short vertical extent */
+      /* Layer 2 — mid, faster, finer scale, drifts the other way for depth */
+      vec2  q2 = p * 3.4 + vec2(-t * 0.045, t * 0.014);
+      vec2  w2 = vec2(fbm(q2 + vec2(2.1, 8.7)),
+                      fbm(q2 + vec2(4.3, 0.5))) * 0.70;
+      float n2 = fbm(q2 + w2);
 
-        float d  = fogBank(uv, pos, w, h2) * (0.5 + rnd.x * 0.3) * s;
-        /* ground fog: cool blue-grey */
-        vec3  gc = mix(vec3(0.75, 0.78, 0.86), vec3(0.82, 0.80, 0.75), rnd.y);
-        fogDensity += d * (1. - fogDensity); /* max blend */
-        fogColor    = mix(fogColor, gc, d * (1. - fogDensity + d));
-      }
+      /* Layer 3 — near, fast, fine wisps (no warp — keeps it cheap) */
+      vec2  q3 = p * 6.2 + vec2(t * 0.080, -t * 0.022);
+      float n3 = fbm(q3);
 
-      /* ── MID WISPS (thin tendrils at medium height) ── */
-      for(int i = 0; i < 8; i++){
-        float fi    = float(i);
-        vec2  rnd   = h22(vec2(fi*5.7+1., fi*2.3+4.));
-        float speed = (rnd.x - 0.5) * 0.018;
-        float angle = (rnd.y - 0.5) * 0.4;   /* slight diagonal */
+      /* Bottom-heavy vertical gradient — fog hugs the ground but with
+         enough atmospheric haze up high that the image still feels foggy
+         everywhere, not just at the bottom. */
+      float vGrad = mix(0.98, 0.32, smoothstep(0.0, 0.85, uv.y));
 
-        vec2  pos;
-        pos.x = fract(rnd.x*1.3 + t * speed + 0.5);
-        pos.y = 0.20 + rnd.y * 0.45;
+      /* Combine layers, then push through a contrast curve so density
+         falls off naturally instead of being uniformly hazy */
+      float density = n1 * 0.55 + n2 * 0.32 + n3 * 0.13;
+      density = smoothstep(0.28, 0.95, density) * vGrad;
 
-        float len   = 0.10 + rnd.x * 0.18;
-        float width = 0.015 + rnd.y * 0.025;
+      /* Color drifts cool-grey at the floor → warm cream up high.
+         n2 modulates locally so adjacent banks read as different patches. */
+      vec3 fogCol = mix(
+        vec3(0.78, 0.81, 0.88),
+        vec3(0.92, 0.90, 0.86),
+        clamp(n2 * 0.7 + uv.y * 0.4, 0.0, 1.0)
+      );
 
-        float d = wisp(uv, pos, len/AR, width, angle) * 0.45 * s;
-        /* wisps: warm light grey */
-        vec3  wc = vec3(0.88, 0.86, 0.84);
-        fogDensity += d * (1. - fogDensity);
-        fogColor    = mix(fogColor, wc, d);
-      }
+      density = clamp(density * s * 1.25, 0.0, 0.92);
+      col.rgb = mix(col.rgb, fogCol, density);
 
-      /* ── HIGH WISPS (thin, fast, near top) ── */
-      for(int i = 0; i < 5; i++){
-        float fi    = float(i);
-        vec2  rnd   = h22(vec2(fi*9.1+2., fi*4.7+8.));
-        float speed = (rnd.x - 0.5) * 0.025;
+      /* Bloom into thin fog so the image bleeds through softly */
+      float lum  = dot(col.rgb, vec3(0.299, 0.587, 0.114));
+      float glow = (1.0 - density) * lum * 0.08 * s;
+      col.rgb   += glow * vec3(1.0, 0.95, 0.88);
 
-        vec2  pos;
-        pos.x = fract(rnd.x*0.8 + t * speed + 0.2);
-        pos.y = 0.55 + rnd.y * 0.35;          /* upper portion */
-
-        float len   = 0.06 + rnd.x * 0.12;
-        float width = 0.008 + rnd.y * 0.012;
-        float angle = (rnd.y - 0.5) * 0.6;
-
-        float d = wisp(uv, pos, len/AR, width, angle) * 0.30 * s;
-        /* high wisps: near white, ethereal */
-        vec3  hc = vec3(0.93, 0.92, 0.95);
-        fogDensity += d * (1. - fogDensity);
-        fogColor    = mix(fogColor, hc, d);
-      }
-
-      /* ── Blend fog over image ──
-         Fog is semi-transparent — image always shows through */
-      fogDensity = clamp(fogDensity, 0., 0.82);
-      col.rgb    = mix(col.rgb, fogColor, fogDensity);
-
-      /* ── Add subtle image glow where fog is thin ──
-         Bright parts of image bleed a bit of color into nearby fog */
-      float lum = dot(col.rgb, vec3(0.299, 0.587, 0.114));
-      float glow= (1. - fogDensity) * lum * 0.1 * s;
-      col.rgb  += glow * vec3(1., 0.95, 0.88);
-
-      gl_FragColor = vec4(clamp(col.rgb, 0., 1.), 1.);
+      gl_FragColor = vec4(clamp(col.rgb, 0.0, 1.0), 1.0);
     }
   `,
 
@@ -8562,6 +9106,15 @@ function setImgFx(fx) {
   _currentFx     = fx;
   _currentFxMode = fx;
 
+  // Restore this FX's remembered strength (default 1.0). Also sync the
+  // slider so the UI reflects the actual value being used.
+  const remembered = (typeof _fxStrengthByFx[fx] === 'number') ? _fxStrengthByFx[fx] : 1.0;
+  _fxStrength = remembered;
+  const sl = el('fx-strength-sl');
+  if (sl) sl.value = remembered;
+  const sv = el('fx-strength-v');
+  if (sv) sv.textContent = remembered.toFixed(2);
+
   // Single-select: activate this fx
   el('fxmode-viz')?.classList.remove('active');
   _allFxKeys.forEach(k => el('ifx-'+k)?.classList.toggle('active', k === fx));
@@ -8572,8 +9125,8 @@ function setImgFx(fx) {
   // Turn off waveform
   if (_vizEnabled) toggleViz();
 
-  // Turn off scenes
-  if (_sceneEnabled) toggleScene();
+  // Scene is allowed to coexist with image FX. Switching FX types must
+  // not toggle scene off — only a fresh image / folder upload resets it.
 
   // Rain video overlay — show/hide
   if (fx === 'raindrops') { showRainVideo(); }
@@ -8637,6 +9190,9 @@ function onBgFileChange(input) {
     el('viz').style.display = 'none';
     const vbtn = el('viz-toggle-btn');
     if (vbtn) { vbtn.textContent = '○ Off'; vbtn.classList.remove('active'); }
+    // Fresh upload = full reset back to rain. Scene off too — once the
+    // user has the new image, they can re-enable scene if they want it.
+    if (_sceneEnabled) toggleScene();
     // Auto-select Rain when image is loaded
     setImgFx('raindrops');
     };
@@ -8665,6 +9221,9 @@ async function pickBgFolder() {
   el('viz').style.display = 'none';
   const vbtn = el('viz-toggle-btn');
   if (vbtn) { vbtn.textContent = '○ Off'; vbtn.classList.remove('active'); }
+  // Fresh folder = full reset back to rain. Scene off too — once the
+  // user has the new folder cycling, they can re-enable scene if they want it.
+  if (_sceneEnabled) toggleScene();
   // Auto-select Rain when folder is loaded
   setImgFx('raindrops');
   loadBgFile(_bgFiles[0]);
