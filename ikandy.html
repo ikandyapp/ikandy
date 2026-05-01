@@ -1659,7 +1659,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   <div class="ho-opt" id="ho-status" onclick="toggleHideKeep('status')">Connection status
     <span class="ho-show-toggle on" id="ho-show-status" onclick="event.stopPropagation(); toggleShowFeature('status')" title="Show connection status"></span>
   </div>
-  <div class="ho-opt on" id="ho-mouse-fx" onclick="toggleMouseFx()" style="border-top:1px solid rgba(255,255,255,.07);margin-top:4px;padding-top:8px;">Mouse effects</div>
+  <div class="ho-opt" id="ho-mouse-fx" onclick="toggleMouseFx()" style="border-top:1px solid rgba(255,255,255,.07);margin-top:4px;padding-top:8px;">Mouse effects</div>
   <div class="ho-opt on" id="ho-draw-mode" onclick="toggleDrawMode()" style="padding-left:18px;">↳ Draw on canvas</div>
   <div style="padding:6px 14px 4px 28px;display:flex;gap:6px;align-items:center;" id="ho-draw-color-row">
     <span style="font-size:10px;color:rgba(255,255,255,.3);margin-right:2px;">Color</span>
@@ -1779,14 +1779,14 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   </div>
   <div class="acc-bd open">
     <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
-      <button id="src-spotify-btn" class="btn primary tier-full" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('spotify')">Spotify</button>
+      <button id="src-spotify-btn" class="btn tier-full" style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('spotify')">Spotify Premium</button>
       <button id="src-foobar-btn"  class="btn tier-full"         style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('foobar')">foobar2000</button>
       <button id="src-vlc-btn"     class="btn"                   style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('vlc')">VLC</button>
       <button id="src-smtc-btn"    class="btn"                   style="flex:1 1 calc(50% - 3px);margin:0;font-size:11px;" onclick="setSourceMode('smtc')">Now Playing</button>
     </div>
     <button class="btn" id="recapture-btn" onclick="startSystemAudioCapture()" style="margin-bottom:6px;border-color:var(--sp);color:var(--sp);">🎤 Reconnect System Audio</button>
     <div id="src-spotify-panel">
-      <div class="src-tier"><span class="tier-dot full"></span><b>Premium:</b> full features &mdash; playlists, search, shuffle modes, art, lyrics. <b>Free:</b> transport only.</div>
+      <div class="src-tier"><span class="tier-dot full"></span><b>Spotify Premium</b> &mdash; full features: playlists, search, shuffle, art, lyrics. <b>Free users:</b> use Now Playing instead.</div>
       <div id="sp-info" style="font-size:12px;color:var(--dim);line-height:1.6;margin-bottom:10px;">Not connected.</div>
       <button class="btn green" id="sb-connect" onclick="startLogin()">Connect Spotify</button>
       <div style="font-size:11px;color:var(--dim);margin-top:6px;line-height:1.6;">Open Spotify and start playing something before using IKANDY's controls.</div>
@@ -2775,11 +2775,9 @@ async function refreshMonitorList() {
 }
 
 async function closeAllMirrors() {
-  if (_monitorMode === 'span') {
-    await window.IKANDY.setSpanDisplays([]);
-  } else {
-    await window.IKANDY.closeAllMirrors();
-  }
+  // Clean up BOTH modes defensively — switching modes can leave the other type orphaned
+  try { await window.IKANDY.closeAllMirrors(); } catch {}
+  try { await window.IKANDY.setSpanDisplays([]); } catch {}
   _activeDisplayIds.clear();
   refreshMonitorList();
   document.getElementById('close-all-mirrors-btn').style.display = 'none';
@@ -3016,7 +3014,14 @@ document.addEventListener('dblclick', e => {
 });
 
 /* ── HOLD & CHARGE: ring grows on hold, explodes on release ── */
-let _mouseFxEnabled = true;
+// Default OFF on first launch — let users discover and opt in.
+// localStorage value '1' = explicitly on, '0' = explicitly off, null = first run.
+let _mouseFxEnabled = localStorage.getItem('IKANDY-mouse-fx') === '1';
+// Sync menu visual state once DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('ho-mouse-fx');
+  if (btn) btn.classList.toggle('on', _mouseFxEnabled);
+});
 
 function toggleMouseFx() {
   _mouseFxEnabled = !_mouseFxEnabled;
@@ -4146,14 +4151,19 @@ function fadeLoading() {
 function setupSpotifyIPC() {
   window.IKANDY.onAuthResult(state => {
     console.log('[IKANDY] auth-result:', state);
+    if (state.noSource) {
+      // First launch or non-Spotify mode — just fade loading; source prompt handles the rest
+      fadeLoading();
+      el('setup').style.display = 'none';
+      el('login').style.display = 'none';
+      return;
+    }
     if (state.needsSetup) {
       fadeLoading();
-      el('setup').style.display = 'flex';
+      // Show the new popup-style guide instead of the old full-screen setup
+      el('setup').style.display = 'none';
       el('login').style.display = 'none';
-      el('client-id-input').value = '';
-      el('setup-error').style.display = 'none';
-      if (sidebarOpen || leftSidebarOpen) toggleBothSidebars();
-      setTimeout(() => {}, 0); // setup screen shown
+      openSpGuide();
       return;
     }
     if (state.success) {
@@ -4169,10 +4179,32 @@ function setupSpotifyIPC() {
       el('sb-disconnect').style.display    = '';
       el('sb-change-client').style.display = '';
 
-      // Free vs Premium — show/hide playback controls
-      const isPremium = state.product === 'premium';
-      _isPremium = isPremium;
-      setSpotifyControls(isPremium);
+      // Free vs Premium — only trigger lockout on CONFIRMED product, and only once per install
+      const product = state.product;
+      if (state.productConfirmed && product === 'premium') {
+        // User confirmed Premium — clear any stale "Free seen" flag from past false positives
+        localStorage.removeItem('IKANDY-sp-free-seen');
+        _isPremium = true;
+        setSpotifyControls(true);
+      } else if (state.productConfirmed && product === 'free') {
+        const seenKey = 'IKANDY-sp-free-seen';
+        if (!localStorage.getItem(seenKey)) {
+          localStorage.setItem(seenKey, '1');
+          showSpFreeModal();
+          return;
+        }
+        // They've seen the modal before — silently keep them logged out, don't nag
+        _isPremium = false;
+        setSpotifyControls(false);
+        return;
+      }
+      // If product not confirmed, don't change anything — wait for confirmation
+      const isPremium = product === 'premium';
+      // Only update _isPremium if we have a confirmed value; otherwise keep whatever it was
+      if (state.productConfirmed || product === 'premium') {
+        _isPremium = isPremium;
+        setSpotifyControls(isPremium);
+      }
 
       // First-run tour
       setTimeout(window.tkStart, 1200);
@@ -5024,10 +5056,10 @@ function skipToLocal() {
 function logout() { window.IKANDY.logout(); }
 
 /* ── SOURCE MODE ── */
-let currentSource = 'spotify';
+let currentSource = null;
 async function initSource() {
   const s = await window.IKANDY.getSource();
-  currentSource = s.mode || 'spotify';
+  currentSource = s.mode || null;
   if (s.vlcPort)     el('vlc-port-input').value = s.vlcPort;
   if (s.vlcPassword) el('vlc-pass-input').value  = s.vlcPassword;
   if (s.foobarPort && el('foobar-port-input')) el('foobar-port-input').value = s.foobarPort;
@@ -5051,18 +5083,18 @@ function applySourceUI(mode) {
 let _isPremium = false; // track premium state across source switches
 
 async function setSourceMode(mode) {
-  // If switching to Spotify with no Client ID, go straight to setup
+  // If switching to Spotify with no Client ID, show setup guide first
   if (mode === 'spotify') {
     const id = await window.IKANDY.getClientId();
     if (!id) {
-      if (sidebarOpen || leftSidebarOpen) toggleBothSidebars();
-      el('setup').style.display = 'flex';
-      el('login').style.display = 'none';
-      el('client-id-input').value = '';
-      el('setup-error').style.display = 'none';
+      // Hide source prompt if showing
+      el('source-prompt').style.display = 'none';
+      el('sp-guide-modal').style.display = 'flex';
       return;
     }
   }
+  // Hide source prompt — they've picked something
+  el('source-prompt').style.display = 'none';
   currentSource = mode;
   applySourceUI(mode);
   if (mode !== 'smtc') clearSMTCCaps(); // restore buttons when leaving SMTC
@@ -10273,6 +10305,59 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
 
 <!-- GitHub release update modal — shown on launch when newer release exists -->
 <!-- Welcome modal -->
+<!-- Spotify Premium setup guide modal -->
+<div id="sp-guide-modal" onclick="if(event.target===this)closeSpGuide()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);">
+  <div style="background:linear-gradient(160deg,#0d0d14 60%,#11091a);border:1px solid rgba(30,215,96,.3);border-radius:10px;max-width:520px;width:100%;padding:30px;color:#ccc;font-size:13px;line-height:1.7;box-shadow:0 0 60px rgba(30,215,96,.15),0 20px 60px rgba(0,0,0,.7);">
+    <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(30,215,96,.7);margin-bottom:6px;">Spotify Premium Setup</div>
+    <h2 style="font-size:22px;color:#fff;margin:0 0 16px 0;font-weight:700;">One-time setup</h2>
+    <p style="margin:0 0 14px;color:rgba(200,190,220,.85);">IKANDY connects to Spotify with your own free developer credentials — Spotify requires this. Takes about 2 minutes.</p>
+    <ol style="padding-left:20px;margin:14px 0;color:rgba(200,190,220,.85);">
+      <li style="margin-bottom:8px;">Visit <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:#1DB954;">developer.spotify.com/dashboard</a> and sign in</li>
+      <li style="margin-bottom:8px;">Click <b style="color:#fff;">Create app</b></li>
+      <li style="margin-bottom:8px;">For Redirect URI use:<br><code style="background:rgba(255,255,255,.06);padding:3px 8px;border-radius:4px;font-size:11px;color:#1DB954;">http://127.0.0.1:8888/callback</code></li>
+      <li style="margin-bottom:8px;">Copy your <b style="color:#fff;">Client ID</b> and paste it below</li>
+    </ol>
+    <div style="margin:18px 0 6px;">
+      <input id="sp-guide-client-id" type="text" placeholder="Paste your Client ID (32 hex chars)"
+        spellcheck="false" autocomplete="off"
+        style="width:100%;padding:11px 14px;border-radius:6px;border:1px solid rgba(255,255,255,.15);
+        background:rgba(0,0,0,.3);color:#fff;font-family:monospace;font-size:13px;letter-spacing:.5px;
+        outline:none;box-sizing:border-box;" />
+      <div id="sp-guide-error" style="display:none;color:#ff6b6b;font-size:11px;margin-top:6px;">Please enter a valid Client ID (32 hex characters).</div>
+    </div>
+    <p style="font-size:11.5px;color:rgba(200,190,220,.55);border-top:1px solid rgba(255,255,255,.06);margin-top:14px;padding-top:14px;">Need pictures? See the full guide at <a href="https://ikandy.app/spotify-setup" target="_blank" style="color:#1DB954;">ikandy.app/spotify-setup</a></p>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button onclick="closeSpGuide()" style="flex:0 0 auto;padding:9px 16px;border-radius:5px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-size:12px;cursor:pointer;">Cancel</button>
+      <button onclick="submitSpGuide()" style="flex:1;padding:9px 0;border-radius:5px;border:none;font-size:12.5px;font-weight:600;cursor:pointer;background:#1DB954;color:#000;">Save & Continue →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Spotify Free user lockout modal -->
+<div id="sp-free-modal" onclick="if(event.target===this)closeSpFreeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);">
+  <div style="background:linear-gradient(160deg,#0d0d14 60%,#1a0d11);border:1px solid rgba(255,107,107,.25);border-radius:10px;max-width:480px;width:100%;padding:30px;color:#ccc;font-size:13px;line-height:1.7;">
+    <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,107,107,.7);margin-bottom:6px;">Spotify Free detected</div>
+    <h2 style="font-size:22px;color:#fff;margin:0 0 12px 0;font-weight:700;">Use Now Playing instead</h2>
+    <p style="margin:0 0 12px;color:rgba(200,190,220,.85);">Spotify's API doesn't allow Free accounts to control playback. But you can still use IKANDY!</p>
+    <p style="margin:0 0 16px;color:rgba(200,190,220,.85);"><b style="color:#fff;">Now Playing</b> reads whatever is playing on your computer — including Spotify Free. You'll get full transport control with no setup.</p>
+    <button onclick="switchToNowPlaying()" style="width:100%;padding:11px 0;border-radius:5px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#7b2fff,#b44fff);color:#fff;">Switch to Now Playing →</button>
+  </div>
+</div>
+
+<!-- Source selection prompt (first launch nudge) -->
+<div id="source-prompt" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(20,20,28,.95);border:1px solid rgba(180,100,255,.35);border-radius:8px;padding:12px 18px;color:#ccc;font-size:13px;z-index:9000;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.5);animation:sourcePromptPulse 2.4s ease-in-out infinite;">
+  <span style="margin-right:6px;">🎵</span>
+  Pick a source from the sidebar to begin
+  <span style="margin-left:6px;color:rgba(180,100,255,.7);">→</span>
+</div>
+<style>
+@keyframes sourcePromptPulse {
+  0%, 100% { box-shadow: 0 8px 24px rgba(0,0,0,.5), 0 0 0 0 rgba(180,100,255,.4); }
+  50%      { box-shadow: 0 8px 24px rgba(0,0,0,.5), 0 0 0 8px rgba(180,100,255,0); }
+}
+</style>
+
+<!-- Welcome modal -->
 <div id="welcome-modal" onclick="if(event.target===this)closeWelcome()">
   <div class="wm-box">
     <div class="wm-logo">IKANDY App</div>
@@ -10369,7 +10454,11 @@ function closeSourceHelp() { document.getElementById('src-help-modal').classList
 
 /* ── Welcome modal ── */
 const WELCOME_VERSION = 'v2'; // bump this when modal content changes meaningfully
-function closeWelcome() { el('welcome-modal').classList.remove('open'); }
+function closeWelcome() {
+  el('welcome-modal').classList.remove('open');
+  // After welcome closes, if no source is selected, prompt them to pick one
+  setTimeout(maybeShowSourcePrompt, 400);
+}
 function closeWelcomePermanent() {
   localStorage.setItem('IKANDY-welcome-seen', WELCOME_VERSION);
   closeWelcome();
@@ -10377,8 +10466,68 @@ function closeWelcomePermanent() {
 (function() {
   if (localStorage.getItem('IKANDY-welcome-seen') !== WELCOME_VERSION) {
     setTimeout(() => el('welcome-modal')?.classList.add('open'), 800);
+  } else {
+    // Returning user — still check if no source is selected
+    setTimeout(maybeShowSourcePrompt, 800);
   }
 })();
+
+/* ── Source selection prompt ── */
+function maybeShowSourcePrompt() {
+  // Show only if no source is currently selected
+  if (!currentSource) {
+    el('source-prompt').style.display = 'block';
+    // Auto-open the sidebar so the source picker is visible
+    if (typeof leftSidebarOpen !== 'undefined' && !leftSidebarOpen && typeof toggleLeftSidebar === 'function') {
+      toggleLeftSidebar();
+    }
+  }
+}
+function hideSourcePrompt() {
+  const p = el('source-prompt');
+  if (p) p.style.display = 'none';
+}
+
+/* ── Spotify Premium setup guide ── */
+function openSpGuide() {
+  el('sp-guide-modal').style.display = 'flex';
+  setTimeout(() => el('sp-guide-client-id')?.focus(), 100);
+}
+function closeSpGuide() {
+  el('sp-guide-modal').style.display = 'none';
+  el('sp-guide-error').style.display = 'none';
+}
+async function submitSpGuide() {
+  const id = el('sp-guide-client-id').value.trim().toLowerCase();
+  if (!/^[a-f0-9]{32}$/.test(id)) {
+    el('sp-guide-error').style.display = 'block';
+    return;
+  }
+  try {
+    await window.IKANDY.saveClientId(id);
+    el('sp-guide-modal').style.display = 'none';
+    el('sp-guide-error').style.display = 'none';
+    // Now trigger the actual Spotify auth flow
+    if (typeof startLogin === 'function') startLogin();
+  } catch (e) {
+    el('sp-guide-error').textContent = 'Save failed: ' + (e?.message || e);
+    el('sp-guide-error').style.display = 'block';
+  }
+}
+
+/* ── Spotify Free user lockout ── */
+function showSpFreeModal() { el('sp-free-modal').style.display = 'flex'; }
+function closeSpFreeModal() { el('sp-free-modal').style.display = 'none'; }
+function switchToNowPlaying() {
+  closeSpFreeModal();
+  // Disconnect current Spotify session
+  if (typeof logout === 'function') {
+    try { logout(); } catch {}
+  }
+  // Switch source to SMTC
+  setSourceMode('smtc');
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && el('src-help-modal')?.classList.contains('open')) closeSourceHelp();
 });

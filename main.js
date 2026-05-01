@@ -13,6 +13,7 @@
  */
 
 const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut, screen } = require('electron');
+console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-01 r5');
 const { autoUpdater } = require('electron-updater');
 const http  = require('http');
 const https = require('https');
@@ -58,7 +59,7 @@ let isRateLimited   = false;
 let lastKnownProduct = null;  // 'premium' | 'free' | null — cached from /me, source of truth for UI
 
 // ── Source mode ───────────────────────────────────────────────────────────────
-let sourceMode   = 'spotify';
+let sourceMode   = null; // null = first-launch, no source selected yet
 let vlcPort      = 8080;
 let vlcPassword  = '';
 // Mirror of foobarConnected — gate VLC access until the user successfully
@@ -75,7 +76,7 @@ const SOURCE_FILE = () => path.join(app.getPath('userData'), 'IKANDY-source.json
 function loadSource() {
   try {
     const s = JSON.parse(fs.readFileSync(SOURCE_FILE(), 'utf8'));
-    sourceMode  = s.mode        || 'spotify';
+    sourceMode  = s.mode        || null;
     vlcPort     = s.vlcPort     || 8080;
     vlcPassword = s.vlcPassword || '';
     foobarPort     = s.foobarPort     || 8880;
@@ -486,15 +487,34 @@ function startAuthServer(pkceVerifier) {
       console.log('[IKANDY] Auth success — token saved to', TOKEN_FILE());
 
       // Fetch user profile to get product (free/premium)
-      let product = 'free';
+      let product = null; // null = unknown, do not assume free
+      let productConfirmed = false;
       try {
         const me = await httpsGet('https://api.spotify.com/v1/me',
           { Authorization: 'Bearer ' + data.access_token });
-        if (me.status === 200) product = JSON.parse(me.body).product || 'free';
-      } catch(e) {}
-      lastKnownProduct = product;
-      console.log('[IKANDY] Spotify product:', product);
-      mainWindow?.webContents.send('auth-result', { success: true, product });
+        console.log('[IKANDY] /me status:', me.status, 'body length:', me.body?.length);
+        if (me.status === 200) {
+          try {
+            const parsed = JSON.parse(me.body);
+            console.log('[IKANDY] /me parsed keys:', Object.keys(parsed).join(','));
+            if (parsed.product) {
+              product = parsed.product;
+              productConfirmed = true;
+            } else {
+              console.log('[IKANDY] /me has no product field — body:', me.body.substring(0, 200));
+            }
+          } catch(parseErr) {
+            console.log('[IKANDY] /me parse error:', parseErr.message, 'body:', me.body?.substring(0, 200));
+          }
+        } else {
+          console.log('[IKANDY] /me non-200:', me.body?.substring(0, 200));
+        }
+      } catch(e) {
+        console.log('[IKANDY] /me fetch failed:', e.message);
+      }
+      if (productConfirmed) lastKnownProduct = product;
+      console.log('[IKANDY] Spotify product:', product, 'confirmed:', productConfirmed);
+      mainWindow?.webContents.send('auth-result', { success: true, product, productConfirmed });
 
       // Start polling immediately
       startPolling();
@@ -1428,15 +1448,40 @@ function setupDesktopCapturer() {
       try {
         console.log('[IKANDY] Mirror request from:', url);
         const sources = await desktopCapturer.getSources({ types: ['window', 'screen'], fetchWindowIcons: false });
-        const wantedId = mainWindow?.getMediaSourceId?.();
 
-        // 1. Try direct ID match (most reliable — uses Electron's own window ID)
-        let target = wantedId ? sources.find(s => s.id === wantedId) : null;
+        // PREFER screen capture of the display the main window is on.
+        // Window capture on Windows uses BitBlt by default, which returns BLACK
+        // frames for hardware-accelerated content (WebGL/Butterchurn). Screen
+        // capture goes through DWM and works reliably.
+        // The mirror is on a different display, so no recursion.
+        let target = null;
+        if (mainWindow) {
+          try {
+            const mainBounds = mainWindow.getBounds();
+            const mainDisplay = screen.getDisplayMatching(mainBounds);
+            if (mainDisplay) {
+              // Match the screen source to the main window's display.
+              // Source IDs look like "screen:0:0" / "screen:1:0" — last segment
+              // matches Electron's display id when types include 'screen'.
+              const screenSources = sources.filter(s => s.id.startsWith('screen:'));
+              // Try to match by display_id field if available on the source
+              target = screenSources.find(s => s.display_id == mainDisplay.id) || screenSources[0];
+              if (target) console.log('[IKANDY] Mirror: capturing screen', target.name, 'for display', mainDisplay.id);
+            }
+          } catch (e) {
+            console.log('[IKANDY] Display match failed, falling back:', e.message);
+          }
+        }
 
-        // 2. Try name match
+        // Fallback chain if screen capture didn't resolve:
+        // 1. Direct window ID match
+        // 2. Name match
+        // 3. First screen
+        if (!target) {
+          const wantedId = mainWindow?.getMediaSourceId?.();
+          target = wantedId ? sources.find(s => s.id === wantedId) : null;
+        }
         if (!target) target = sources.find(s => s.name === 'IKANDY');
-
-        // 3. Fall back to primary screen (will include desktop, but at least shows something)
         if (!target) target = sources.find(s => s.id.startsWith('screen:'));
 
         if (target) {
@@ -1444,7 +1489,7 @@ function setupDesktopCapturer() {
           callback({ video: target });
           return;
         }
-        _mirrorErr('Capture', 'No IKANDY window or screen source found. wantedId=' + wantedId + ' available=' + sources.map(s => s.name || s.id).join(', '));
+        _mirrorErr('Capture', 'No IKANDY window or screen source found. available=' + sources.map(s => s.name || s.id).join(', '));
         callback({});
       } catch (err) {
         _mirrorErr('Capture', err.message);
@@ -1598,6 +1643,8 @@ function createWindow() {
     // Kill all mirror windows when main closes
     mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
     mirrorWindows = [];
+    // Kill the title bar cover (span mode overlay)
+    _uncoverTitleBar();
     mainWindow = null;
   });
 
@@ -2269,6 +2316,13 @@ ipcMain.handle('set-span-displays', async (_e, displayIds) => {
   // Save bounds on first entry
   if (_spanActiveIds.size === 0) _saveOriginalBounds();
 
+  // Defensive: kill any leftover mirror-mode windows from a prior session.
+  // Without this, switching mirror→span leaves orphan windows alive.
+  mirrorWindows.filter(w => w.mode !== 'span').forEach(w => {
+    if (!w.win.isDestroyed()) w.win.destroy();
+  });
+  mirrorWindows = mirrorWindows.filter(w => w.mode === 'span');
+
   // Exit any native fullscreen and disable it during span.
   // Windows native fullscreen forces single-monitor exclusive mode which
   // turns off the second monitor — completely incompatible with span.
@@ -2303,7 +2357,8 @@ ipcMain.handle('set-span-displays', async (_e, displayIds) => {
     return { error: 'Resize failed: ' + e.message };
   }
   _spanActiveIds = ids;
-  return { ok: true, mode: 'span', count: _spanActiveIds.size };
+  const megapixels = (total.width * total.height) / 1_000_000;
+  return { ok: true, mode: 'span', count: _spanActiveIds.size, megapixels: +megapixels.toFixed(1) };
 });
 
 // ── Display hot-plug: handle disconnect during span ──────────────────────────
@@ -2339,11 +2394,18 @@ ipcMain.handle('close-mirror', (_e, displayId) => {
 });
 
 ipcMain.handle('close-all-mirrors', () => {
-  mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.close(); });
+  // Force-destroy every mirror window regardless of mode
+  mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
   mirrorWindows = [];
+  // Always exit span state too — defensive for mode switches
   if (_spanActiveIds.size) {
     _spanActiveIds.clear();
     _restoreOriginalBounds();
+    _uncoverTitleBar();
+    try {
+      mainWindow?.setAlwaysOnTop(false);
+      mainWindow?.setFullScreenable(true);
+    } catch {}
   }
   return { ok: true };
 });
@@ -2375,12 +2437,24 @@ app.whenReady().then(() => {
   // Wait for renderer to signal it has registered IPC listeners (after boot())
   // This prevents auth-result arriving before setupSpotifyIPC() runs
   ipcMain.once('renderer-ready', async () => {
-    console.log('[IKANDY] Renderer ready — checking token');
+    console.log('[IKANDY] Renderer ready — checking source mode:', sourceMode);
 
-    if (sourceMode === 'vlc' || sourceMode === 'local' || sourceMode === 'foobar') {
-      sourceMode = 'spotify';
-      console.log('[IKANDY] Non-spotify mode saved but starting in Spotify mode');
+    // If user hasn't picked a source yet (first launch), tell renderer so it
+    // can fade the loading screen and show the source picker prompt.
+    if (!sourceMode) {
+      console.log('[IKANDY] No source selected — waiting for user to pick one');
+      mainWindow?.webContents.send('auth-result', { noSource: true });
+      return;
     }
+
+    // If they previously had a non-Spotify source, fade loading and exit.
+    if (sourceMode !== 'spotify') {
+      console.log('[IKANDY] Source mode:', sourceMode, '— skipping Spotify auto-auth');
+      mainWindow?.webContents.send('auth-result', { noSource: true });
+      return;
+    }
+
+    // Spotify mode — try to restore session
     if (!getClientId()) {
       console.log('[IKANDY] No Client ID — showing setup screen');
       mainWindow?.webContents.send('auth-result', { success: false, needsSetup: true });
@@ -2389,20 +2463,39 @@ app.whenReady().then(() => {
     const valid = await ensureValidToken();
     if (valid) {
       console.log('[IKANDY] Valid token found — restoring session');
-      // Send auth-result immediately so loading screen fades fast
-      // Fetch product in background and send update if needed
-      mainWindow?.webContents.send('auth-result', { success: true, restored: true, product: 'free' });
+      // Send auth-result with cached product if known, or undefined (don't trigger Free check)
+      mainWindow?.webContents.send('auth-result', {
+        success: true,
+        restored: true,
+        product: lastKnownProduct || undefined,
+      });
       startPolling();
       try {
         const me = await httpsGet('https://api.spotify.com/v1/me',
           { Authorization: 'Bearer ' + tokens.access_token });
+        console.log('[IKANDY] restore /me status:', me.status);
         if (me.status === 200) {
-          const product = JSON.parse(me.body).product || 'free';
-          lastKnownProduct = product;
-          // Send product update so UI can unlock premium controls if needed
-          mainWindow?.webContents.send('auth-result', { success: true, restored: true, product });
+          try {
+            const parsed = JSON.parse(me.body);
+            if (parsed.product) {
+              lastKnownProduct = parsed.product;
+              console.log('[IKANDY] restore /me product:', parsed.product);
+              mainWindow?.webContents.send('auth-result', {
+                success: true, restored: true,
+                product: parsed.product, productConfirmed: true,
+              });
+            } else {
+              console.log('[IKANDY] restore /me has no product field — keys:', Object.keys(parsed).join(','));
+            }
+          } catch(parseErr) {
+            console.log('[IKANDY] restore /me parse error:', parseErr.message);
+          }
+        } else {
+          console.log('[IKANDY] restore /me non-200:', me.body?.substring(0, 200));
         }
-      } catch(e) {}
+      } catch(e) {
+        console.log('[IKANDY] restore /me fetch failed:', e.message);
+      }
     } else {
       console.log('[IKANDY] No valid token — showing login');
       mainWindow?.webContents.send('auth-result', { success: false });
@@ -2449,9 +2542,10 @@ app.on('window-all-closed', () => {
   if (pollTimer) clearInterval(pollTimer);
   stopSMTCPoller();
   if (authServer) authServer.close();
-  // Force-close any orphan mirror windows
+  // Force-close any orphan mirror windows and the title bar cover
   mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
   mirrorWindows = [];
+  _uncoverTitleBar();
   if (process.platform !== 'darwin') app.quit();
 });
 
