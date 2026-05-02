@@ -3712,12 +3712,12 @@ async function startSystemAudioCapture() {
     }
     console.error('[IKANDY] getDisplayMedia error:', e);
     if (_isLoopbackBugError(e)) {
-      toast('Loopback failed — trying Stereo Mix fallback…');
+      console.log('[IKANDY] Loopback failed — trying Stereo Mix fallback…');
       const fb = await tryStereoMixFallback();
       if (fb) {
         try {
           await connectAudioStream(fb.stream, 'Stereo Mix (' + fb.label + ')');
-          toast('✓ Connected via Stereo Mix (' + fb.label + ')');
+          console.log('[IKANDY] ✓ Connected via Stereo Mix (' + fb.label + ')');
           return;
         } catch(err2) {
           console.error('[IKANDY] Stereo Mix fallback connect failed:', err2);
@@ -4219,9 +4219,6 @@ function setupSpotifyIPC() {
         _isPremium = isPremium;
         setSpotifyControls(isPremium);
       }
-
-      // First-run tour
-      setTimeout(window.tkStart, 1200);
     } else if (state.loggedOut) {
       fadeLoading();
       updateBadge(false, 'Disconnected');
@@ -5463,16 +5460,6 @@ async function loadAllPresetPacks() {
     default: { getPresets: () => merged },
   };
   console.log(`[IKANDY] Total preset library: ${finalCount} presets (added ${finalCount - baseCount})`);
-  setTimeout(() => {
-    if (typeof toast === 'function') {
-      const added = finalCount - baseCount;
-      const broken = (window._brokenPresets && window._brokenPresets.size) || 0;
-      const working = finalCount - broken;
-      if (added > 0) toast(`Loaded ${working} working presets (+${added} from extra packs)`);
-      else toast(`Loaded ${working} presets — extra packs unavailable`);
-    }
-  }, 2500);
-  return finalCount;
 }
 
 // Tracks presets whose EEL/expression code crashes butterchurn 2.6.7 — we skip these
@@ -10193,7 +10180,7 @@ async function bootApp() {
 
 
 /* ═══════════════════════════════════════════════════════════════════
-   TOOLTIP TOUR — starts after Spotify connected (tkStart called on success)
+   TOOLTIP TOUR — starts after the welcome modal is dismissed (tkStart called from closeWelcome)
    ═══════════════════════════════════════════════════════════════════ */
 (function() {
   const DONE_KEY = 'IKANDY-tour6-done';
@@ -10534,8 +10521,11 @@ function closeSourceHelp() { document.getElementById('src-help-modal').classList
 const WELCOME_VERSION = 'v3'; // bump this when modal content changes meaningfully
 function closeWelcome() {
   el('welcome-modal').classList.remove('open');
-  // After welcome closes, if no source is selected, prompt them to pick one
+  // After welcome closes: prompt source pick if needed, then start the tour.
+  // Tour is gated by isDone() and _tkStarted so this is safe to call even if
+  // it's already fired (e.g. user reopens welcome from settings).
   setTimeout(maybeShowSourcePrompt, 400);
+  setTimeout(() => { try { window.tkStart && window.tkStart(); } catch(_) {} }, 1400);
 }
 function closeWelcomePermanent() {
   localStorage.setItem('IKANDY-welcome-seen', WELCOME_VERSION);
