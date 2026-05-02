@@ -13,7 +13,7 @@
  */
 
 const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut, screen } = require('electron');
-console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-01 r5');
+console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-02 r8');
 
 // Enable Windows Graphics Capture API for proper hardware-accelerated capture.
 // Without these flags, Electron uses BitBlt which silently returns black frames
@@ -49,6 +49,9 @@ const _mirrorWebContentsIds = new Set(); // tracks which webContents are mirrors
 let _spanActiveIds = new Set(); // displays currently in span mode (excluding primary)
 let _originalMainBounds = null;
 let _wasMainMaximized   = false;
+let _mmEnabled     = false;     // multi-monitor master toggle
+let _mmMode        = 'mirror';  // 'mirror' | 'span'
+let _mirrorFitMode = 'contain'; // 'contain' (letterbox) | 'fill' (stretch)
 
 function _mirrorErr(label, msg) {
   console.error('[IKANDY] ' + label + ':', msg);
@@ -1487,6 +1490,35 @@ ipcMain.handle('broken-presets-clear', async () => {
   return writeBroken([]) ? { ok: true } : { ok: false };
 });
 
+// ── Mood detection cache ──────────────────────────────────────────────────────
+const MOOD_CACHE_FILE = () => path.join(app.getPath('userData'), 'IKANDY-mood-cache.json');
+
+function readMoodCache() {
+  try {
+    const raw = fs.readFileSync(MOOD_CACHE_FILE(), 'utf8');
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  } catch (e) { return {}; }
+}
+
+ipcMain.handle('mood-cache-load', async () => readMoodCache());
+
+ipcMain.handle('mood-cache-save', async (_e, entries) => {
+  if (!Array.isArray(entries)) return { ok: false };
+  try {
+    const cache = readMoodCache();
+    for (const [url, data] of entries) {
+      if (typeof url === 'string' && url && data && typeof data === 'object') {
+        cache[url] = data;
+      }
+    }
+    const keys = Object.keys(cache);
+    const trimmed = keys.length > 2000 ? Object.fromEntries(keys.slice(-2000).map(k => [k, cache[k]])) : cache;
+    fs.writeFileSync(MOOD_CACHE_FILE(), JSON.stringify(trimmed));
+    return { ok: true };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
 ipcMain.handle('pick-image-folder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
@@ -2263,6 +2295,43 @@ process.on('unhandledRejection',     (e) => pingError(e?.message || e, e?.stack 
 
 // IPC — renderer reports source mode and auto-cycle state
 // ── Multi-monitor mirror ───────────────────────────────────────────────────
+
+function _openMirrorOnDisplay(display) {
+  const { x, y, width, height } = display.bounds;
+  // Close any stale mirror on this display first
+  mirrorWindows = mirrorWindows.filter(w => {
+    if (w.displayId === display.id) { if (!w.win.isDestroyed()) w.win.destroy(); return false; }
+    return true;
+  });
+  const win = new BrowserWindow({
+    x, y, width, height,
+    frame: false, transparent: false, hasShadow: false,
+    resizable: false, movable: false, minimizable: false, maximizable: false,
+    skipTaskbar: true, focusable: false, backgroundColor: '#000000',
+    title: 'IKANDY Mirror',
+    webPreferences: {
+      autoplayPolicy: 'no-user-gesture-required',
+      nodeIntegration: false, contextIsolation: true,
+      sandbox: false, webSecurity: true,
+      backgroundThrottling: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+  win.setMenu(null);
+  win.setIgnoreMouseEvents(true);
+  win.setAlwaysOnTop(true, 'screen-saver');
+  const procId = win.webContents.getOSProcessId?.() || win.webContents.id;
+  _mirrorWebContentsIds.add(procId);
+  win.loadFile(path.join(__dirname, 'mirror.html'), { query: { fit: _mirrorFitMode } });
+  win.on('closed', () => {
+    _mirrorWebContentsIds.delete(procId);
+    mirrorWindows = mirrorWindows.filter(w => w.displayId !== display.id);
+    mainWindow?.webContents.send('mirror-closed', display.id);
+  });
+  mirrorWindows.push({ displayId: display.id, win, mode: 'mirror' });
+  return win;
+}
+
 ipcMain.handle('get-displays', () => {
   return screen.getAllDisplays().map(d => ({
     id:     d.id,
@@ -2422,61 +2491,21 @@ function _openSpanMirror(display, totalBounds) {
   mirrorWindows.push({ displayId: display.id, win, mode: 'span' });
 }
 
-ipcMain.handle('set-span-displays', async (_e, displayIds) => {
+// ── Span enable / disable extracted so mm-enable can call them too ──────────
+function _activateSpan(ids) {
   if (!mainWindow) return { error: 'No main window' };
-  const ids = new Set((displayIds || []).map(Number));
-
-  // Empty set = exit span
-  if (ids.size === 0) {
-    _closeAllSpanMirrors(); // safety, in case any are lingering
-    _restoreOriginalBounds();
-    _spanActiveIds.clear();
-    _uncoverTitleBar();
-    // Drop always-on-top, re-enable native fullscreen
-    try {
-      mainWindow.setAlwaysOnTop(false);
-      mainWindow.setFullScreenable(true);
-    } catch {}
-    return { ok: true, mode: 'exited' };
-  }
-
-  // Save bounds on first entry
   if (_spanActiveIds.size === 0) _saveOriginalBounds();
-
-  // Defensive: kill any leftover mirror-mode windows from a prior session.
-  // Without this, switching mirror→span leaves orphan windows alive.
-  mirrorWindows.filter(w => w.mode !== 'span').forEach(w => {
-    if (!w.win.isDestroyed()) w.win.destroy();
-  });
+  // Kill any leftover mirror-mode windows — switching mirror→span leaves orphans.
+  mirrorWindows.filter(w => w.mode !== 'span').forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
   mirrorWindows = mirrorWindows.filter(w => w.mode === 'span');
-
-  // Exit any native fullscreen and disable it during span.
-  // Windows native fullscreen forces single-monitor exclusive mode which
-  // turns off the second monitor — completely incompatible with span.
-  try {
-    if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false);
-    mainWindow.setFullScreenable(false);
-  } catch {}
-
-  // No mirror windows in span mode — main window IS the span.
-  // Just resize main window to cover the bounding box. Visualizer naturally
-  // fills all monitors. Sidebar stays anchored on primary monitor.
-  _closeAllSpanMirrors(); // clean any left over from older builds
+  // Windows native fullscreen forces single-monitor exclusive mode — incompatible with span.
+  try { if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false); mainWindow.setFullScreenable(false); } catch {}
+  _closeAllSpanMirrors();
   const total = _computeSpanBounds(ids);
   try {
-    // Use setContentBounds so the visible content area covers the bounding box.
-    // Electron positions the window's frame around it — title bar ends up above
-    // the monitor edge automatically.
-    mainWindow.setContentBounds({
-      x: total.x,
-      y: total.y,
-      width:  total.width,
-      height: total.height
-    });
+    mainWindow.setContentBounds({ x: total.x, y: total.y, width: total.width, height: total.height });
     mainWindow.setAlwaysOnTop(true, 'screen-saver');
     mainWindow.setMenuBarVisibility(false);
-    // Cover the title bar with a small black overlay window since Windows
-    // won't let us hide the frame at runtime.
     setTimeout(_coverTitleBar, 100);
   } catch (e) {
     _mirrorErr('Span resize', e.message);
@@ -2486,28 +2515,73 @@ ipcMain.handle('set-span-displays', async (_e, displayIds) => {
   _spanActiveIds = ids;
   const megapixels = (total.width * total.height) / 1_000_000;
   return { ok: true, mode: 'span', count: _spanActiveIds.size, megapixels: +megapixels.toFixed(1) };
+}
+
+function _deactivateSpan() {
+  _closeAllSpanMirrors();
+  _restoreOriginalBounds();
+  _spanActiveIds.clear();
+  _uncoverTitleBar();
+  try { mainWindow?.setAlwaysOnTop(false); mainWindow?.setFullScreenable(true); } catch {}
+}
+
+ipcMain.handle('set-span-displays', async (_e, displayIds) => {
+  if (!mainWindow) return { error: 'No main window' };
+  const ids = new Set((displayIds || []).map(Number));
+  if (ids.size === 0) { _deactivateSpan(); return { ok: true, mode: 'exited' }; }
+  return _activateSpan(ids);
 });
 
-// ── Display hot-plug: handle disconnect during span ──────────────────────────
+// ── Display hot-plug ──────────────────────────────────────────────────────────
 function _setupDisplayListeners() {
   screen.on('display-removed', (_e, removed) => {
+    console.log('[MM] display-removed:', removed.id, removed.label || '', removed.bounds);
+    mainWindow?.webContents.send('mirror-closed', removed.id);
     if (_spanActiveIds.has(removed.id)) {
-      _mirrorErr('Span', 'Display ' + removed.id + ' was disconnected — recomputing');
+      _mirrorErr('Span', 'Display ' + removed.id + ' disconnected — recomputing');
       _spanActiveIds.delete(removed.id);
-      mainWindow?.webContents.send('mirror-closed', removed.id);
       if (_spanActiveIds.size === 0) {
-        _closeAllSpanMirrors();
-        _restoreOriginalBounds();
+        _deactivateSpan();
+        if (_mmEnabled) { _mmEnabled = false; mainWindow?.webContents.send('mm-state-changed', { enabled: false }); }
       } else {
-        _closeAllSpanMirrors();
-        const total = _computeSpanBounds(_spanActiveIds);
-        try { mainWindow.setBounds(total); } catch {}
-        const primaryId = screen.getPrimaryDisplay().id;
-        for (const d of total.displays) {
-          if (d.id === primaryId) continue;
-          _openSpanMirror(d, total);
-        }
+        _deactivateSpan();
+        _activateSpan(_spanActiveIds);
       }
+    } else if (_mmEnabled && _mmMode === 'mirror') {
+      mirrorWindows = mirrorWindows.filter(w => {
+        if (w.displayId === removed.id) { if (!w.win.isDestroyed()) w.win.destroy(); return false; }
+        return true;
+      });
+    }
+  });
+
+  screen.on('display-added', (_e, added) => {
+    console.log('[MM] display-added:', added.id, added.label || '', added.bounds);
+    if (!_mmEnabled) return;
+    const primaryId = screen.getPrimaryDisplay().id;
+    if (added.id === primaryId) return;
+    if (_mmMode === 'mirror') {
+      _openMirrorOnDisplay(added);
+      // Tell renderer to add a checkbox row for this display
+      mainWindow?.webContents.send('mm-display-added', _displayInfo(added, 0));
+    } else if (_mmMode === 'span') {
+      _spanActiveIds.add(added.id);
+      _deactivateSpan();
+      _activateSpan(_spanActiveIds);
+      mainWindow?.webContents.send('mm-display-added', _displayInfo(added, 0));
+    }
+  });
+
+  // changedMetrics: array of changed property names e.g. ['bounds', 'scaleFactor']
+  // Win+P (project mode) cycling is harsh on WorkerW windows (Wallpaper Mode) —
+  // display-metrics-changed may fire rapidly or not at all; best-effort reposition only.
+  screen.on('display-metrics-changed', (_e, display, changedMetrics) => {
+    console.log('[MM] display-metrics-changed:', display.id, changedMetrics, display.bounds);
+    if (!_mmEnabled || _mmMode !== 'mirror') return;
+    const mirror = mirrorWindows.find(w => w.displayId === display.id);
+    if (mirror && !mirror.win.isDestroyed()) {
+      const { x, y, width, height } = display.bounds;
+      try { mirror.win.setBounds({ x, y, width, height }); } catch {}
     }
   });
 }
@@ -2521,19 +2595,84 @@ ipcMain.handle('close-mirror', (_e, displayId) => {
 });
 
 ipcMain.handle('close-all-mirrors', () => {
-  // Force-destroy every mirror window regardless of mode
   mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
   mirrorWindows = [];
-  // Always exit span state too — defensive for mode switches
-  if (_spanActiveIds.size) {
-    _spanActiveIds.clear();
-    _restoreOriginalBounds();
-    _uncoverTitleBar();
-    try {
-      mainWindow?.setAlwaysOnTop(false);
-      mainWindow?.setFullScreenable(true);
-    } catch {}
+  _deactivateSpan();
+  return { ok: true };
+});
+
+// ── New unified multi-monitor API ─────────────────────────────────────────────
+
+function _displayInfo(d, idx) {
+  const name = (d.label && d.label.trim()) ? d.label.trim() : `Monitor ${idx + 1}`;
+  return { id: d.id, label: `${name}  ${d.bounds.width}×${d.bounds.height}`, width: d.bounds.width, height: d.bounds.height };
+}
+
+ipcMain.handle('mm-enable', () => {
+  if (!mainWindow) return { error: 'No main window' };
+  _mmEnabled = true;
+  const primaryId   = screen.getPrimaryDisplay().id;
+  const secondaries = screen.getAllDisplays().filter(d => d.id !== primaryId);
+  if (!secondaries.length) return { ok: true, count: 0, note: 'No secondary displays found', displays: [] };
+  const displays = secondaries.map(_displayInfo);
+  if (_mmMode === 'span') {
+    return { ..._activateSpan(new Set(secondaries.map(d => d.id))), displays };
   }
+  _deactivateSpan();
+  for (const d of secondaries) _openMirrorOnDisplay(d);
+  return { ok: true, mode: 'mirror', count: secondaries.length, displays };
+});
+
+ipcMain.handle('mm-disable', () => {
+  _mmEnabled = false;
+  mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
+  mirrorWindows = [];
+  _deactivateSpan();
+  return { ok: true };
+});
+
+ipcMain.handle('mm-set-mode', (_e, mode) => {
+  _mmMode = mode;
+  if (!_mmEnabled) return { ok: true };
+  mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
+  mirrorWindows = [];
+  _deactivateSpan();
+  const primaryId   = screen.getPrimaryDisplay().id;
+  const secondaries = screen.getAllDisplays().filter(d => d.id !== primaryId);
+  if (!secondaries.length) return { ok: true, count: 0, displays: [] };
+  const displays = secondaries.map(_displayInfo);
+  if (mode === 'span') return { ..._activateSpan(new Set(secondaries.map(d => d.id))), displays };
+  for (const d of secondaries) _openMirrorOnDisplay(d);
+  return { ok: true, mode: 'mirror', count: secondaries.length, displays };
+});
+
+ipcMain.handle('mm-open-display', (_e, displayId) => {
+  if (!_mmEnabled) return { error: 'Multi-monitor not active' };
+  const display = screen.getAllDisplays().find(d => d.id === displayId);
+  if (!display) return { error: 'Display not found: ' + displayId };
+  _openMirrorOnDisplay(display);
+  return { ok: true };
+});
+
+ipcMain.handle('mm-close-display', (_e, displayId) => {
+  mirrorWindows = mirrorWindows.filter(w => {
+    if (w.displayId === displayId) { if (!w.win.isDestroyed()) w.win.destroy(); return false; }
+    return true;
+  });
+  return { ok: true };
+});
+
+ipcMain.handle('mm-respan', (_e, displayIds) => {
+  const ids = new Set((displayIds || []).map(Number));
+  if (ids.size === 0) { _deactivateSpan(); return { ok: true }; }
+  return _activateSpan(ids);
+});
+
+ipcMain.handle('mm-set-fit', (_e, mode) => {
+  _mirrorFitMode = mode;
+  mirrorWindows.forEach(w => {
+    if (!w.win.isDestroyed() && w.mode === 'mirror') w.win.webContents.send('mirror-fit', mode);
+  });
   return { ok: true };
 });
 

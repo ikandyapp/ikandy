@@ -6,7 +6,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: sans-serif; color: #fff; }
-  #v { width: 100%; height: 100%; object-fit: fill; display: block; background: #000; }
+  #v { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
   #status {
     position: fixed; inset: 0; display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 12px;
@@ -30,6 +30,16 @@
   const params  = new URLSearchParams(window.location.search);
   const spanRaw = params.get('span');
   const span    = spanRaw ? JSON.parse(decodeURIComponent(spanRaw)) : null;
+  const v       = document.getElementById('v');
+
+  // Fit mode: 'contain' = letterbox (default), 'fill' = stretch
+  // Span mode always uses fill since the video is the bounding-box canvas.
+  v.style.objectFit = span ? 'fill' : (params.get('fit') || 'contain');
+
+  // Runtime fit toggle from main window UI
+  if (window.IKANDY?.onMirrorFit) {
+    window.IKANDY.onMirrorFit((mode) => { if (!span) v.style.objectFit = mode; });
+  }
 
   const statusEl = document.getElementById('status');
   const titleEl  = document.getElementById('status-title');
@@ -47,12 +57,29 @@
     const { offsetX, offsetY, sliceW, sliceH, totalW, totalH } = span;
     const scaleX = window.innerWidth  / sliceW;
     const scaleY = window.innerHeight / sliceH;
-    const v = document.getElementById('v');
     v.style.position = 'absolute';
     v.style.width  = (totalW * scaleX) + 'px';
     v.style.height = (totalH * scaleY) + 'px';
     v.style.left   = (-offsetX * scaleX) + 'px';
     v.style.top    = (-offsetY * scaleY) + 'px';
+  }
+
+  let _reconnecting = false;
+  let _reconnectAttempts = 0;
+  const MAX_RECONNECTS = 3;
+
+  function scheduleReconnect() {
+    if (_reconnectAttempts >= MAX_RECONNECTS) {
+      setStatus('STREAM ENDED', 'Could not reconnect after ' + MAX_RECONNECTS + ' attempts', true);
+      try { window.IKANDY?.reportMirrorError('stream-ended', 'Max reconnects reached'); } catch {}
+      return;
+    }
+    _reconnectAttempts++;
+    const delay = Math.pow(2, _reconnectAttempts - 1) * 1000; // 1s, 2s, 4s
+    console.log('[Mirror] reconnect attempt ' + _reconnectAttempts + '/' + MAX_RECONNECTS + ' in ' + delay + 'ms');
+    statusEl.style.display = '';
+    setStatus('RECONNECTING', 'Attempt ' + _reconnectAttempts + ' of ' + MAX_RECONNECTS + '…');
+    setTimeout(start, delay);
   }
 
   async function start() {
@@ -64,7 +91,8 @@
         video: { frameRate: 60 },
         audio: false
       });
-      const v = document.getElementById('v');
+      _reconnectAttempts = 0;
+      _reconnecting = false;
       v.srcObject = stream;
       v.onplaying = () => { statusEl.style.display = 'none'; };
       v.onerror = (e) => {
@@ -73,8 +101,9 @@
       };
       stream.getVideoTracks().forEach(t => {
         t.onended = () => {
-          setStatus('STREAM ENDED', 'IKANDY may have closed', true);
-          try { window.IKANDY?.reportMirrorError('stream-ended', 'Track ended'); } catch {}
+          if (_reconnecting) return;
+          _reconnecting = true;
+          scheduleReconnect();
         };
       });
       setTimeout(() => {
@@ -85,6 +114,7 @@
       }, 5000);
     } catch (e) {
       console.error('[Mirror]', e);
+      if (_reconnecting) { scheduleReconnect(); return; }
       setStatus('CAPTURE FAILED', e.message || String(e), true);
       try { window.IKANDY?.reportMirrorError('capture-failed', e.message || String(e)); } catch {}
     }

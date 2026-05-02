@@ -116,6 +116,12 @@ html, body {
   z-index: 9; pointer-events: none; opacity: 0; transition: opacity .6s;
   mix-blend-mode: screen;
 }
+/* PULSE — image-sourced light glow layer */
+#pulse-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 10; pointer-events: none; opacity: 0; transition: opacity .4s;
+  mix-blend-mode: screen;
+}
 #viz { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
 
 /* ─── FPS OVERLAY (toggled from Performance panel) ─── */
@@ -509,7 +515,7 @@ html, body {
   bottom: 80px;
   transform: translateX(-50%);
   width: min(720px, 90vw);
-  max-height: 140px;
+  max-height: 180px;
   z-index: 25;
   background: rgba(15,15,20,.92);
   border: 0.5px solid rgba(255,255,255,.18);
@@ -561,6 +567,41 @@ html, body {
 #debug-bug-btn.has-entries { color: #ff8a8a; }
 body.ui-hidden #debug-panel,
 body.ui-hidden #debug-bug-btn { opacity: 0; pointer-events: none; }
+/* ─── MOOD DEBUG HUD ─── */
+#mood-hud-section {
+  padding: 5px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px; line-height: 1.4;
+  color: rgba(255,255,255,.85);
+  border-bottom: 0.5px solid rgba(255,255,255,.08);
+  background: rgba(100,160,255,.06);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#mood-hud-mood { font-weight: 700; letter-spacing: .06em; color: #a8d8ff; margin: 0 5px; }
+#mood-hud-effective { font-size: 9px; opacity: 0.5; }
+#mood-hud-metrics   { opacity: 0.65; margin-left: 6px; }
+/* ─── MOOD OVERLAY (fixed corner HUD) ─── */
+#mood-overlay {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 30;
+  background: rgba(10,10,18,.82);
+  border: 0.5px solid rgba(255,255,255,.15);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: rgba(255,255,255,.85);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  white-space: nowrap;
+}
+#mood-overlay-mood { font-weight: 700; letter-spacing: .06em; color: #a8d8ff; margin: 0 4px; }
+#mood-overlay-effective { font-size: 9px; opacity: .5; }
+#mood-overlay-metrics { opacity: .65; display: block; margin-top: 2px; }
+body.ui-hidden #mood-overlay { opacity: 0; }
 
 /* ─── UI HIDE MODE ─── */
 /* Always hidden in hide mode — top bar, side-panel toggles, lyric overlay */
@@ -1520,6 +1561,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <canvas id="fire-canvas"></canvas>
 <canvas id="singularity-canvas"></canvas>
 <canvas id="voyager-canvas"></canvas>
+<canvas id="pulse-canvas"></canvas>
 
 <input type="file" id="bg-file-input" accept="image/*" style="display:none" onchange="onBgFileChange(this)">
 <div id="drop"><p>DROP AUDIO HERE</p></div>
@@ -1576,14 +1618,24 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 <div id="physics-wrap"></div>
 
 <!-- DEBUG PANEL — sits below lyrics, auto-opens on errors -->
+<div id="mood-overlay" style="display:none">
+  <span>🎭</span><span id="mood-overlay-mood">—</span><span id="mood-overlay-effective"></span>
+  <span id="mood-overlay-metrics"></span>
+</div>
+
 <div id="debug-panel" class="closed">
   <div id="debug-header">
     <span id="debug-title">🐞 Debug log <span id="debug-count">0</span></span>
     <span id="debug-actions">
+      <button id="mood-hud-toggle" onclick="toggleMoodOverlay()" title="Toggle mood overlay HUD">Mood</button>
       <button id="debug-copy" onclick="debugCopy()" title="Copy all to clipboard">Copy</button>
       <button id="debug-clear" onclick="debugClear()" title="Clear log">Clear</button>
       <button id="debug-close" onclick="debugToggle(false)" title="Hide">×</button>
     </span>
+  </div>
+  <div id="mood-hud-section" style="display:none">
+    <span>🎭</span><span id="mood-hud-mood">—</span><span id="mood-hud-effective"></span>
+    <span id="mood-hud-metrics"></span>
   </div>
   <pre id="debug-body"></pre>
 </div>
@@ -2003,6 +2055,27 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     </div>
   </div>
 
+  <!-- PULSE (hidden — re-enable when resuming this feature) -->
+  <div style="display:none;">
+    <div class="acc-hd" id="acc-pulse" onclick="accToggle(this)">
+      <span>Pulse</span><span class="chev">›</span>
+    </div>
+    <div class="acc-bd">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <button id="pulse-toggle-btn" class="vibe-btn" onclick="togglePulse()" style="width:auto;padding:5px 14px;opacity:.35;pointer-events:none;">○ Off</button>
+        <span style="font-size:11px;color:var(--dim);">Image light sources</span>
+      </div>
+      <div id="pulse-lock-note" style="font-size:10px;color:var(--dim);margin-bottom:8px;line-height:1.5;opacity:.7;">↑ Load a folder above to enable Pulse</div>
+      <div id="pulse-controls-row" style="opacity:.35;pointer-events:none;">
+        <span class="lbl">Glow radius</span>
+        <div class="svr">
+          <input type="range" id="pulse-intensity-sl" min="0.2" max="2" step="0.05" value="1" oninput="setPulseIntensity(+this.value)">
+          <span class="svv" id="pulse-intensity-v">1.0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- VIBE -->
   <div class="acc-hd" id="acc-vibe" onclick="accToggle(this)">
     <span>Vibe</span><span class="chev">›</span>
@@ -2019,9 +2092,13 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <span style="font-size:11px;color:var(--dim);">s</span>
     </div>
     <button class="btn" id="bg-clear-btn" onclick="clearBgImage()" style="display:none;font-size:11px;padding:5px 10px;margin-bottom:8px;">✕ Remove</button>
-    <div style="display:flex;align-items:center;gap:8px;margin-top:4px;margin-bottom:8px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-top:4px;margin-bottom:4px;">
       <span class="lbl" style="margin:0;">FX Mode</span>
       <button id="fx-toggle-btn" class="vibe-btn" onclick="toggleFxMode()" style="width:auto;padding:5px 14px;opacity:.35;pointer-events:none;">○ Off</button>
+    </div>
+    <div style="display:none;">
+      <span class="lbl" style="margin:0;">Mood Drive</span>
+      <button id="mood-drive-btn" class="vibe-btn" onclick="toggleMoodDrive()" style="width:auto;padding:5px 14px;">○ Off</button>
     </div>
     <div id="imgfx-lock-note" style="font-size:10px;color:var(--dim);margin-bottom:8px;line-height:1.5;opacity:.7;">
       ↑ Load an image above to enable FX
@@ -2058,18 +2135,22 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
     <span>Monitors</span><span class="chev">›</span>
   </div>
   <div class="acc-bd" id="acc-monitors-bd">
-    <div style="font-size:11px;color:var(--dim);margin-bottom:10px;line-height:1.5;">
-      Mirror duplicates the scene. Span stretches it wall-to-wall across all selected displays.
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <button id="mm-toggle-btn" class="vibe-btn" onclick="toggleMultiMonitor()" style="width:auto;padding:5px 14px;">○ Off</button>
+      <span style="font-size:11px;color:var(--dim);">All non-primary displays</span>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:12px;">
-      <button id="mon-mode-mirror" class="vibe-btn" onclick="setMonitorMode('mirror')"
-        style="flex:1;font-size:11px;padding:5px 0;color:var(--sp);border-color:var(--sp);">⧉ Mirror</button>
-      <button id="mon-mode-span" class="vibe-btn" onclick="setMonitorMode('span')"
-        style="flex:1;font-size:11px;padding:5px 0;">⬛ Span</button>
+    <div style="display:flex;gap:6px;margin-bottom:4px;">
+      <button id="mm-mode-mirror" class="vibe-btn" onclick="setMmMode('mirror')" style="flex:1;font-size:11px;padding:5px 0;color:var(--sp);border-color:var(--sp);">⧉ Mirror</button>
+      <button id="mm-mode-span"   class="vibe-btn" onclick="setMmMode('span')"   style="flex:1;font-size:11px;padding:5px 0;">⬛ Span</button>
     </div>
-    <div id="monitor-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
-    <button class="vibe-btn" onclick="refreshMonitorList()" style="width:100%;font-size:11px;padding:5px 0;">↺ Refresh displays</button>
-    <button class="vibe-btn" id="close-all-mirrors-btn" onclick="closeAllMirrors()" style="width:100%;font-size:11px;padding:5px 0;margin-top:6px;display:none;">✕ Close all mirrors</button>
+    <div id="mm-fit-row" style="display:flex;gap:6px;margin-top:4px;">
+      <button id="mm-fit-contain" class="vibe-btn" onclick="setMmFit('contain')" style="flex:1;font-size:11px;padding:4px 0;color:var(--sp);border-color:var(--sp);">⬜ Fit</button>
+      <button id="mm-fit-fill"    class="vibe-btn" onclick="setMmFit('fill')"    style="flex:1;font-size:11px;padding:4px 0;">⬛ Fill</button>
+    </div>
+    <div id="mm-display-list" style="display:none;margin-top:6px;"></div>
+    <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-top:6px;">
+      Span works best with same-resolution monitors.<br>Use Mirror for mixed setups — gaps between non-aligned monitors get black filler.
+    </div>
   </div>
 
   <!-- PERFORMANCE -->
@@ -2689,158 +2770,215 @@ function togglePb() { setPbEnabled(!_pbEnabled); }
 /* ═══════════════════════════════════════════════════════════════════
    MULTI-MONITOR
    ═══════════════════════════════════════════════════════════════════ */
-const _isMirror = new URLSearchParams(window.location.search).get('mirror') === '1';
-const _spanData = (() => { try { return JSON.parse(decodeURIComponent(new URLSearchParams(window.location.search).get('span') || 'null')); } catch { return null; } })();
-let _activeDisplayIds = new Set();
-let _monitorMode = 'mirror'; // 'mirror' | 'span'
+let _mmEnabled  = false;
+let _mmMode     = 'mirror';   // 'mirror' | 'span'
+let _mmFitMode  = 'contain';  // 'contain' (letterbox) | 'fill' (stretch) — mirror only
+let _mmDisplays = []; // [{ id, label, width, height, checked }]
 
-function setMonitorMode(mode) {
-  _monitorMode = mode;
-  document.getElementById('mon-mode-mirror').style.color = mode === 'mirror' ? 'var(--sp)' : '';
-  document.getElementById('mon-mode-mirror').style.borderColor = mode === 'mirror' ? 'var(--sp)' : '';
-  document.getElementById('mon-mode-span').style.color = mode === 'span' ? 'var(--sp)' : '';
-  document.getElementById('mon-mode-span').style.borderColor = mode === 'span' ? 'var(--sp)' : '';
-  // Close any open mirrors and reopen in new mode
-  if (_activeDisplayIds.size) { closeAllMirrors().then(refreshMonitorList); }
+function _mmSaveState() {
+  localStorage.setItem('IKANDY-mm-enabled', _mmEnabled ? '1' : '0');
+  localStorage.setItem('IKANDY-mm-mode',    _mmMode);
+  localStorage.setItem('IKANDY-mm-fit',     _mmFitMode);
+  const allIds     = _mmDisplays.map(d => d.id);
+  const checkedIds = _mmDisplays.filter(d => d.checked).map(d => d.id);
+  localStorage.setItem('IKANDY-mm-displays', JSON.stringify({ all: allIds, checked: checkedIds }));
+}
+
+function _renderMmDisplayList() {
+  const container = el('mm-display-list');
+  if (!container) return;
+  if (!_mmEnabled || !_mmDisplays.length) { container.style.display = 'none'; return; }
+  container.style.display = 'block';
+  container.innerHTML = '';
+  for (const d of _mmDisplays) {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;user-select:none;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = d.checked;
+    cb.style.cssText = 'accent-color:var(--sp);width:13px;height:13px;cursor:pointer;flex-shrink:0;';
+    cb.onchange = () => _toggleMmDisplay(d.id, cb.checked);
+    const lbl = document.createElement('span');
+    lbl.style.cssText = 'font-size:11px;color:var(--txt);';
+    lbl.textContent = d.label;
+    row.appendChild(cb);
+    row.appendChild(lbl);
+    container.appendChild(row);
+  }
+}
+
+async function _toggleMmDisplay(id, checked) {
+  const d = _mmDisplays.find(d => d.id === id);
+  if (!d) return;
+  d.checked = checked;
+  if (_mmMode === 'span') {
+    const checkedIds = _mmDisplays.filter(d => d.checked).map(d => d.id);
+    if (!checkedIds.length) return; // keep at least one in span
+    await window.IKANDY.mmRespan(checkedIds).catch(() => {});
+  } else {
+    if (checked) {
+      await window.IKANDY.mmOpenDisplay(id).catch(() => {});
+    } else {
+      await window.IKANDY.mmCloseDisplay(id).catch(() => {});
+    }
+  }
+  _mmSaveState();
+}
+
+async function toggleMultiMonitor() {
+  if (_mmEnabled) {
+    _mmEnabled = false;
+    _mmDisplays = [];
+    _renderMmDisplayList();
+    await window.IKANDY.mmDisable().catch(() => {});
+    const btn = el('mm-toggle-btn');
+    if (btn) { btn.textContent = '○ Off'; btn.classList.remove('active'); }
+    _mmSaveState();
+  } else {
+    const r = await window.IKANDY.mmEnable().catch(e => ({ error: e.message }));
+    if (r?.error) { debugLog('Monitor', r.error); return; }
+    if (r?.note)  debugLog('Monitor', r.note);
+    _mmEnabled = true;
+    _mmDisplays = (r.displays || []).map(d => ({ ...d, checked: true }));
+    const btn = el('mm-toggle-btn');
+    if (btn) { btn.textContent = '● On'; btn.classList.add('active'); }
+    if (r?.megapixels > 8) debugLog('Span Performance', `Rendering ${r.megapixels} MP — if you see stutter, lower Render Scale in Performance settings.`);
+    _renderMmDisplayList();
+    _mmSaveState();
+  }
   _updateFsButtonForSpan();
+}
+
+async function setMmMode(mode) {
+  _mmMode = mode;
+  _updateMmModeButtons();
+  if (_mmEnabled) {
+    const r = await window.IKANDY.mmSetMode(mode).catch(e => ({ error: e.message }));
+    if (r?.error) { debugLog('Monitor', r.error); return; }
+    // Mode switch reopens all — reset all checkboxes to checked
+    _mmDisplays = (r.displays || _mmDisplays).map(d => ({ ...d, checked: true }));
+    _renderMmDisplayList();
+    _mmSaveState();
+  }
+  _updateFsButtonForSpan();
+}
+
+function _updateMmModeButtons() {
+  const mirror = el('mm-mode-mirror');
+  const span   = el('mm-mode-span');
+  if (mirror) { mirror.style.color = _mmMode === 'mirror' ? 'var(--sp)' : ''; mirror.style.borderColor = _mmMode === 'mirror' ? 'var(--sp)' : ''; }
+  if (span)   { span.style.color   = _mmMode === 'span'   ? 'var(--sp)' : ''; span.style.borderColor   = _mmMode === 'span'   ? 'var(--sp)' : ''; }
+  // Fit/Fill row only meaningful in mirror mode
+  const fitRow = el('mm-fit-row');
+  if (fitRow) fitRow.style.display = _mmMode === 'mirror' ? 'flex' : 'none';
+  _updateMmFitButtons();
+}
+
+function _updateMmFitButtons() {
+  const fit  = el('mm-fit-contain');
+  const fill = el('mm-fit-fill');
+  if (fit)  { fit.style.color  = _mmFitMode === 'contain' ? 'var(--sp)' : ''; fit.style.borderColor  = _mmFitMode === 'contain' ? 'var(--sp)' : ''; }
+  if (fill) { fill.style.color = _mmFitMode === 'fill'    ? 'var(--sp)' : ''; fill.style.borderColor = _mmFitMode === 'fill'    ? 'var(--sp)' : ''; }
+}
+
+async function setMmFit(mode) {
+  _mmFitMode = mode;
+  _updateMmFitButtons();
+  _mmSaveState();
+  if (_mmEnabled && _mmMode === 'mirror') {
+    await window.IKANDY.mmSetFit(mode).catch(() => {});
+  }
 }
 
 function _updateFsButtonForSpan() {
-  const btn = document.getElementById('fs-btn');
+  const btn = el('fs-btn');
   if (!btn) return;
-  const inSpan = (_monitorMode === 'span' && _activeDisplayIds.size > 0);
-  if (inSpan) {
-    btn.style.opacity = '0.3';
-    btn.style.cursor  = 'not-allowed';
-    btn.style.pointerEvents = 'none';
-    btn.title = 'Fullscreen disabled in span mode — window already covers all monitors';
-  } else {
-    btn.style.opacity = '';
-    btn.style.cursor  = '';
-    btn.style.pointerEvents = '';
-    btn.title = document.fullscreenElement ? 'Exit Fullscreen (Esc)' : 'Fullscreen (F)';
-  }
+  const inSpan = _mmEnabled && _mmMode === 'span';
+  btn.style.opacity       = inSpan ? '0.3' : '';
+  btn.style.cursor        = inSpan ? 'not-allowed' : '';
+  btn.style.pointerEvents = inSpan ? 'none' : '';
+  btn.title = inSpan ? 'Fullscreen disabled in span mode — window already covers all monitors'
+                     : (document.fullscreenElement ? 'Exit Fullscreen (Esc)' : 'Fullscreen (F)');
 }
 
-async function refreshMonitorList() {
-  if (_isMirror || _spanData) return;
-  const displays = await window.IKANDY.getDisplays() || [];
-  const list = document.getElementById('monitor-list');
-  if (!list) return;
-  list.innerHTML = '';
-  displays.forEach(d => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;';
-    const label = document.createElement('span');
-    label.style.cssText = 'font-size:11px;color:var(--txt);flex:1;';
-    label.textContent = (d.isPrimary ? '★ ' : '') + d.label;
-    const btn = document.createElement('button');
-    btn.className = 'vibe-btn';
-    btn.style.cssText = 'width:auto;padding:4px 12px;font-size:11px;';
-    const isActive = _activeDisplayIds.has(d.id);
-    btn.textContent = isActive ? '✕ Close' : '+ Add';
-    if (isActive) btn.style.color = 'var(--sp)';
-    btn.disabled = d.isPrimary;
-    if (d.isPrimary) { btn.textContent = 'Primary'; btn.style.opacity = '0.35'; }
-    btn.onclick = async () => {
-      if (d.isPrimary) return;
-      try {
-        if (_activeDisplayIds.has(d.id)) {
-          _activeDisplayIds.delete(d.id);
-          if (_monitorMode === 'span') {
-            const r = await window.IKANDY.setSpanDisplays(Array.from(_activeDisplayIds));
-            if (r?.error) debugLog('Span', r.error);
-          } else {
-            await window.IKANDY.closeMirror(d.id);
-          }
-        } else {
-          _activeDisplayIds.add(d.id);
-          if (_monitorMode === 'span') {
-            const r = await window.IKANDY.setSpanDisplays(Array.from(_activeDisplayIds));
-            if (r?.error) debugLog('Span', r.error);
-            else if (r?.megapixels > 8) {
-              debugLog('Span Performance', `Rendering ${r.megapixels} MP — heavy load. If you see stutter, lower the render scale in Performance settings.`);
-            }
-          } else {
-            await window.IKANDY.openMirror(d.id);
-          }
-        }
-      } catch (err) {
-        debugLog('Monitor', 'Toggle ' + d.label + ' failed: ' + (err?.message || err));
-        _activeDisplayIds.delete(d.id);
-      }
-      refreshMonitorList();
-      document.getElementById('close-all-mirrors-btn').style.display =
-        _activeDisplayIds.size ? '' : 'none';
-      _updateFsButtonForSpan();
-    };
-    row.appendChild(label);
-    row.appendChild(btn);
-    list.appendChild(row);
+// main.js forces MM off when last secondary disconnects
+if (window.IKANDY?.onMmStateChanged) {
+  window.IKANDY.onMmStateChanged(({ enabled }) => {
+    _mmEnabled = enabled;
+    if (!enabled) { _mmDisplays = []; _renderMmDisplayList(); }
+    const btn = el('mm-toggle-btn');
+    if (btn) { btn.textContent = enabled ? '● On' : '○ Off'; btn.classList.toggle('active', enabled); }
+    _updateFsButtonForSpan();
+    _mmSaveState();
   });
 }
 
-async function closeAllMirrors() {
-  // Clean up BOTH modes defensively — switching modes can leave the other type orphaned
-  try { await window.IKANDY.closeAllMirrors(); } catch {}
-  try { await window.IKANDY.setSpanDisplays([]); } catch {}
-  _activeDisplayIds.clear();
-  refreshMonitorList();
-  document.getElementById('close-all-mirrors-btn').style.display = 'none';
-  _updateFsButtonForSpan();
+// Hot-plug: new display connected while MM is on → add checkbox (checked)
+if (window.IKANDY?.onMmDisplayAdded) {
+  window.IKANDY.onMmDisplayAdded((d) => {
+    if (!_mmEnabled) return;
+    if (!_mmDisplays.find(x => x.id === d.id)) {
+      _mmDisplays.push({ ...d, checked: true });
+      _renderMmDisplayList();
+    }
+  });
 }
 
+// mirror-closed: if the display is still in our list with checked=true it was
+// a hot-unplug (unexpected) — remove it. If checked=false, user closed it intentionally.
 if (window.IKANDY?.onMirrorClosed) {
   window.IKANDY.onMirrorClosed((displayId) => {
-    _activeDisplayIds.delete(displayId);
-    refreshMonitorList();
+    const d = _mmDisplays.find(d => d.id === displayId);
+    if (d && d.checked) {
+      _mmDisplays = _mmDisplays.filter(d => d.id !== displayId);
+      _renderMmDisplayList();
+    }
   });
 }
 
-// Surface any mirror/span errors into the user-visible debug panel
 if (window.IKANDY?.onMirrorError) {
-  window.IKANDY.onMirrorError(({ label, msg }) => {
-    debugLog(label || 'Monitor', msg);
-  });
+  window.IKANDY.onMirrorError(({ label, msg }) => { debugLog(label || 'Monitor', msg); });
 }
 
-// Audio forwarding
-if (!_isMirror && !_spanData) {
-  let _mirrorForwardThrottle = 0;
-  window._mirrorForward = function(bass, mid, treble, intensity) {
-    const now = performance.now();
-    if (now - _mirrorForwardThrottle < 33) return;
-    _mirrorForwardThrottle = now;
-    if (_activeDisplayIds.size) window.IKANDY.sendMirrorAudio({ bass, mid, treble, intensity });
-  };
-} else {
-  // Mirror/span mode — receive audio, hide UI
-  window.IKANDY.onMirrorAudio(({ bass, mid, treble }) => {
-    window._mirrorBass    = bass;
-    window._mirrorMid     = mid;
-    window._mirrorTreble  = treble;
-  });
-  document.addEventListener('DOMContentLoaded', () => {
-    ['#sidebar','#top-bar','#transport-bar','#welcome-modal'].forEach(sel => {
-      const el = document.querySelector(sel);
-      if (el) el.style.display = 'none';
-    });
-  });
-  // Span mode — scale and offset the entire page to show only this slice
-  if (_spanData) {
-    const { offsetX, offsetY, sliceW, sliceH, totalW, totalH } = _spanData;
-    const style = document.createElement('style');
-    style.textContent = `
-      html, body { width: ${totalW}px !important; height: ${totalH}px !important; overflow: hidden; }
-      body { transform: translate(-${offsetX}px, -${offsetY}px); transform-origin: 0 0; }
-    `;
-    document.head.appendChild(style);
+// Audio forwarding — throttled to ~30fps, no-op when MM is off
+let _mirrorForwardThrottle = 0;
+window._mirrorForward = function(bass, mid, treble, intensity) {
+  if (!_mmEnabled) return;
+  const now = performance.now();
+  if (now - _mirrorForwardThrottle < 33) return;
+  _mirrorForwardThrottle = now;
+  window.IKANDY.sendMirrorAudio({ bass, mid, treble, intensity });
+};
+
+_updateMmModeButtons();
+
+// Restore persisted MM state from last session
+(async function _mmRestore() {
+  const savedMode = localStorage.getItem('IKANDY-mm-mode');
+  if (savedMode === 'mirror' || savedMode === 'span') { _mmMode = savedMode; _updateMmModeButtons(); }
+  const savedFit = localStorage.getItem('IKANDY-mm-fit');
+  if (savedFit === 'contain' || savedFit === 'fill') { _mmFitMode = savedFit; _updateMmFitButtons(); }
+  if (localStorage.getItem('IKANDY-mm-enabled') !== '1') return;
+  await toggleMultiMonitor(); // enables MM, populates _mmDisplays with current monitors
+  const raw = localStorage.getItem('IKANDY-mm-displays');
+  if (!raw) return;
+  try {
+    const { all: savedAll, checked: savedChecked } = JSON.parse(raw);
+    const currentIds = _mmDisplays.map(d => d.id).sort().join(',');
+    const savedIds   = (savedAll || []).slice().sort().join(',');
+    if (currentIds !== savedIds) {
+      console.log('[MM restore] Monitor lineup changed — defaulting all-on. saved:', savedAll, 'current:', _mmDisplays.map(d => d.id));
+      return;
+    }
+    const checkedSet = new Set(savedChecked);
+    for (const d of _mmDisplays) {
+      if (!checkedSet.has(d.id)) await _toggleMmDisplay(d.id, false).catch(() => {});
+    }
+    _renderMmDisplayList();
+  } catch (e) {
+    console.warn('[MM restore] Failed to parse saved displays:', e);
   }
-}
-
-document.getElementById('acc-monitors')?.addEventListener('click', () => {
-  setTimeout(refreshMonitorList, 150);
-});
+})();
 
 
 
@@ -3250,6 +3388,8 @@ function renderLoop(ts) {
     renderFxLayer(bassRaw);
     // FX Layer — particle burst (no-op when disabled)
     renderPb(bassRaw);
+    // Pulse glow layer — image-sourced light sources (no-op when disabled)
+    renderPulse(bassRaw, midRaw, trebleRaw);
 
     // Overall peak for image FX shader
     const peak = Math.max(...d) / 255;
@@ -6094,9 +6234,7 @@ function toast(msg, dur = 3500) {
 /* ── FULLSCREEN ── */
 function toggleFullscreen() {
   // Silently no-op in span mode — the button is visually disabled.
-  if (typeof _activeDisplayIds !== 'undefined' && _activeDisplayIds.size > 0 && _monitorMode === 'span') {
-    return;
-  }
+  if (_mmEnabled && _mmMode === 'span') return;
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(() => {});
     el('fs-btn').textContent = '✕';
@@ -6300,6 +6438,11 @@ document.addEventListener('keydown', e => {
     }
     case 'b': openPresetPanel(); break;
     case 'Escape':
+      if (_mmEnabled) {
+        toggleMultiMonitor();
+        toast('Multi-monitor disabled');
+        break;
+      }
       if (document.fullscreenElement) document.exitFullscreen();
       else closePresetPanel();
       break;
@@ -6572,6 +6715,7 @@ function stopAuroraLoop() {
   if (_auroraRAF) { cancelAnimationFrame(_auroraRAF); _auroraRAF = null; }
   const gl = auroraGl; if (gl) gl.clear(gl.COLOR_BUFFER_BIT);
 }
+
 
 /* ═══════════════════════════════════════════════════════════════════
    PATCH 11: SINGULARITY — black hole scene (the million-dollar one)
@@ -7054,6 +7198,133 @@ function startVoyagerLoop() {
 function stopVoyagerLoop() {
   if (_voyagerRAF) { cancelAnimationFrame(_voyagerRAF); _voyagerRAF = null; }
   const gl = voyagerGl; if (gl) gl.clear(gl.COLOR_BUFFER_BIT);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PULSE — image-sourced light glow layer
+   Reads bright saturated pixels (lights[]) extracted by mood-worker,
+   renders each as an audio-reactive radial Gaussian glow on a
+   mix-blend-mode:screen canvas at z=10.
+   Driven from the main render loop (not its own RAF) so it is
+   synchronised with the audio analysis.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const pulseCanvas = document.getElementById('pulse-canvas');
+const pulseGl     = pulseCanvas ? pulseCanvas.getContext('webgl') : null;
+let _pulseEnabled   = false;
+let _pulseIntensity = 1.0;
+let _pulseLights    = [];   // lights[] from _bgMoodCache for current image
+let _pulseTime      = 0;
+
+const PULSE_FRAG = `
+  precision mediump float;
+  uniform vec2  u_res;
+  uniform float u_bass;
+  uniform float u_mid;
+  uniform float u_treble;
+  uniform float u_intensity;
+  uniform float u_time;
+  uniform int   u_lightCount;
+  uniform vec2  u_lightPos[8];
+  uniform vec3  u_lightColor[8];
+  uniform float u_lightBright[8];
+  varying vec2  v_uv;
+
+  void main() {
+    float aspect = u_res.x / u_res.y;
+    vec3  col    = vec3(0.0);
+    float pulse  = 1.0 + u_bass * 2.5 + u_mid * 0.5;
+    float base_r = 0.20 * u_intensity;
+    for (int i = 0; i < 8; i++) {
+      if (i >= u_lightCount) break;
+      vec2  d    = v_uv - u_lightPos[i];
+      d.x       *= aspect;
+      float dist = length(d);
+      float r    = base_r * (0.6 + u_lightBright[i] * 0.8) * pulse;
+      float glow = exp(-dist * dist / (r * r));
+      col       += u_lightColor[i] * u_lightBright[i] * glow * u_intensity;
+    }
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+function _initPulseProgram() {
+  if (!pulseGl) return null;
+  const prog = buildSceneProgram(pulseGl, AURORA_VERT, PULSE_FRAG, 'Pulse');
+  if (!prog) return null;
+  pulseGl.useProgram(prog);
+  prog._u.u_lightCount = pulseGl.getUniformLocation(prog, 'u_lightCount');
+  for (let i = 0; i < 8; i++) {
+    prog._u[`u_lp${i}`] = pulseGl.getUniformLocation(prog, `u_lightPos[${i}]`);
+    prog._u[`u_lc${i}`] = pulseGl.getUniformLocation(prog, `u_lightColor[${i}]`);
+    prog._u[`u_lb${i}`] = pulseGl.getUniformLocation(prog, `u_lightBright[${i}]`);
+  }
+  return prog;
+}
+const _pulseProgram = _initPulseProgram();
+
+function renderPulse(bassRaw, midRaw, trebleRaw) {
+  if (!_pulseEnabled || !pulseGl || !_pulseProgram) return;
+  const gl = pulseGl;
+  const W  = window.innerWidth, H = window.innerHeight;
+  if (pulseCanvas.width !== W || pulseCanvas.height !== H) {
+    pulseCanvas.width = W; pulseCanvas.height = H;
+    gl.viewport(0, 0, W, H);
+  }
+  gl.useProgram(_pulseProgram);
+  const u     = _pulseProgram._u;
+  const lights = _pulseLights;
+  const count  = Math.min(lights.length, 8);
+  gl.uniform2f(u.u_res,        W, H);
+  gl.uniform1f(u.u_bass,       bassRaw);
+  gl.uniform1f(u.u_mid,        midRaw);
+  gl.uniform1f(u.u_treble,     trebleRaw);
+  gl.uniform1f(u.u_intensity,  _pulseIntensity);
+  gl.uniform1f(u.u_time,       _pulseTime);
+  gl.uniform1i(u.u_lightCount, count);
+  for (let i = 0; i < count; i++) {
+    const l = lights[i];
+    gl.uniform2f(u[`u_lp${i}`], l.x, l.y);
+    gl.uniform3f(u[`u_lc${i}`], l.r, l.g, l.b);
+    gl.uniform1f(u[`u_lb${i}`], l.brightness);
+  }
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  _pulseTime += 0.016;
+}
+
+function updatePulseForImage(url) {
+  const cached = url ? _bgMoodCache.get(url) : null;
+  _pulseLights = (cached && cached.lights) ? cached.lights : [];
+}
+
+function togglePulse() {
+  _pulseEnabled = !_pulseEnabled;
+  pulseCanvas.style.opacity = _pulseEnabled ? '1' : '0';
+  const btn = el('pulse-toggle-btn');
+  if (btn) { btn.textContent = _pulseEnabled ? '● On' : '○ Off'; btn.classList.toggle('active', _pulseEnabled); }
+  if (!_pulseEnabled && pulseGl) pulseGl.clear(pulseGl.COLOR_BUFFER_BIT);
+}
+
+function setPulseIntensity(v) {
+  _pulseIntensity = v;
+  const disp = el('pulse-intensity-v');
+  if (disp) disp.textContent = v.toFixed(1);
+}
+
+function setPulseFolderLock(locked) {
+  const btn  = el('pulse-toggle-btn');
+  const note = el('pulse-lock-note');
+  const row  = el('pulse-controls-row');
+  if (locked) {
+    if (btn)  { btn.style.opacity = '.35'; btn.style.pointerEvents = 'none'; }
+    if (note) note.style.display = 'block';
+    if (row)  { row.style.opacity = '.35'; row.style.pointerEvents = 'none'; }
+    if (_pulseEnabled) togglePulse();
+  } else {
+    if (btn)  { btn.style.opacity = '1'; btn.style.pointerEvents = ''; }
+    if (note) note.style.display = 'none';
+    if (row)  { row.style.opacity = '1'; row.style.pointerEvents = ''; }
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -9856,6 +10127,7 @@ function setImgFx(fx) {
 }
 
 function onBgFileChange(input) {
+  console.log('[mood] onBgFileChange called, file:', input.files[0]?.name);
   const file = input.files[0]; if (!file) return;
   // Validate MIME type — don't rely on accept attribute alone
   const allowed = new Set(['image/jpeg','image/png','image/webp','image/gif','image/bmp','image/avif']);
@@ -9914,7 +10186,9 @@ function onBgFileChange(input) {
 let _bgFiles = [], _bgCycleIdx = 0, _bgCycleTimer = null, _bgCycleSeconds = 15;
 
 async function pickBgFolder() {
+  console.log('[mood] pickBgFolder called');
   const result = await window.IKANDY.pickImageFolder();
+  console.log('[mood] pickImageFolder result:', result?.ok, 'files:', result?.files?.length);
   if (!result.ok || !result.files.length) { toast('No images found in folder'); return; }
   _bgFiles = result.files;
   _bgCycleIdx = 0;
@@ -9939,6 +10213,16 @@ async function pickBgFolder() {
   setImgFx('raindrops');
   loadBgFile(_bgFiles[0]);
   startBgCycle();
+  _bgMoodCache.clear();
+  _currentMood = null;
+  _currentMoodScores = null;
+  setPulseFolderLock(false);
+  updatePulseForImage(_bgFiles[0]);
+  console.log('[pulse] folder picked, files:', _bgFiles.length);
+  loadMoodCacheForFolder(_bgFiles).then(() => {
+    analyzeBgFolder(_bgFiles);
+    updatePulseForImage(_bgFiles[_bgCycleIdx]);
+  });
 }
 
 function loadBgFile(url) {
@@ -9951,13 +10235,210 @@ function startBgCycle() {
   if (_bgCycleTimer) clearInterval(_bgCycleTimer);
   _bgCycleTimer = setInterval(() => {
     _bgCycleIdx = (_bgCycleIdx + 1) % _bgFiles.length;
-    loadBgFile(_bgFiles[_bgCycleIdx]);
+    const url    = _bgFiles[_bgCycleIdx];
+    const fname  = url.split('/').pop();
+    const cached = _bgMoodCache.get(url);
+    console.log('[pulse] cycle advance:', fname, cached ? 'cached' : '(not cached)');
+    loadBgFile(url);
+    updatePulseForImage(url);
+    updateMoodDebugHud();
   }, _bgCycleSeconds * 1000);
 }
 
 function setBgCycleTime(s) {
   _bgCycleSeconds = s || 15;
   if (_bgFiles.length) startBgCycle();
+}
+
+// ── Mood Detection Engine ─────────────────────────────────────────────────────
+let _moodWorker        = null;
+let _bgMoodCache       = new Map();  // fileUrl → { metrics, lights, version }
+const LIGHTS_SCHEMA_VERSION = 3;
+let _currentMood       = null;
+let _currentMoodScores = null;
+let _moodAnalysisGen   = 0;          // bumped on each folder pick to abort stale scans
+let _moodScanTotal     = 0;
+let _moodScanDone      = 0;
+let _moodScanStart     = 0;
+let _moodCacheSaveTimer = null;
+const MOOD_HYSTERESIS  = 0.15;
+let _moodDriveEnabled  = false;
+const MOOD_TO_SCENE = { energetic:'ripple', chill:'aurora', dark:'singularity', warm:'waveray', ethereal:'pawrticles' };
+const MOOD_TO_FX    = { energetic:'plasmaarc', chill:'fog', dark:'vhswarp', warm:'heatwave', ethereal:'hologram' };
+
+function initMoodWorker() {
+  if (_moodWorker) return;
+  _moodWorker = new Worker('./mood-worker.js');
+  _moodWorker.onerror = e => console.warn('[mood] worker error:', e.message);
+  _moodWorker.onmessage = ({ data }) => {
+    if (data.type === 'log') { console.log(data.text); return; }
+    const { fileUrl, metrics, lights } = data;
+    _bgMoodCache.set(fileUrl, { metrics, lights });
+
+    _moodScanDone++;
+    if (_moodScanTotal > 0 && _moodScanDone === _moodScanTotal) {
+      const ms  = Math.round(performance.now() - _moodScanStart);
+      const avg = Math.round(ms / _moodScanDone);
+      console.log(`[pulse] scan complete: ${_moodScanDone} imgs ${ms}ms (avg ${avg}ms/img)`);
+      debugLog('Pulse scan', `${_moodScanDone} images in ${ms}ms (avg ${avg}ms/img)`);
+      scheduleMoodCacheSave();
+    }
+
+    const currentFile = _bgFiles[_bgCycleIdx];
+    if (fileUrl === currentFile) { updatePulseForImage(fileUrl); updateMoodDebugHud(); }
+  };
+}
+
+async function loadMoodCacheForFolder(files) {
+  try {
+    const disk = await window.IKANDY.loadMoodCache();
+    const allEntries = Object.values(disk);
+    if (allEntries.length > 0 && allEntries.some(e => e.version !== LIGHTS_SCHEMA_VERSION)) {
+      console.log('[pulse] cache invalidated — schema mismatch, rescanning');
+      return;
+    }
+    let hits = 0;
+    for (const url of files) {
+      if (disk[url]) { _bgMoodCache.set(url, disk[url]); hits++; }
+    }
+    if (hits) console.log(`[pulse] cache: ${hits}/${files.length} disk hits`);
+  } catch (e) {
+    console.warn('[pulse] cache load failed:', e.message);
+  }
+}
+
+function analyzeBgFolder(files) {
+  console.log('[mood] analyzeBgFolder called, files:', files.length);
+  initMoodWorker();
+  const gen     = ++_moodAnalysisGen;
+  const pending = files.filter(u => !_bgMoodCache.has(u));
+  console.log('[mood] pending (not cached):', pending.length);
+
+  if (!pending.length) {
+    console.log(`[pulse] all ${files.length} images already cached`);
+    debugLog('Pulse scan', `All ${files.length} images already cached`);
+    updateMoodDebugHud();
+    return;
+  }
+
+  _moodScanTotal = pending.length;
+  _moodScanDone  = 0;
+  _moodScanStart = performance.now();
+
+  const next = idx => {
+    if (gen !== _moodAnalysisGen) return;
+    if (idx >= pending.length) return;
+    const url   = pending[idx];
+    const fname = url.split('/').pop();
+    console.log('[mood] loading image', idx + 1 + '/' + pending.length + ':', fname);
+    const img = new Image();
+    img.onload = () => {
+      if (gen !== _moodAnalysisGen) return;
+      const oc  = new OffscreenCanvas(64, 64);
+      const ctx = oc.getContext('2d');
+      ctx.drawImage(img, 0, 0, 64, 64);
+      const id  = ctx.getImageData(0, 0, 64, 64);
+      console.log('[mood] sending to worker:', fname);
+      _moodWorker.postMessage(
+        { fileUrl: url, pixels: id.data, width: 64, height: 64, skipLights: true },
+        [id.data.buffer]
+      );
+      setTimeout(() => next(idx + 1), 0);
+    };
+    img.onerror = () => { console.log('[mood] image load failed:', fname); setTimeout(() => next(idx + 1), 0); };
+    img.src = url;
+  };
+  next(0);
+}
+
+function applyMoodWithHysteresis(fileUrl) {
+  const cached = _bgMoodCache.get(fileUrl);
+  if (!cached) return;
+  const { scores, mood: top } = cached;
+
+  if (!_currentMood) {
+    _currentMood       = top;
+    _currentMoodScores = scores;
+    if (_moodDriveEnabled) applyMoodVisuals(top);
+    updateMoodDebugHud();
+    return;
+  }
+
+  const curScore = scores[_currentMood] || 0;
+  const topScore = scores[top]          || 0;
+  if (top !== _currentMood && topScore > curScore * (1 + MOOD_HYSTERESIS)) {
+    _currentMood       = top;
+    _currentMoodScores = scores;
+    if (_moodDriveEnabled) applyMoodVisuals(top);
+  }
+  updateMoodDebugHud();
+}
+
+function scheduleMoodCacheSave() {
+  if (_moodCacheSaveTimer) clearTimeout(_moodCacheSaveTimer);
+  _moodCacheSaveTimer = setTimeout(() => {
+    _moodCacheSaveTimer = null;
+    const entries = Array.from(_bgMoodCache.entries())
+      .map(([url, v]) => [url, { ...v, version: LIGHTS_SCHEMA_VERSION }]);
+    if (entries.length) window.IKANDY.saveMoodCache(entries).catch(() => {});
+  }, 2000);
+}
+
+function applyMoodVisuals(mood) {
+  const scene = MOOD_TO_SCENE[mood];
+  const fx    = MOOD_TO_FX[mood];
+  if (scene) selectScene(scene);
+  if (fx && _currentFx !== fx) setImgFx(fx);
+}
+
+function toggleMoodDrive() {
+  _moodDriveEnabled = !_moodDriveEnabled;
+  const btn = document.getElementById('mood-drive-btn');
+  if (btn) {
+    btn.textContent = _moodDriveEnabled ? '● On' : '○ Off';
+    btn.classList.toggle('active', _moodDriveEnabled);
+  }
+  if (_moodDriveEnabled && _currentMood) applyMoodVisuals(_currentMood);
+  debugLog('Mood Drive', _moodDriveEnabled ? 'enabled' : 'disabled');
+}
+
+function toggleMoodOverlay() {
+  const ov  = document.getElementById('mood-overlay');
+  const btn = document.getElementById('mood-hud-toggle');
+  if (!ov) return;
+  const show = ov.style.display === 'none';
+  ov.style.display = show ? '' : 'none';
+  if (btn) btn.classList.toggle('active', show);
+  if (show) updateMoodDebugHud();
+}
+
+function updateMoodDebugHud() {
+  const hud = document.getElementById('mood-hud-section');
+  const ov  = document.getElementById('mood-overlay');
+  const fileUrl = _bgFiles.length ? _bgFiles[_bgCycleIdx] : null;
+  const cached  = fileUrl ? _bgMoodCache.get(fileUrl) : null;
+  if (!cached) {
+    if (hud) hud.style.display = 'none';
+    return;
+  }
+
+  if (hud) hud.style.display = '';
+  const { metrics: m } = cached;
+  const fname  = fileUrl.split('/').pop();
+  const T      = (m.colorTemp >= 0 ? '+' : '') + m.colorTemp.toFixed(2);
+  const metStr = `B:${m.brightness.toFixed(2)}  sd:${m.stdDev.toFixed(2)}  S:${m.saturation.toFixed(2)}  T:${T}  hue:${m.dominantHue}`;
+
+  const fill = (nameId, metId) => {
+    const n = document.getElementById(nameId);
+    const x = document.getElementById(metId);
+    if (n) n.textContent = fname;
+    if (x) x.textContent = metStr;
+  };
+
+  fill('mood-hud-mood', 'mood-hud-metrics');
+
+  if (ov && ov.style.display !== 'none')
+    fill('mood-overlay-mood', 'mood-overlay-metrics');
 }
 
 let _fxModeEnabled = false;
@@ -10023,6 +10504,8 @@ function clearBgImage() {
   el('bg-file-input').value = '';
   stopRippleLoop();
   setVibeFxLock(true);
+  setPulseFolderLock(true);
+  _pulseLights = [];
   // Reset FX mode state
   _fxModeEnabled = false;
   // Restore Waveform

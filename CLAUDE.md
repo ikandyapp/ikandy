@@ -104,3 +104,49 @@ localStorage (renderer): `IKANDY-fx-strengths`, `IKANDY-scene-intensities` (per-
 - **Single-instance lock**: `app.requestSingleInstanceLock()` — second launch focuses existing window
 - **DevTools**: Gated by `!app.isPackaged` — only available in dev (`npm start`)
 - **Windows-specific**: Hardware-accelerated WebGL screen capture uses `AllowWGCScreenCapturer` Chromium flag; app is Windows-first
+
+
+## Design Philosophy
+
+These are the principles that guided every shipped feature in IKANDY. Apply them when adding new ones.
+
+**Offline-first / BYOK.** Anything that can run locally, does. External APIs are user-keyed (Spotify Client ID, eventually OpenAI/Anthropic if added). No telemetry beyond opt-in Supabase. No third-party dependencies that phone home.
+
+**Overlay pattern is the precedent.** New visual layers (FX passes, particle systems, image effects) follow the vignette/grain/FX Layer model: separate canvas at a defined z-index, own context, composited via CSS blend modes. Don't refactor existing layers to share contexts — isolation is the feature.
+
+**Default OFF, behind a toggle.** Every new feature ships disabled. Existing behavior must be preserved when the toggle is off. UI toggle lives near related controls. Persist the toggle state to localStorage.
+
+**Tunable via UI, not constants.** If a feature has a magic number a user might want to tweak (intensity, threshold, density), expose it as a slider. Persist the slider value. Don't ship "the right value" — ship the user's choice.
+
+## How to Add Features
+
+**1. Plan before code.** When asked to add a feature, first read existing related code and propose: where logic lives, what data flows, what UI surface, what persists. Get human sign-off before writing.
+
+**2. Heavy work goes off the render loop.** Pixel analysis, audio analysis beyond the AnalyserNode, file scanning — use Web Workers (renderer-side) or main process IPC. Never block the visualizer.
+
+**3. Cache derived data on disk.** Anything computed from user files (preset thumbs, mood metadata, broken-preset list) gets a JSON sidecar in `app.getPath('userData')`. Two IPC handlers: load-on-startup, save-on-change.
+
+**4. Checkpoint before visuals.** When building features that affect what's on screen (mood detection, beat-reactive effects, scene transitions), wire the *logic* and *logging* first. Verify behavior in the console. Only then connect it to the visualizer.
+
+**5. Add a debug surface for anything that will be tuned.** New classifiers, scoring systems, threshold-based logic, or anything probabilistic should expose its raw inputs and outputs via a debug overlay (toggle from BUG panel). You'll thank yourself when a user reports "it's misclassifying my photos."
+
+**6. Hysteresis on state machines that switch modes.** Anything that switches based on a metric crossing a threshold — mood detection, scene mode, audio source — needs hysteresis to avoid flicker at boundary values. New state must beat current by a margin, not just edge it out.
+
+**7. Ship "good enough." Iterate based on real use.** First-pass thresholds and weights are starting points, not endpoints. Don't tune the same classifier 5 times in isolation. Wire it up, use it on real content, then tune from observed misfires.
+
+## Anti-Patterns to Avoid
+
+- Adding a feature that's on by default and changes existing behavior
+- Coupling new visual layers to existing layers (e.g., reusing the Butterchurn WebGL context)
+- Hardcoding thresholds with no UI exposure when a user might want to tune them
+- Wiring a feature directly to visuals before its logic is testable in isolation
+- Shipping classifiers/scoring without a debug overlay
+- Skipping the on-disk cache for derived data ("it's fast enough, we'll just recompute")
+- Adding npm dependencies for things doable in vanilla JS (this codebase has zero rendering deps beyond Butterchurn)
+
+## Current State (as of mood detection work)
+
+- FX Layer: complete. Single-pass chromatic aberration + beat-reactive particle burst. Pipeline supports more passes; none added yet.
+- Auto-updater: coded but not activated. Pending `npm install electron-updater` + cert wiring.
+- Code signing: Certum Open Source cert in verification. Wires into `package.json` build config when received.
+- Mood detection: Web worker classifier with 5 moods (energetic/chill/dark/warm/ethereal). Tuned for lofi-style folders. Hooks to scene + image FX behind Mood Drive toggle.
