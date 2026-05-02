@@ -5,6 +5,43 @@ All notable changes to IKANDY are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9] - 2026-05-02
+
+### Added
+- **Multi-monitor: Mirror mode** — one frameless `BrowserWindow` per secondary display, always-on-top at screen-saver level, auto-opened when the toggle is turned on. Per-monitor checkboxes let you include or exclude individual displays without toggling the whole feature off.
+- **Multi-monitor: Span mode** — stretches the main window to the bounding box of all selected secondaries so the visualiser covers the wall. Per-monitor checkboxes dynamically respan to the selected subset.
+- **Multi-monitor: Fit / Fill toggle** — Mirror mode only. *Fit* (default) letterboxes the source into each display; *Fill* stretches to cover. Runtime toggle propagated to all open mirrors instantly via IPC push. Span always forces fill.
+- **Multi-monitor: Escape bail-out** — pressing Escape while MM is active immediately disables it (closes all mirrors / exits span, restores main window bounds) and shows a brief "Multi-monitor disabled" toast. Existing Escape behaviour (exit fullscreen / close preset panel) falls through only when MM is off.
+- **Multi-monitor: localStorage persistence** — MM on/off, mode (mirror/span), fit mode, and per-monitor checked IDs are saved on every change and restored on next launch. If the monitor lineup changed since the last session (different IDs or count), per-display restore is skipped and all monitors default to checked; the skip reason is logged.
+- **Multi-monitor: hot-plug handling** — `display-added` auto-opens a new mirror and adds a checkbox row; `display-removed` closes the orphaned mirror or recomputes span (forces MM off if the last secondary disconnects); `display-metrics-changed` repositions the mirror to the new bounds. All three events log display ID, label, bounds, and changed-metrics array for debugging. Win+P / WorkerW instability documented in code.
+- **Mirror reconnect** — when a mirror's capture stream ends unexpectedly, up to 3 reconnect attempts are made with exponential backoff (1 s, 2 s, 4 s). Each attempt logs `[Mirror] reconnect attempt N/3 in Xms`. A `_reconnecting` guard prevents double-triggers. Success resets the counter; exhausting all attempts shows a permanent error status.
+- **Mood worker (`mood-worker.js`)** — off-thread image pixel analysis (brightness, std-dev, saturation, colour temperature, dominant hue) and light-source extraction. Lights: strict local-maximum filter (must beat all neighbours by ≥ 5%), saturation ≥ 0.35, ranked by `brightness × (1 + saturation)`, capped at 8. `skipLights` flag omits extraction when the Pulse feature is hidden.
+
+### Changed
+- **Multi-monitor UI overhauled** — replaced the old per-display picker and Refresh/Close-all buttons with a single toggle that auto-opens all secondaries, plus an inline checkbox list for per-display control. Mode and Fit buttons are always visible; the checkbox list appears only when MM is on.
+- **Windows Graphics Capture enabled** (`main.js`) — `AllowWGCScreenCapturer`, `AllowWGCDesktopCapturer`, and `AllowWGCFrameSourceCapturer` Chromium flags appended on Win32. Electron was silently falling back to BitBlt, which returns black frames for WebGL / Butterchurn content on Windows 10+.
+
+## [1.0.8] - 2026-05-01
+
+### Added
+- **Draw on canvas** — right-click and drag to draw freehand lines over the visualiser (screen-blend layer, z-index 19). Both mouse buttons held simultaneously clears the canvas. Color options: Random (default, cycles through accent-adjacent hues), White, Accent. Brush width 1–40 px, persisted to `IKANDY-draw-width`. Toggle and color/width controls live in the right-click hide-options menu under Mouse effects.
+- **SMTC volume label** — a locked row in the transport bar explains that volume control isn't available from IKANDY and directs users to their source app or system mixer, replacing the previously absent/broken volume slider.
+
+### Changed
+- **Modal scroll on small displays** — all modals now cap at `100vh − 40px` with `overflow-y: auto` so content is reachable on 768 px-tall or smaller screens without the modal clipping off-screen.
+- **Audio reconnect coverage expanded** — `autoConnectSystemAudio` is now triggered on play gesture (click/keydown), on cold boot when Spotify is already playing, and when switching to the Spotify source. Previously these paths required a manual "Reconnect System Audio" click after the stream lapsed.
+
+## [1.0.7] - 2026-05-01
+
+### Added
+- **Click ripples** — left-click spawns an expanding ring at the cursor; right-click collapses an implosion ring inward. Double-right-click triggers a rapid strobe flash. Hold right-click charges a growing ring that explodes outward on release with intensity proportional to hold duration. All effects rendered on a dedicated `click-ripple-canvas` (screen-blend, z-index 18).
+- **Cursor trail** — a fading streak of up to 28 points follows mouse movement. Trail color matches the current accent. Rendered in the same click-ripple pass so there is no second canvas.
+- **Double-click particle burst at cursor** — overrides the burst origin to the cursor position for one frame, placing the particle explosion exactly where the user clicks.
+- **Aurora mouse warp** — in the Aurora scene the UV field is locally pulled toward the cursor based on distance; the curtain bends and reaches toward the pointer in real time.
+- **Pawrticles mouse repel** — particles flee from the cursor within a configurable radius, snapping back after the pointer moves away.
+- **Mouse effects toggle** — on/off switch in the right-click hide-options menu. Persisted to `IKANDY-mouse-fx`. Disabling clears all active rings and trail immediately.
+- **Welcome modal** — shown on first launch (or after a version bump). Displays version number, highlights new features in the current release, and links to the subreddit. "Don't show again" option persisted to `IKANDY-welcome-seen`.
+
 ## [1.0.6] - 2026-04-30
 
 ### Added
