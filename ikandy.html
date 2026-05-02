@@ -2787,7 +2787,7 @@ function _mmSaveState() {
 function _renderMmDisplayList() {
   const container = el('mm-display-list');
   if (!container) return;
-  if (!_mmEnabled || !_mmDisplays.length) { container.style.display = 'none'; return; }
+  if (!_mmDisplays.length) { container.style.display = 'none'; return; }
   container.style.display = 'block';
   container.innerHTML = '';
   for (const d of _mmDisplays) {
@@ -2811,15 +2811,17 @@ async function _toggleMmDisplay(id, checked) {
   const d = _mmDisplays.find(d => d.id === id);
   if (!d) return;
   d.checked = checked;
-  if (_mmMode === 'span') {
-    const checkedIds = _mmDisplays.filter(d => d.checked).map(d => d.id);
-    if (!checkedIds.length) return; // keep at least one in span
-    await window.IKANDY.mmRespan(checkedIds).catch(() => {});
-  } else {
-    if (checked) {
-      await window.IKANDY.mmOpenDisplay(id).catch(() => {});
+  if (_mmEnabled) {
+    if (_mmMode === 'span') {
+      const checkedIds = _mmDisplays.filter(d => d.checked).map(d => d.id);
+      if (!checkedIds.length) { d.checked = true; return; } // keep at least one in span
+      await window.IKANDY.mmRespan(checkedIds).catch(() => {});
     } else {
-      await window.IKANDY.mmCloseDisplay(id).catch(() => {});
+      if (checked) {
+        await window.IKANDY.mmOpenDisplay(id).catch(() => {});
+      } else {
+        await window.IKANDY.mmCloseDisplay(id).catch(() => {});
+      }
     }
   }
   _mmSaveState();
@@ -2828,18 +2830,22 @@ async function _toggleMmDisplay(id, checked) {
 async function toggleMultiMonitor() {
   if (_mmEnabled) {
     _mmEnabled = false;
-    _mmDisplays = [];
     _renderMmDisplayList();
     await window.IKANDY.mmDisable().catch(() => {});
     const btn = el('mm-toggle-btn');
     if (btn) { btn.textContent = '○ Off'; btn.classList.remove('active'); }
     _mmSaveState();
   } else {
-    const r = await window.IKANDY.mmEnable().catch(e => ({ error: e.message }));
+    const checkedIds = _mmDisplays.filter(d => d.checked).map(d => d.id);
+    const r = await window.IKANDY.mmEnable(checkedIds).catch(e => ({ error: e.message }));
     if (r?.error) { debugLog('Monitor', r.error); return; }
     if (r?.note)  debugLog('Monitor', r.note);
     _mmEnabled = true;
-    _mmDisplays = (r.displays || []).map(d => ({ ...d, checked: true }));
+    // Merge fresh display info while preserving checked states the user set
+    if (r.displays?.length) {
+      const prev = new Map(_mmDisplays.map(d => [d.id, d]));
+      _mmDisplays = r.displays.map(d => ({ ...d, checked: prev.has(d.id) ? prev.get(d.id).checked : true }));
+    }
     const btn = el('mm-toggle-btn');
     if (btn) { btn.textContent = '● On'; btn.classList.add('active'); }
     if (r?.megapixels > 8) debugLog('Span Performance', `Rendering ${r.megapixels} MP — if you see stutter, lower Render Scale in Performance settings.`);
@@ -2853,10 +2859,14 @@ async function setMmMode(mode) {
   _mmMode = mode;
   _updateMmModeButtons();
   if (_mmEnabled) {
-    const r = await window.IKANDY.mmSetMode(mode).catch(e => ({ error: e.message }));
+    const checkedIds = _mmDisplays.filter(d => d.checked).map(d => d.id);
+    const r = await window.IKANDY.mmSetMode(mode, checkedIds).catch(e => ({ error: e.message }));
     if (r?.error) { debugLog('Monitor', r.error); return; }
-    // Mode switch reopens all — reset all checkboxes to checked
-    _mmDisplays = (r.displays || _mmDisplays).map(d => ({ ...d, checked: true }));
+    // Mode switch reopens — preserve checked states, update display info
+    if (r.displays?.length) {
+      const prev = new Map(_mmDisplays.map(d => [d.id, d]));
+      _mmDisplays = r.displays.map(d => ({ ...d, checked: prev.has(d.id) ? prev.get(d.id).checked : true }));
+    }
     _renderMmDisplayList();
     _mmSaveState();
   }
@@ -2905,7 +2915,14 @@ function _updateFsButtonForSpan() {
 if (window.IKANDY?.onMmStateChanged) {
   window.IKANDY.onMmStateChanged(({ enabled }) => {
     _mmEnabled = enabled;
-    if (!enabled) { _mmDisplays = []; _renderMmDisplayList(); }
+    if (!enabled) {
+      // Re-query display list; topology may have changed (e.g. last secondary disconnected)
+      window.IKANDY.mmGetDisplays().then(r => {
+        const prev = new Map(_mmDisplays.map(d => [d.id, d]));
+        _mmDisplays = (r?.displays || []).map(d => ({ ...d, checked: prev.has(d.id) ? prev.get(d.id).checked : true }));
+        _renderMmDisplayList();
+      }).catch(() => { _mmDisplays = []; _renderMmDisplayList(); });
+    }
     const btn = el('mm-toggle-btn');
     if (btn) { btn.textContent = enabled ? '● On' : '○ Off'; btn.classList.toggle('active', enabled); }
     _updateFsButtonForSpan();
@@ -2952,31 +2969,42 @@ window._mirrorForward = function(bass, mid, treble, intensity) {
 
 _updateMmModeButtons();
 
-// Restore persisted MM state from last session
-(async function _mmRestore() {
+// Init: populate display list immediately (so checkboxes are visible before MM is toggled),
+// apply saved per-display checked states, then re-enable MM if it was on last session.
+(async function _mmInit() {
   const savedMode = localStorage.getItem('IKANDY-mm-mode');
   if (savedMode === 'mirror' || savedMode === 'span') { _mmMode = savedMode; _updateMmModeButtons(); }
   const savedFit = localStorage.getItem('IKANDY-mm-fit');
   if (savedFit === 'contain' || savedFit === 'fill') { _mmFitMode = savedFit; _updateMmFitButtons(); }
-  if (localStorage.getItem('IKANDY-mm-enabled') !== '1') return;
-  await toggleMultiMonitor(); // enables MM, populates _mmDisplays with current monitors
-  const raw = localStorage.getItem('IKANDY-mm-displays');
-  if (!raw) return;
-  try {
-    const { all: savedAll, checked: savedChecked } = JSON.parse(raw);
-    const currentIds = _mmDisplays.map(d => d.id).sort().join(',');
-    const savedIds   = (savedAll || []).slice().sort().join(',');
-    if (currentIds !== savedIds) {
-      console.log('[MM restore] Monitor lineup changed — defaulting all-on. saved:', savedAll, 'current:', _mmDisplays.map(d => d.id));
-      return;
-    }
-    const checkedSet = new Set(savedChecked);
-    for (const d of _mmDisplays) {
-      if (!checkedSet.has(d.id)) await _toggleMmDisplay(d.id, false).catch(() => {});
+
+  // Load display list without enabling MM — checkboxes are always visible from here on
+  const r = await window.IKANDY.mmGetDisplays().catch(() => null);
+  if (r?.displays?.length) {
+    _mmDisplays = r.displays.map(d => ({ ...d, checked: true }));
+    // Apply saved per-display checked states BEFORE enabling so mm-enable only opens checked ones
+    const raw = localStorage.getItem('IKANDY-mm-displays');
+    if (raw) {
+      try {
+        const { all: savedAll, checked: savedChecked } = JSON.parse(raw);
+        const currentIds = _mmDisplays.map(d => d.id).sort().join(',');
+        const savedIds   = (savedAll || []).slice().sort().join(',');
+        if (currentIds !== savedIds) {
+          console.log('[MM restore] Monitor lineup changed — defaulting all-on. saved:', savedAll, 'current:', _mmDisplays.map(d => d.id));
+        } else {
+          const checkedSet = new Set(savedChecked);
+          _mmDisplays.forEach(d => { d.checked = checkedSet.has(d.id); });
+        }
+      } catch (e) {
+        console.warn('[MM restore] Failed to parse saved displays:', e);
+      }
     }
     _renderMmDisplayList();
-  } catch (e) {
-    console.warn('[MM restore] Failed to parse saved displays:', e);
+  }
+
+  // Re-enable MM if it was active — checked states already applied above, so mm-enable
+  // receives the correct displayIds and opens only the right mirrors.
+  if (localStorage.getItem('IKANDY-mm-enabled') === '1') {
+    await toggleMultiMonitor();
   }
 })();
 

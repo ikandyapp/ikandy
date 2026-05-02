@@ -13,7 +13,7 @@
  */
 
 const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut, screen } = require('electron');
-console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-02 r8');
+console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-02 r9');
 
 // Enable Windows Graphics Capture API for proper hardware-accelerated capture.
 // Without these flags, Electron uses BitBlt which silently returns black frames
@@ -1607,9 +1607,16 @@ function setupDesktopCapturer() {
           }
         }
 
-        // STRATEGY 3: Match by enumeration index — assume primary display
-        // is screen index 0 in BOTH Electron's display list AND Chromium's
-        // screen sources (mostly true on Windows)
+        // STRATEGY 3: Window title match — more reliable than screen-index on
+        // multi-GPU systems (AMD+Intel) where desktopCapturer source indices
+        // do not align with Electron display indices.
+        if (!target) {
+          target = sources.find(s => s.name && s.name.startsWith('IKANDY') && !s.name.includes('Mirror'));
+          if (target) strategy = 'window-name';
+        }
+
+        // STRATEGY 4: Match by enumeration index — fragile on multi-GPU, only
+        // tried after window-name fails.
         if (!target && mainWindow) {
           try {
             const allDisplays = screen.getAllDisplays();
@@ -1629,12 +1636,6 @@ function setupDesktopCapturer() {
           } catch (e) {
             console.log('[IKANDY] index match failed:', e.message);
           }
-        }
-
-        // STRATEGY 4: Window name match
-        if (!target) {
-          target = sources.find(s => s.name === 'IKANDY');
-          if (target) strategy = 'window-name';
         }
 
         // STRATEGY 5: Last resort — first screen
@@ -2608,19 +2609,21 @@ function _displayInfo(d, idx) {
   return { id: d.id, label: `${name}  ${d.bounds.width}×${d.bounds.height}`, width: d.bounds.width, height: d.bounds.height };
 }
 
-ipcMain.handle('mm-enable', () => {
+ipcMain.handle('mm-enable', (_e, displayIds) => {
   if (!mainWindow) return { error: 'No main window' };
   _mmEnabled = true;
   const primaryId   = screen.getPrimaryDisplay().id;
   const secondaries = screen.getAllDisplays().filter(d => d.id !== primaryId);
   if (!secondaries.length) return { ok: true, count: 0, note: 'No secondary displays found', displays: [] };
   const displays = secondaries.map(_displayInfo);
+  const wantSet  = displayIds?.length ? new Set(displayIds) : null;
+  const toOpen   = wantSet ? secondaries.filter(d => wantSet.has(d.id)) : secondaries;
   if (_mmMode === 'span') {
-    return { ..._activateSpan(new Set(secondaries.map(d => d.id))), displays };
+    return { ..._activateSpan(new Set(toOpen.map(d => d.id))), displays };
   }
   _deactivateSpan();
-  for (const d of secondaries) _openMirrorOnDisplay(d);
-  return { ok: true, mode: 'mirror', count: secondaries.length, displays };
+  for (const d of toOpen) _openMirrorOnDisplay(d);
+  return { ok: true, mode: 'mirror', count: toOpen.length, displays };
 });
 
 ipcMain.handle('mm-disable', () => {
@@ -2631,7 +2634,7 @@ ipcMain.handle('mm-disable', () => {
   return { ok: true };
 });
 
-ipcMain.handle('mm-set-mode', (_e, mode) => {
+ipcMain.handle('mm-set-mode', (_e, { mode, displayIds } = {}) => {
   _mmMode = mode;
   if (!_mmEnabled) return { ok: true };
   mirrorWindows.forEach(w => { if (!w.win.isDestroyed()) w.win.destroy(); });
@@ -2641,9 +2644,11 @@ ipcMain.handle('mm-set-mode', (_e, mode) => {
   const secondaries = screen.getAllDisplays().filter(d => d.id !== primaryId);
   if (!secondaries.length) return { ok: true, count: 0, displays: [] };
   const displays = secondaries.map(_displayInfo);
-  if (mode === 'span') return { ..._activateSpan(new Set(secondaries.map(d => d.id))), displays };
-  for (const d of secondaries) _openMirrorOnDisplay(d);
-  return { ok: true, mode: 'mirror', count: secondaries.length, displays };
+  const wantSet  = displayIds?.length ? new Set(displayIds) : null;
+  const toOpen   = wantSet ? secondaries.filter(d => wantSet.has(d.id)) : secondaries;
+  if (mode === 'span') return { ..._activateSpan(new Set(toOpen.map(d => d.id))), displays };
+  for (const d of toOpen) _openMirrorOnDisplay(d);
+  return { ok: true, mode: 'mirror', count: toOpen.length, displays };
 });
 
 ipcMain.handle('mm-open-display', (_e, displayId) => {
@@ -2666,6 +2671,12 @@ ipcMain.handle('mm-respan', (_e, displayIds) => {
   const ids = new Set((displayIds || []).map(Number));
   if (ids.size === 0) { _deactivateSpan(); return { ok: true }; }
   return _activateSpan(ids);
+});
+
+ipcMain.handle('mm-get-displays', () => {
+  const primaryId   = screen.getPrimaryDisplay().id;
+  const secondaries = screen.getAllDisplays().filter(d => d.id !== primaryId);
+  return { displays: secondaries.map(_displayInfo) };
 });
 
 ipcMain.handle('mm-set-fit', (_e, mode) => {

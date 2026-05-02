@@ -81,9 +81,10 @@ contextBridge.exposeInMainWorld('IKANDY', {
   rendererReady: ()    => ipcRenderer.send('renderer-ready'),
 
   // Multi-monitor
-  mmEnable:        ()     => ipcRenderer.invoke('mm-enable'),
-  mmDisable:       ()     => ipcRenderer.invoke('mm-disable'),
-  mmSetMode:       (mode) => ipcRenderer.invoke('mm-set-mode', mode),
+  mmGetDisplays:   ()               => ipcRenderer.invoke('mm-get-displays'),
+  mmEnable:        (displayIds)     => ipcRenderer.invoke('mm-enable', displayIds),
+  mmDisable:       ()               => ipcRenderer.invoke('mm-disable'),
+  mmSetMode:       (mode, displayIds) => ipcRenderer.invoke('mm-set-mode', { mode, displayIds }),
   mmOpenDisplay:   (id)   => ipcRenderer.invoke('mm-open-display', id),
   mmCloseDisplay:  (id)   => ipcRenderer.invoke('mm-close-display', id),
   mmRespan:        (ids)  => ipcRenderer.invoke('mm-respan', ids),
