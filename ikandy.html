@@ -1350,7 +1350,13 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   padding: 32px 30px 26px; color: #ccc;
   font-size: 13px; line-height: 1.7;
   box-shadow: 0 0 60px rgba(140,60,255,.15), 0 20px 60px rgba(0,0,0,.7);
-  position: relative; overflow: hidden;
+  position: relative;
+  /* Cap to viewport (minus the modal's 20px padding × 2) and scroll the
+     overflow on smaller monitors. overflow-x stays hidden so the radial
+     gradient pseudo-element can't poke horizontally past the rounded corners. */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 #welcome-modal .wm-box::before {
   content: '';
@@ -3628,7 +3634,15 @@ function _isLoopbackBugError(e) {
 
 /* ── Auto-connect system audio on load (Electron bypasses picker) ── */
 async function autoConnectSystemAudio() {
-  if (_systemAudioStream) return; // already connected
+  // Verify tracks are still live — a stale stream after device change would
+  // otherwise no-op this whole function and leave the visualizer silent.
+  if (_systemAudioStream && _systemAudioStream.getAudioTracks().some(t => t.readyState === 'live')) return;
+  // Stale stream — clear it so we re-acquire below.
+  if (_systemAudioStream) {
+    try { _systemAudioStream.getTracks().forEach(t => t.stop()); } catch(_) {}
+    _systemAudioStream = null;
+    if (_systemAudioSrc) { try { _systemAudioSrc.disconnect(); } catch(_) {} _systemAudioSrc = null; }
+  }
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { width: 1, height: 1, frameRate: 1 },
@@ -4675,6 +4689,13 @@ async function spAction(cmd) {
     toast(sourceNotStartedHint(currentSource));
     return;
   }
+  // Silent reconnect on play gesture — covers cold boot, stale stream after
+  // device change, OS audio config changes, source-app close/reopen. Fires
+  // inside the user-activation context (spec-correct place for getDisplayMedia)
+  // and is idempotent: live stream → returns in microseconds, stale → heals.
+  if ((type === 'play' || type === 'playpause') && currentSource && currentSource !== 'local') {
+    autoConnectSystemAudio().catch(() => { /* silent — backup detection will nudge */ });
+  }
   if (currentSource === 'vlc') {
     await window.IKANDY.vlcAction(typeof cmd === 'string' ? { type: cmd } : cmd);
     return;
@@ -5065,6 +5086,13 @@ async function initSource() {
   if (s.foobarPort && el('foobar-port-input')) el('foobar-port-input').value = s.foobarPort;
   if (s.foobarPassword && el('foobar-pass-input')) el('foobar-pass-input').value = s.foobarPassword;
   applySourceUI(currentSource);
+  // Cold-boot audio capture: setupSpotifyIPC only fires autoConnectSystemAudio
+  // inside the Spotify-success branch. For saved non-Spotify sources (foobar,
+  // VLC, smtc) the noSource branch returns early and the visualizer launches
+  // silent until the user manually clicks 🎤. Trigger here for parity.
+  if (currentSource && currentSource !== 'local') {
+    autoConnectSystemAudio().catch(() => { /* silent — backup detection will nudge */ });
+  }
 }
 function applySourceUI(mode) {
   const isVlc    = mode === 'vlc';
@@ -5096,6 +5124,15 @@ async function setSourceMode(mode) {
   // Hide source prompt — they've picked something
   el('source-prompt').style.display = 'none';
   currentSource = mode;
+
+  // Auto-connect system audio capture if not already running.
+  // Picking a source handles metadata/transport, but the visualizer needs a
+  // separate Windows loopback stream to react to the actual sound. Trigger it
+  // silently — autoConnectSystemAudio() no-ops if a stream is already live.
+  if (mode !== 'local') {
+    autoConnectSystemAudio().catch(() => { /* silent — backup detection will nudge */ });
+  }
+
   applySourceUI(mode);
   if (mode !== 'smtc') clearSMTCCaps(); // restore buttons when leaving SMTC
   // Hide controls that have no meaning in Now Playing mode (no remote shuffle,
@@ -5229,9 +5266,13 @@ function setSpeed(v) {
 }
 function setSensitivity(v) {
   el('sens-v').textContent = v.toFixed(2);
-  if (window._boostGainNode) window._boostGainNode.gain.value = v * 3;
+  // v * 2: default slider (1.5) → gain 3.0, enough to drive visualizer response.
+  // Bottom half of slider stays under 1.0 boost (clean, non-clipping zone) so
+  // the slider has visible effect across its range. Was v*3 (always saturated).
+  if (window._boostGainNode) window._boostGainNode.gain.value = v * 2;
   localStorage.setItem('viz-sensitivity', v);
 }
+
 function setSmoothing(v) {
   el('sm-v').textContent = v.toFixed(2);
   if (analyserNode) analyserNode.smoothingTimeConstant = v;
@@ -10321,7 +10362,7 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
 <!-- Welcome modal -->
 <!-- Spotify Premium setup guide modal -->
 <div id="sp-guide-modal" onclick="if(event.target===this)closeSpGuide()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);">
-  <div style="background:linear-gradient(160deg,#0d0d14 60%,#11091a);border:1px solid rgba(30,215,96,.3);border-radius:10px;max-width:520px;width:100%;padding:30px;color:#ccc;font-size:13px;line-height:1.7;box-shadow:0 0 60px rgba(30,215,96,.15),0 20px 60px rgba(0,0,0,.7);">
+  <div style="background:linear-gradient(160deg,#0d0d14 60%,#11091a);border:1px solid rgba(30,215,96,.3);border-radius:10px;max-width:520px;width:100%;padding:30px;color:#ccc;font-size:13px;line-height:1.7;box-shadow:0 0 60px rgba(30,215,96,.15),0 20px 60px rgba(0,0,0,.7);max-height:calc(100vh - 40px);overflow-y:auto;overflow-x:hidden;">
     <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(30,215,96,.7);margin-bottom:6px;">Spotify Premium Setup</div>
     <h2 style="font-size:22px;color:#fff;margin:0 0 16px 0;font-weight:700;">One-time setup</h2>
     <p style="margin:0 0 14px;color:rgba(200,190,220,.85);">IKANDY connects to Spotify with your own free developer credentials — Spotify requires this. Takes about 2 minutes.</p>
@@ -10389,22 +10430,45 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
     </p>
 
     <div class="wm-features">
-      <div class="wm-feat-title">✦ Mouse Interactions</div>
+      <div class="wm-feat-title">✦ Getting Started</div>
+      <div class="wm-feat"><span class="wm-feat-key">1.</span> Open the sidebar (☰) and pick a source</div>
+      <div class="wm-feat"><span class="wm-feat-key">2.</span> Start playing music in that app</div>
+      <div class="wm-feat"><span class="wm-feat-key">3.</span> Watch the visuals come alive</div>
+    </div>
+
+    <div class="wm-features">
+      <div class="wm-feat-title">✦ Audio Sources</div>
+      <div class="wm-feat"><span class="wm-feat-key">Spotify Premium</span> Full features &mdash; playlists, search, lyrics, transport. Requires Premium.</div>
+      <div class="wm-feat"><span class="wm-feat-key">foobar2000</span> Full features via Beefweb plugin</div>
+      <div class="wm-feat"><span class="wm-feat-key">VLC</span> Transport control, art, lyrics</div>
+      <div class="wm-feat"><span class="wm-feat-key">Now Playing</span> Reads any audio playing on your computer (works with Spotify Free)</div>
+    </div>
+
+    <div class="wm-features">
+      <div class="wm-feat-title">✦ Mouse Interactions <span style="font-size:10px;color:rgba(180,100,255,.6);font-weight:400;text-transform:none;letter-spacing:0;">— enable in the ◎ menu</span></div>
       <div class="wm-feat"><span class="wm-feat-key">Left drag</span> Draw glowing strokes on the canvas</div>
-      <div class="wm-feat"><span class="wm-feat-key">Both buttons</span> Clear the canvas instantly</div>
-      <div class="wm-feat"><span class="wm-feat-key">Click</span> Drop an expanding ripple (draw mode off)</div>
+      <div class="wm-feat"><span class="wm-feat-key">Click</span> Drop an expanding ripple</div>
       <div class="wm-feat"><span class="wm-feat-key">Double-click</span> Burst particles from your cursor</div>
       <div class="wm-feat"><span class="wm-feat-key">Hold click</span> Charge a ring — release to explode</div>
-      <div class="wm-feat"><span class="wm-feat-key">Right-click</span> Implosion ring · double for strobe · hold for slow-mo</div>
+      <div class="wm-feat"><span class="wm-feat-key">Right-click</span> Implosion · double for strobe · hold for slow-mo</div>
       <div class="wm-feat"><span class="wm-feat-key">Mouse move</span> Aurora bends · Particles scatter · Cursor trail</div>
     </div>
 
     <div class="wm-features">
       <div class="wm-feat-title">✦ Multi-Monitor</div>
       <div class="wm-feat"><span class="wm-feat-key">Mirror</span> Duplicate the scene on each selected display</div>
-      <div class="wm-feat"><span class="wm-feat-key">Span</span> Stretch the visualizer wall-to-wall across multiple displays</div>
+      <div class="wm-feat"><span class="wm-feat-key">Span</span> Stretch the visualizer wall-to-wall across displays</div>
       <div class="wm-feat"><span class="wm-feat-key">Hot-plug</span> Disconnect a display mid-session and span auto-recovers</div>
       <div class="wm-feat" style="color:rgba(180,100,255,.6);font-style:italic;">Find it in the sidebar under "Monitors"</div>
+    </div>
+
+    <div class="wm-features">
+      <div class="wm-feat-title">✦ Keyboard Shortcuts</div>
+      <div class="wm-feat"><span class="wm-feat-key">← →</span> Previous / next preset</div>
+      <div class="wm-feat"><span class="wm-feat-key">R or Enter</span> Random preset</div>
+      <div class="wm-feat"><span class="wm-feat-key">Space</span> Play / pause</div>
+      <div class="wm-feat"><span class="wm-feat-key">F</span> Fullscreen</div>
+      <div class="wm-feat"><span class="wm-feat-key">H</span> Hide UI</div>
     </div>
 
     <div class="wm-reddit">
@@ -10467,7 +10531,7 @@ function openSourceHelp() { document.getElementById('src-help-modal').classList.
 function closeSourceHelp() { document.getElementById('src-help-modal').classList.remove('open'); }
 
 /* ── Welcome modal ── */
-const WELCOME_VERSION = 'v2'; // bump this when modal content changes meaningfully
+const WELCOME_VERSION = 'v3'; // bump this when modal content changes meaningfully
 function closeWelcome() {
   el('welcome-modal').classList.remove('open');
   // After welcome closes, if no source is selected, prompt them to pick one

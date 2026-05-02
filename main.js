@@ -872,6 +872,39 @@ ipcMain.handle('set-source',  async (_e, mode) => {
       }
     } catch(e) { console.log('[IKANDY] Spotify restore failed:', e.message); }
   }
+
+  // Auto-test connection for foobar/VLC so polling can start without the user
+  // having to click "Test Connection" first. If it fails, no harm — the existing
+  // "Test Connection" UI button still works as a manual fallback.
+  if (mode === 'foobar' && !foobarConnected) {
+    try {
+      const res = await httpGet(`http://localhost:${foobarPort}/api/player`, foobarAuthHeaders());
+      if (res.status === 200) {
+        foobarConnected = true;
+        console.log('[IKANDY] foobar auto-connect succeeded on source switch');
+      } else {
+        console.log('[IKANDY] foobar auto-connect failed: HTTP', res.status);
+      }
+    } catch(e) {
+      console.log('[IKANDY] foobar auto-connect failed:', e.message);
+    }
+  }
+  if (mode === 'vlc' && !vlcConnected) {
+    try {
+      const auth = Buffer.from(`:${vlcPassword}`).toString('base64');
+      const res = await httpGet(`http://localhost:${vlcPort}/requests/status.json`,
+        { Authorization: 'Basic ' + auth });
+      if (res.status === 200) {
+        vlcConnected = true;
+        console.log('[IKANDY] VLC auto-connect succeeded on source switch');
+      } else {
+        console.log('[IKANDY] VLC auto-connect failed: HTTP', res.status);
+      }
+    } catch(e) {
+      console.log('[IKANDY] VLC auto-connect failed:', e.message);
+    }
+  }
+
   // Restart polling for new source
   startPolling();
   return { ok: true };
@@ -2541,9 +2574,31 @@ app.whenReady().then(() => {
       return;
     }
 
-    // If they previously had a non-Spotify source, fade loading and exit.
+    // If they previously had a non-Spotify source, auto-connect it (foobar/VLC)
+    // so polling starts and controls work without the user clicking Test Connection.
     if (sourceMode !== 'spotify') {
       console.log('[IKANDY] Source mode:', sourceMode, '— skipping Spotify auto-auth');
+      if (sourceMode === 'foobar') {
+        try {
+          const res = await httpGet(`http://localhost:${foobarPort}/api/player`, foobarAuthHeaders());
+          if (res.status === 200) {
+            foobarConnected = true;
+            console.log('[IKANDY] foobar auto-connect succeeded on launch');
+            startPolling();
+          }
+        } catch(e) { console.log('[IKANDY] foobar auto-connect on launch failed:', e.message); }
+      } else if (sourceMode === 'vlc') {
+        try {
+          const auth = Buffer.from(`:${vlcPassword}`).toString('base64');
+          const res = await httpGet(`http://localhost:${vlcPort}/requests/status.json`,
+            { Authorization: 'Basic ' + auth });
+          if (res.status === 200) {
+            vlcConnected = true;
+            console.log('[IKANDY] VLC auto-connect succeeded on launch');
+            startPolling();
+          }
+        } catch(e) { console.log('[IKANDY] VLC auto-connect on launch failed:', e.message); }
+      }
       mainWindow?.webContents.send('auth-result', { noSource: true });
       return;
     }
