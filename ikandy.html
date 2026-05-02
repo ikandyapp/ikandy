@@ -2140,12 +2140,12 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <span style="font-size:11px;color:var(--dim);">All non-primary displays</span>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:4px;">
-      <button id="mm-mode-mirror" class="vibe-btn" onclick="setMmMode('mirror')" style="flex:1;font-size:11px;padding:5px 0;color:var(--sp);border-color:var(--sp);">⧉ Mirror</button>
-      <button id="mm-mode-span"   class="vibe-btn" onclick="setMmMode('span')"   style="flex:1;font-size:11px;padding:5px 0;">⬛ Span</button>
+      <button id="mm-mode-mirror" class="vibe-btn" onclick="setMmMode('mirror')" style="flex:1;font-size:11px;padding:5px 0;">Mirror</button>
+      <button id="mm-mode-span"   class="vibe-btn" onclick="setMmMode('span')"   style="flex:1;font-size:11px;padding:5px 0;">Span</button>
     </div>
     <div id="mm-fit-row" style="display:flex;gap:6px;margin-top:4px;">
-      <button id="mm-fit-contain" class="vibe-btn" onclick="setMmFit('contain')" style="flex:1;font-size:11px;padding:4px 0;color:var(--sp);border-color:var(--sp);">⬜ Fit</button>
-      <button id="mm-fit-fill"    class="vibe-btn" onclick="setMmFit('fill')"    style="flex:1;font-size:11px;padding:4px 0;">⬛ Fill</button>
+      <button id="mm-fit-contain" class="vibe-btn" onclick="setMmFit('contain')" style="flex:1;font-size:11px;padding:4px 0;">Fit</button>
+      <button id="mm-fit-fill"    class="vibe-btn" onclick="setMmFit('fill')"    style="flex:1;font-size:11px;padding:4px 0;">Fill</button>
     </div>
     <div id="mm-display-list" style="display:none;margin-top:6px;"></div>
     <div style="font-size:10px;color:var(--dim);line-height:1.5;margin-top:6px;">
@@ -2876,8 +2876,8 @@ async function setMmMode(mode) {
 function _updateMmModeButtons() {
   const mirror = el('mm-mode-mirror');
   const span   = el('mm-mode-span');
-  if (mirror) { mirror.style.color = _mmMode === 'mirror' ? 'var(--sp)' : ''; mirror.style.borderColor = _mmMode === 'mirror' ? 'var(--sp)' : ''; }
-  if (span)   { span.style.color   = _mmMode === 'span'   ? 'var(--sp)' : ''; span.style.borderColor   = _mmMode === 'span'   ? 'var(--sp)' : ''; }
+  if (mirror) mirror.classList.toggle('active', _mmMode === 'mirror');
+  if (span)   span.classList.toggle('active',   _mmMode === 'span');
   // Fit/Fill row only meaningful in mirror mode
   const fitRow = el('mm-fit-row');
   if (fitRow) fitRow.style.display = _mmMode === 'mirror' ? 'flex' : 'none';
@@ -2887,8 +2887,8 @@ function _updateMmModeButtons() {
 function _updateMmFitButtons() {
   const fit  = el('mm-fit-contain');
   const fill = el('mm-fit-fill');
-  if (fit)  { fit.style.color  = _mmFitMode === 'contain' ? 'var(--sp)' : ''; fit.style.borderColor  = _mmFitMode === 'contain' ? 'var(--sp)' : ''; }
-  if (fill) { fill.style.color = _mmFitMode === 'fill'    ? 'var(--sp)' : ''; fill.style.borderColor = _mmFitMode === 'fill'    ? 'var(--sp)' : ''; }
+  if (fit)  fit.classList.toggle('active',  _mmFitMode === 'contain');
+  if (fill) fill.classList.toggle('active', _mmFitMode === 'fill');
 }
 
 async function setMmFit(mode) {
