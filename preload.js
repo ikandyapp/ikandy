@@ -27,10 +27,14 @@ contextBridge.exposeInMainWorld('IKANDY', {
   saveThumb:     (name, dataUrl) => ipcRenderer.invoke('preset-thumb-save', { name, dataUrl }),
   clearThumbs:   ()              => ipcRenderer.invoke('preset-thumb-clear'),
 
-  // Broken-preset persistence (presets that crash butterchurn — never replay)
-  loadBrokenPresets:  ()      => ipcRenderer.invoke('broken-presets-load'),
-  addBrokenPreset:    (name)  => ipcRenderer.invoke('broken-presets-add', name),
-  clearBrokenPresets: ()      => ipcRenderer.invoke('broken-presets-clear'),
+  // Broken-preset persistence (presets that crash butterchurn or render silent)
+  loadBrokenPresets:  ()       => ipcRenderer.invoke('broken-presets-load'),
+  addBrokenPreset:    (entry)  => ipcRenderer.invoke('broken-presets-add', entry),
+  clearBrokenPresets: ()       => ipcRenderer.invoke('broken-presets-clear'),
+
+  // Preset reactivity cache (name → score, persisted across sessions)
+  loadPresetReactivity: ()     => ipcRenderer.invoke('preset-reactivity-load'),
+  savePresetReactivity: (data) => ipcRenderer.invoke('preset-reactivity-save', data),
 
   // Mood detection cache
   loadMoodCache: ()        => ipcRenderer.invoke('mood-cache-load'),

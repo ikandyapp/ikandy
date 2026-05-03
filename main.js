@@ -13,7 +13,7 @@
  */
 
 const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut, screen } = require('electron');
-console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-02 r9');
+console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-02 r10');
 
 // Enable Windows Graphics Capture API for proper hardware-accelerated capture.
 // Without these flags, Electron uses BitBlt which silently returns black frames
@@ -1466,28 +1466,52 @@ function readBroken() {
   try {
     const raw = fs.readFileSync(BROKEN_FILE(), 'utf8');
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter(n => typeof n === 'string') : [];
+    if (!Array.isArray(arr)) return [];
+    // Coerce legacy plain-string entries to {name, reason:'crash'} objects
+    return arr
+      .map(e => typeof e === 'string' ? { name: e, reason: 'crash' } : e)
+      .filter(e => e && typeof e.name === 'string' && e.name);
   } catch(e) { return []; }
 }
-function writeBroken(names) {
-  try { fs.writeFileSync(BROKEN_FILE(), JSON.stringify(names)); return true; }
+function writeBroken(entries) {
+  try { fs.writeFileSync(BROKEN_FILE(), JSON.stringify(entries)); return true; }
   catch(e) { console.warn('[IKANDY] writeBroken:', e.message); return false; }
 }
 
 ipcMain.handle('broken-presets-load', async () => readBroken());
 
-ipcMain.handle('broken-presets-add', async (_e, name) => {
-  if (typeof name !== 'string' || !name) return { ok: false };
-  const cur = new Set(readBroken());
-  if (cur.has(name)) return { ok: true, already: true };
-  cur.add(name);
+ipcMain.handle('broken-presets-add', async (_e, entry) => {
+  // Accept {name, reason} object or legacy plain string
+  const name   = typeof entry === 'string' ? entry : entry?.name;
+  const reason = typeof entry === 'string' ? 'crash' : (entry?.reason || 'crash');
+  if (!name || typeof name !== 'string') return { ok: false };
+  const cur = readBroken();
+  if (cur.some(e => e.name === name)) return { ok: true, already: true };
+  cur.push({ name, reason });
   // Soft cap so a runaway crash loop doesn't bloat the file
-  const arr = Array.from(cur).slice(-1000);
-  return writeBroken(arr) ? { ok: true, total: arr.length } : { ok: false };
+  const trimmed = cur.slice(-1000);
+  return writeBroken(trimmed) ? { ok: true, total: trimmed.length } : { ok: false };
 });
 
 ipcMain.handle('broken-presets-clear', async () => {
   return writeBroken([]) ? { ok: true } : { ok: false };
+});
+
+// Preset reactivity cache — maps preset name → reactivity score (0–1)
+const REACTIVITY_FILE = () => path.join(app.getPath('userData'), 'IKANDY-preset-reactivity.json');
+
+ipcMain.handle('preset-reactivity-load', async () => {
+  try {
+    const raw = fs.readFileSync(REACTIVITY_FILE(), 'utf8');
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  } catch(e) { return {}; }
+});
+
+ipcMain.handle('preset-reactivity-save', async (_e, data) => {
+  if (!data || typeof data !== 'object') return { ok: false };
+  try { fs.writeFileSync(REACTIVITY_FILE(), JSON.stringify(data)); return { ok: true }; }
+  catch(e) { console.warn('[IKANDY] writeReactivity:', e.message); return { ok: false }; }
 });
 
 // ── Mood detection cache ──────────────────────────────────────────────────────

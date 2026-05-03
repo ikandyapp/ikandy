@@ -5,6 +5,16 @@ All notable changes to IKANDY are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.10] - 2026-05-02
+
+### Added
+- **Silent-preset detection** — after each preset loads, three pixel samples are taken at 1 s, 2 s, and 3 s. A preset is marked silent only if all three samples are ≥95% near-black (R+G+B < 10). Saved to `IKANDY-broken-presets.json` with `reason:"silent"` and skipped in auto-cycle thereafter. Prevents false positives from presets with legitimate dark intro phases.
+- **Shuffle bag for auto-cycle** — replaces the old `Math.random()` pick with a Fisher-Yates–shuffled deck. Every non-broken, non-silent preset is guaranteed to appear exactly once before any repeats. Bag automatically excludes any preset newly marked broken or silent mid-session.
+- **Reactivity scan** — opt-in checkbox ("Hide non-reactive presets") in the Scenes accordion. Off by default. When first enabled, runs a background scan: loads each preset in a hidden 64×64 butterchurn instance, measures the brightness delta between silence and loud bass audio, and assigns a score 0–1. Presets scoring below 0.25 are excluded from auto-cycle. Results persist to `IKANDY-preset-reactivity.json` so subsequent launches restore the filter instantly without re-scanning. Progress shown as "Analyzing presets… N/M" with a cancel button; cancel unchecks the toggle.
+
+### Changed
+- **Broken-preset file schema** — `IKANDY-broken-presets.json` now stores `[{name, reason}]` objects instead of plain strings. Existing plain-string entries are coerced to `{reason:"crash"}` on first read (backward-compatible).
+
 ## [1.0.9] - 2026-05-02
 
 ### Added

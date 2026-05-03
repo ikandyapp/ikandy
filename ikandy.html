@@ -2053,6 +2053,19 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
       <input type="range" id="scene-intensity-sl" min="0.2" max="2" step="0.05" value="1" oninput="setSceneIntensity(+this.value)">
       <span class="svv" id="scene-intensity-v">1.0</span>
     </div>
+    <div id="reactivity-row" style="margin-top:10px;border-top:1px solid var(--bdr);padding-top:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--dim);">
+        <input type="checkbox" id="reactivity-chk" onchange="onReactivityToggle(this.checked)" style="accent-color:var(--sp);">
+        Hide non-reactive presets
+      </label>
+      <div id="reactivity-progress" style="display:none;margin-top:8px;">
+        <div id="reactivity-status" style="font-size:11px;color:var(--dim);margin-bottom:4px;">Analyzing presets…</div>
+        <div style="height:3px;background:var(--bdr);border-radius:2px;overflow:hidden;">
+          <div id="reactivity-bar" style="height:100%;width:0%;background:var(--sp);transition:width .2s;"></div>
+        </div>
+        <button onclick="cancelReactivityScan()" style="margin-top:5px;font-size:11px;color:var(--dim);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <!-- PULSE (hidden — re-enable when resuming this feature) -->
@@ -3374,16 +3387,17 @@ function renderLoop(ts) {
         // hits each faulty preset once. Persisted to disk so subsequent
         // launches skip it without ever entering this catch.
         console.log(`[IKANDY] Render-time crash on preset "${allNames[badIdx]}" — marking broken (${window._brokenPresets.size} total)`);
-        window.IKANDY?.addBrokenPreset?.(allNames[badIdx]);
+        window.IKANDY?.addBrokenPreset?.({ name: allNames[badIdx], reason: 'crash' });
         // Jump to the next non-broken preset on the next tick
         setTimeout(() => {
           for (let i = 1; i < allPresets.length; i++) {
             const next = (badIdx + i) % allPresets.length;
-            if (!window._brokenPresets.has(next)) { loadPreset(next, 0); break; }
+            if (!_isBrokenOrSilent(next)) { loadPreset(next, 0); break; }
           }
         }, 0);
       }
     }
+    _checkSilentSchedule();
   }
   // Feed audio to fx + drive grain/vignette
   if (analyserNode) {
@@ -5632,6 +5646,91 @@ async function loadAllPresetPacks() {
 
 // Tracks presets whose EEL/expression code crashes butterchurn 2.6.7 — we skip these
 window._brokenPresets = new Set();
+// Tracks presets confirmed silent (≥95% near-black across 3 samples at 1s/2s/3s)
+window._silentPresets = new Set();
+// State for the multi-sample silent detection pass on the current preset
+let _silentSchedule = null;
+let _silentSampleCanvas = null, _silentSampleCtx = null;
+// Shuffle bag for auto-cycle — guarantees full coverage before repeating
+let _presetBag = [];
+// Reactivity scan state
+let _reactivityData = {};
+let _hideNonReactive = false;
+let _reactivityScanRunning = false, _reactivityScanCancelled = false;
+const REACTIVITY_THRESHOLD = 0.25;
+
+function _isBrokenOrSilent(idx) {
+  return window._brokenPresets.has(idx) || window._silentPresets.has(idx);
+}
+function _isNonReactive(idx) {
+  if (!_hideNonReactive || !allNames[idx]) return false;
+  const s = _reactivityData[allNames[idx]];
+  return s !== undefined && s < REACTIVITY_THRESHOLD;
+}
+function _sampleIsNearBlack() {
+  if (!vizCanvas) return false;
+  try {
+    if (!_silentSampleCanvas) {
+      _silentSampleCanvas = document.createElement('canvas');
+      _silentSampleCanvas.width = _silentSampleCanvas.height = 8;
+      _silentSampleCtx = _silentSampleCanvas.getContext('2d');
+    }
+    _silentSampleCtx.drawImage(vizCanvas, 0, 0, 8, 8);
+    const px = _silentSampleCtx.getImageData(0, 0, 8, 8).data;
+    let dark = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      if (px[i] + px[i+1] + px[i+2] < 10) dark++;
+    }
+    return dark / 64 >= 0.95;
+  } catch(e) { return false; }
+}
+function _checkSilentSchedule() {
+  if (!_silentSchedule) return;
+  const sch = _silentSchedule;
+  // Cancel if preset changed or marked broken (render crashed on same preset)
+  if (sch.presetIdx !== currentIdx || window._brokenPresets.has(sch.presetIdx)) {
+    _silentSchedule = null; return;
+  }
+  if (performance.now() < sch.startTime + sch.times[sch.nextIdx]) return;
+  if (!_sampleIsNearBlack()) { _silentSchedule = null; return; }
+  sch.nextIdx++;
+  if (sch.nextIdx < sch.times.length) return; // wait for next sample time
+  // All three samples were ≥95% near-black — preset is silent
+  _silentSchedule = null;
+  const idx = sch.presetIdx;
+  if (window._silentPresets.has(idx)) return;
+  window._silentPresets.add(idx);
+  _presetBag = _presetBag.filter(i => i !== idx);
+  console.log(`[IKANDY] Silent preset detected: "${allNames[idx]}" — auto-skipping in future`);
+  window.IKANDY?.addBrokenPreset?.({ name: allNames[idx], reason: 'silent' });
+  setTimeout(() => {
+    for (let i = 1; i < allPresets.length; i++) {
+      const next = (idx + i) % allPresets.length;
+      if (!_isBrokenOrSilent(next)) { loadPreset(next, 0); break; }
+    }
+  }, 0);
+}
+function _refillBag() {
+  if (!allPresets.length) return;
+  const avail = [];
+  for (let i = 0; i < allPresets.length; i++) {
+    if (!_isBrokenOrSilent(i) && !_isNonReactive(i)) avail.push(i);
+  }
+  for (let i = avail.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [avail[i], avail[j]] = [avail[j], avail[i]];
+  }
+  _presetBag = avail;
+  if (_presetBag.length) console.log(`[IKANDY] Preset bag reshuffled, ${_presetBag.length} presets queued`);
+}
+function _nextBagPreset(manual = true) {
+  if (!_presetBag.length) _refillBag();
+  while (_presetBag.length) {
+    const idx = _presetBag.pop();
+    if (!_isBrokenOrSilent(idx) && !_isNonReactive(idx)) { loadPreset(idx, getBlend(), manual); return; }
+  }
+  randPreset(manual);
+}
 
 function loadPresets() {
   const packs = butterchurnPresets.default || butterchurnPresets;
@@ -5645,38 +5744,44 @@ function loadPresets() {
   el('pp-count').textContent = allNames.length + ' presets';
   el('pc-count').textContent = allNames.length;
 
-  // Hydrate the broken-preset set from disk so we don't replay yesterday's crashes.
+  // Hydrate broken + silent sets from disk so we don't replay yesterday's bad presets.
   // Translate persisted names → indices in the current allNames order.
   if (window.IKANDY && typeof window.IKANDY.loadBrokenPresets === 'function') {
-    window.IKANDY.loadBrokenPresets().then(names => {
-      if (!Array.isArray(names) || !names.length) return;
+    window.IKANDY.loadBrokenPresets().then(entries => {
+      if (!Array.isArray(entries) || !entries.length) return;
       const lookup = new Map(allNames.map((n, i) => [n, i]));
-      let hits = 0;
-      for (const n of names) {
-        const idx = lookup.get(n);
-        if (idx != null) { window._brokenPresets.add(idx); hits++; }
+      let crashHits = 0, silentHits = 0;
+      for (const e of entries) {
+        const name   = typeof e === 'string' ? e : e?.name;
+        const reason = typeof e === 'string' ? 'crash' : (e?.reason || 'crash');
+        const idx = lookup.get(name);
+        if (idx == null) continue;
+        if (reason === 'silent') { window._silentPresets.add(idx); silentHits++; }
+        else { window._brokenPresets.add(idx); crashHits++; }
       }
-      if (hits) console.log(`[IKANDY] Loaded ${hits} previously broken preset(s) from disk`);
+      if (crashHits || silentHits)
+        console.log(`[IKANDY] Loaded ${crashHits} broken + ${silentHits} silent preset(s) from disk`);
+      _refillBag();
     }).catch(e => console.warn('[IKANDY] loadBrokenPresets:', e));
   }
 
-  // Try random presets until one loads cleanly (skip broken ones)
+  // Try random presets until one loads cleanly (skip broken/silent ones)
   for (let tries = 0; tries < 20; tries++) {
     const idx = Math.floor(Math.random() * allPresets.length);
-    if (window._brokenPresets.has(idx)) continue;
+    if (_isBrokenOrSilent(idx)) continue;
     if (loadPreset(idx, 0)) break;
   }
+  _refillBag();
 }
 
 function loadPreset(idx, blend, manual = false) {
   if (!allPresets.length || !visualizer) return false;
   const tryIdx = ((idx % allPresets.length) + allPresets.length) % allPresets.length;
-  // Skip presets we've already seen crash
-  if (window._brokenPresets.has(tryIdx)) {
-    // Try the next non-broken preset
+  // Skip presets we've already seen crash or confirmed silent
+  if (_isBrokenOrSilent(tryIdx)) {
     for (let i = 1; i < allPresets.length; i++) {
       const next = (tryIdx + i) % allPresets.length;
-      if (!window._brokenPresets.has(next)) return loadPreset(next, blend, manual);
+      if (!_isBrokenOrSilent(next)) return loadPreset(next, blend, manual);
     }
     return false;
   }
@@ -5687,14 +5792,16 @@ function loadPreset(idx, blend, manual = false) {
     window._brokenPresets.add(tryIdx);
     console.warn(`[IKANDY] Broken preset (skipping): ${allNames[tryIdx]}`,
       `— ${window._brokenPresets.size} broken so far`);
-    window.IKANDY?.addBrokenPreset?.(allNames[tryIdx]);
-    // Recurse to the next preset
+    window.IKANDY?.addBrokenPreset?.({ name: allNames[tryIdx], reason: 'crash' });
     if (window._brokenPresets.size < allPresets.length) {
       return loadPreset(tryIdx + 1, blend, manual);
     }
     return false;
   }
   currentIdx = tryIdx;
+  // Schedule 3 silence-detection samples at 1s, 2s, 3s after load.
+  // All three must be ≥95% near-black to mark the preset silent.
+  _silentSchedule = { presetIdx: tryIdx, times: [1000, 2000, 3000], nextIdx: 0, startTime: performance.now() };
   const name = getLabel(allNames[currentIdx]);
   const pname = el('pname-sb');
   if (pname) pname.textContent = name;
@@ -5795,9 +5902,142 @@ function startCycle() {
   clearTimeout(cycleTimer);
   const secs = +(el('cycle-s')?.value) || 20;
   cycleTimer = setTimeout(() => {
-    randPreset(false);
+    _nextBagPreset(false);
     startCycle();
   }, secs * 1000);
+}
+
+/* ── REACTIVITY SCAN ── */
+async function onReactivityToggle(checked) {
+  if (!checked) {
+    _hideNonReactive = false;
+    cancelReactivityScan();
+    _refillBag();
+    localStorage.setItem('IKANDY-reactivity-hide', '0');
+    return;
+  }
+  _hideNonReactive = true;
+  localStorage.setItem('IKANDY-reactivity-hide', '1');
+  // Try loading cached results from disk first
+  if (window.IKANDY?.loadPresetReactivity) {
+    try {
+      const saved = await window.IKANDY.loadPresetReactivity();
+      if (saved && typeof saved === 'object' && Object.keys(saved).length > 0) {
+        _reactivityData = saved;
+        _refillBag();
+        return;
+      }
+    } catch(e) {}
+  }
+  // No cached data — run scan
+  const progressEl = document.getElementById('reactivity-progress');
+  if (progressEl) progressEl.style.display = '';
+  runReactivityScan();
+}
+
+function cancelReactivityScan() {
+  if (_reactivityScanRunning) _reactivityScanCancelled = true;
+  _hideNonReactive = false;
+  const chk = document.getElementById('reactivity-chk');
+  if (chk) chk.checked = false;
+  const progressEl = document.getElementById('reactivity-progress');
+  if (progressEl) progressEl.style.display = 'none';
+  localStorage.setItem('IKANDY-reactivity-hide', '0');
+}
+
+async function runReactivityScan() {
+  if (_reactivityScanRunning) return;
+  _reactivityScanRunning = true;
+  _reactivityScanCancelled = false;
+
+  const total = allPresets.length;
+  const results = {};
+
+  const testCanvas = document.createElement('canvas');
+  testCanvas.width = testCanvas.height = 64;
+  const sampleCanvas = document.createElement('canvas');
+  sampleCanvas.width = sampleCanvas.height = 8;
+  const sampleCtx = sampleCanvas.getContext('2d');
+
+  // Real AudioContext + oscillator so butterchurn gets genuine FFT bass data
+  const testAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = testAudioCtx.createOscillator();
+  osc.frequency.value = 80;
+  const gainNode = testAudioCtx.createGain();
+  gainNode.gain.value = 0;
+  const testAnalyser = testAudioCtx.createAnalyser();
+  testAnalyser.fftSize = 2048;
+  osc.connect(gainNode);
+  gainNode.connect(testAnalyser);
+  osc.start();
+
+  await waitForButterchurn();
+  const bc = butterchurn.default || butterchurn;
+  const testViz = bc.createVisualizer(testAudioCtx, testCanvas, { width: 64, height: 64, pixelRatio: 1 });
+  testViz.connectAudio(testAnalyser);
+
+  function sampleBrightness() {
+    try {
+      sampleCtx.drawImage(testCanvas, 0, 0, 8, 8);
+      const px = sampleCtx.getImageData(0, 0, 8, 8).data;
+      let sum = 0;
+      for (let i = 0; i < px.length; i += 4) sum += (px[i] + px[i+1] + px[i+2]) / 3;
+      return sum / 64;
+    } catch(e) { return 0; }
+  }
+
+  function renderFrames(n) {
+    return new Promise(resolve => {
+      let f = 0;
+      function frame() {
+        try { testViz.render(); } catch(e) {}
+        if (++f < n) requestAnimationFrame(frame); else resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  for (let i = 0; i < total; i++) {
+    if (_reactivityScanCancelled) break;
+    const name = allNames[i];
+    const statusEl = document.getElementById('reactivity-status');
+    const barEl    = document.getElementById('reactivity-bar');
+    if (statusEl) statusEl.textContent = `Analyzing presets… ${i + 1}/${total}`;
+    if (barEl) barEl.style.width = Math.round(i / total * 100) + '%';
+    try { testViz.loadPreset(allPresets[i], 0); } catch(e) { results[name] = 0; continue; }
+    gainNode.gain.value = 0;
+    await renderFrames(10); // settle with silence
+    const bQuiet = sampleBrightness();
+    gainNode.gain.value = 3.0;
+    await renderFrames(20); // measure with loud bass
+    const bLoud = sampleBrightness();
+    const maxB = Math.max(bQuiet, bLoud, 1);
+    results[name] = Math.round(Math.abs(bLoud - bQuiet) / maxB * 100) / 100;
+    await new Promise(r => setTimeout(r, 0)); // yield to UI
+  }
+
+  osc.stop();
+  testAudioCtx.close().catch(() => {});
+
+  if (!_reactivityScanCancelled) {
+    _reactivityData = results;
+    if (window.IKANDY?.savePresetReactivity) {
+      window.IKANDY.savePresetReactivity(results).catch(e => console.warn('[IKANDY] savePresetReactivity:', e));
+    }
+    _refillBag();
+    const barEl    = document.getElementById('reactivity-bar');
+    const statusEl = document.getElementById('reactivity-status');
+    if (barEl) barEl.style.width = '100%';
+    if (statusEl) {
+      const reactive = Object.values(results).filter(s => s >= REACTIVITY_THRESHOLD).length;
+      statusEl.textContent = `Done — ${reactive}/${total} reactive presets found`;
+    }
+    setTimeout(() => {
+      const progressEl = document.getElementById('reactivity-progress');
+      if (progressEl) progressEl.style.display = 'none';
+    }, 4000);
+  }
+  _reactivityScanRunning = false;
 }
 
 /* ── PRESET PANEL ── */
@@ -10624,6 +10864,21 @@ async function bootApp() {
   await loadAllPresetPacks();
   lp(82);
   loadPresets(); lp(85);
+
+  // Restore reactivity-hide preference and load cached scores
+  if (localStorage.getItem('IKANDY-reactivity-hide') === '1') {
+    _hideNonReactive = true;
+    const chk = document.getElementById('reactivity-chk');
+    if (chk) chk.checked = true;
+    if (window.IKANDY?.loadPresetReactivity) {
+      window.IKANDY.loadPresetReactivity().then(saved => {
+        if (saved && typeof saved === 'object' && Object.keys(saved).length > 0) {
+          _reactivityData = saved;
+          _refillBag();
+        }
+      }).catch(() => {});
+    }
+  }
 
   // Restore saved custom preset folder if any
   if (window.IKANDY.getPresetFolder) {
