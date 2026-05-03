@@ -2058,6 +2058,10 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
         <input type="checkbox" id="reactivity-chk" onchange="onReactivityToggle(this.checked)" style="accent-color:var(--sp);">
         Hide non-reactive presets
       </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--dim);margin-top:6px;">
+        <input type="checkbox" id="image-presets-chk" onchange="toggleImagePresets(this.checked)" style="accent-color:var(--sp);">
+        Include image-texture presets
+      </label>
       <div id="reactivity-progress" style="display:none;margin-top:8px;">
         <div id="reactivity-status" style="font-size:11px;color:var(--dim);margin-bottom:4px;">Analyzing presets…</div>
         <div style="height:3px;background:var(--bdr);border-radius:2px;overflow:hidden;">
@@ -5602,14 +5606,15 @@ async function loadAllPresetPacks() {
   const baseCount = Object.keys(merged).length;
   console.log(`[IKANDY] Base pack: ${baseCount} presets`);
 
-  // Extra packs from butterchurn-presets@3.0.0-beta.4 — compatible with butterchurn@3.0.0-beta.5 engine.
-  const extraPacks = [
-    { url: 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/extra.min.js',      global: 'extra' },
-    { url: 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/md1.min.js',        global: 'md1' },
-    { url: 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/nonMinimal.min.js', global: 'nonMinimal' },
+  // Procedural packs — loaded into the shared merged map.
+  // md1 removed (oldest/lowest-rated). nonMinimal skipped (= base+extra+md1 combined, adds 0).
+  // extra2 from @2.4.7 tested for net-new contribution; if <20 presets it's logged but kept.
+  const proceduralPacks = [
+    { url: 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/extra.min.js',                  global: 'extra' },
+    { url: 'https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresetsExtra2.min.js',        global: 'butterchurnPresetsExtra2' },
   ];
 
-  for (const pack of extraPacks) {
+  for (const pack of proceduralPacks) {
     try {
       await new Promise((resolve) => {
         const s = document.createElement('script');
@@ -5627,6 +5632,7 @@ async function loadAllPresetPacks() {
         Object.assign(merged, newPresets);
         const added = Object.keys(merged).filter(k => !beforeKeys.has(k)).length;
         console.log(`[IKANDY] ${pack.url.split('/').pop()}: +${added} new presets (window.${pack.global})`);
+        if (added < 20) console.log(`[IKANDY] Note: ${pack.url.split('/').pop()} added <20 net-new presets — likely absorbed by base/extra`);
       } else {
         console.warn(`[IKANDY] ${pack.url.split('/').pop()}: loaded but no presets found`);
       }
@@ -5635,14 +5641,49 @@ async function loadAllPresetPacks() {
     }
   }
 
-  // Replace the global with the merged map so all existing code works unchanged.
-  const finalCount = Object.keys(merged).length;
+  // Replace the global with the procedural-only merged map.
+  const proceduralCount = Object.keys(merged).length;
   window.butterchurnPresets = {
     getPresets: () => merged,
     default: { getPresets: () => merged },
   };
-  console.log(`[IKANDY] Total preset library: ${finalCount} presets (added ${finalCount - baseCount})`);
+
+  // Image-texture pack — loaded separately, NOT merged into butterchurnPresets.
+  // Stored in _imagePack; merged into the active preset pool only when the toggle is on.
+  _imagePack = {};
+  try {
+    await new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/image.min.js';
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      s.onload  = finish;
+      s.onerror = () => { console.warn('[IKANDY] image.min.js failed to load'); finish(); };
+      setTimeout(finish, 15000);
+      document.head.appendChild(s);
+    });
+    const imagePresets = extractPresets(window.image);
+    if (imagePresets) {
+      _imagePack = imagePresets;
+      console.log(`[IKANDY] Image-texture pack: ${Object.keys(_imagePack).length} presets (not in default rotation)`);
+    } else {
+      console.warn('[IKANDY] image.min.js loaded but no presets found');
+    }
+  } catch (e) {
+    console.warn('[IKANDY] Failed to load image pack:', e);
+  }
+
+  // Load imageData (textures) at boot if the image-preset toggle is already on
+  if (_imagePresetsEnabled) await _loadImageData();
+
+  const imageCount = Object.keys(_imagePack).length;
+  console.log(`[IKANDY] Library: ${proceduralCount} procedural + ${imageCount} image-texture presets`);
 }
+
+// Image-texture preset pack (loaded from image.min.js, separate from default rotation)
+let _imagePack = {};
+let _imagePresetsEnabled = localStorage.getItem('IKANDY-image-presets') === '1';
+let _imageDataLoaded = false;
 
 // Tracks presets whose EEL/expression code crashes butterchurn 2.6.7 — we skip these
 window._brokenPresets = new Set();
@@ -5735,12 +5776,16 @@ function _nextBagPreset(manual = true) {
 function loadPresets() {
   const packs = butterchurnPresets.default || butterchurnPresets;
   const rawMap = typeof packs.getPresets === 'function' ? packs.getPresets() : packs;
-  allNames = Object.keys(rawMap).sort((a, b) => {
+  // Merge image presets on top if toggle is on — rawMap wins on name collision
+  const activeMap = (_imagePresetsEnabled && Object.keys(_imagePack).length)
+    ? Object.assign({}, _imagePack, rawMap)
+    : rawMap;
+  allNames = Object.keys(activeMap).sort((a, b) => {
     const la = getLabel(a).toLowerCase();
     const lb = getLabel(b).toLowerCase();
     return la < lb ? -1 : la > lb ? 1 : 0;
   });
-  allPresets = allNames.map(n => rawMap[n]);
+  allPresets = allNames.map(n => activeMap[n]);
   el('pp-count').textContent = allNames.length + ' presets';
   el('pc-count').textContent = allNames.length;
 
@@ -5905,6 +5950,70 @@ function startCycle() {
     _nextBagPreset(false);
     startCycle();
   }, secs * 1000);
+}
+
+/* ── IMAGE PRESETS ── */
+async function _loadImageData() {
+  if (_imageDataLoaded) return;
+  return new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/butterchurn-presets@3.0.0-beta.4/dist/imageData.min.js';
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    s.onload = () => {
+      _imageDataLoaded = true;
+      // Attempt to register textures with the active visualizer instance.
+      // butterchurn 3.x exposes loadExtraImages() on the visualizer for exactly this use-case.
+      try {
+        if (visualizer && typeof visualizer.loadExtraImages === 'function' && window.imageData) {
+          visualizer.loadExtraImages(window.imageData);
+          console.log('[IKANDY] Image textures registered with visualizer (loadExtraImages)');
+        } else if (window.imageData) {
+          console.log('[IKANDY] Image textures loaded (window.imageData set; loadExtraImages not available in this build)');
+        } else {
+          console.warn('[IKANDY] imageData.min.js loaded but window.imageData not populated');
+        }
+      } catch(e) {
+        console.warn('[IKANDY] Image texture registration error:', e.message);
+      }
+      finish();
+    };
+    s.onerror = () => { console.warn('[IKANDY] imageData.min.js failed to load — image presets may render black'); finish(); };
+    setTimeout(finish, 15000);
+    document.head.appendChild(s);
+  });
+}
+
+async function toggleImagePresets(enabled) {
+  _imagePresetsEnabled = enabled;
+  localStorage.setItem('IKANDY-image-presets', enabled ? '1' : '0');
+
+  if (enabled && !_imageDataLoaded) await _loadImageData();
+
+  // Rebuild the active preset pool (preserving the current preset by name)
+  const currentName = (currentIdx != null && allNames[currentIdx]) ? allNames[currentIdx] : null;
+  const packs = butterchurnPresets.default || butterchurnPresets;
+  const rawMap = typeof packs.getPresets === 'function' ? packs.getPresets() : packs;
+  const activeMap = (enabled && Object.keys(_imagePack).length)
+    ? Object.assign({}, _imagePack, rawMap)
+    : rawMap;
+  allNames = Object.keys(activeMap).sort((a, b) => {
+    const la = getLabel(a).toLowerCase();
+    const lb = getLabel(b).toLowerCase();
+    return la < lb ? -1 : la > lb ? 1 : 0;
+  });
+  allPresets = allNames.map(n => activeMap[n]);
+  el('pp-count').textContent = allNames.length + ' presets';
+  el('pc-count').textContent = allNames.length;
+
+  // Re-map currentIdx by name so the active preset doesn't change
+  if (currentName) {
+    const newIdx = allNames.indexOf(currentName);
+    if (newIdx >= 0) currentIdx = newIdx;
+  }
+
+  _refillBag();
+  console.log(`[IKANDY] Image presets ${enabled ? 'en' : 'dis'}abled — pool now ${allNames.length} presets`);
 }
 
 /* ── REACTIVITY SCAN ── */
@@ -10864,6 +10973,12 @@ async function bootApp() {
   await loadAllPresetPacks();
   lp(82);
   loadPresets(); lp(85);
+
+  // Sync image-preset toggle checkbox (state already in _imagePresetsEnabled from localStorage)
+  if (_imagePresetsEnabled) {
+    const imgChk = document.getElementById('image-presets-chk');
+    if (imgChk) imgChk.checked = true;
+  }
 
   // Restore reactivity-hide preference and load cached scores
   if (localStorage.getItem('IKANDY-reactivity-hide') === '1') {

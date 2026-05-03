@@ -13,7 +13,7 @@
  */
 
 const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut, screen } = require('electron');
-console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-02 r10');
+console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-02 r11');
 
 // Enable Windows Graphics Capture API for proper hardware-accelerated capture.
 // Without these flags, Electron uses BitBlt which silently returns black frames

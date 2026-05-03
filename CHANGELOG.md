@@ -5,6 +5,16 @@ All notable changes to IKANDY are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] - 2026-05-02
+
+### Added
+- **Image-texture preset category** — butterchurn's image-texture pack (~150 presets using "cells" and "seaweed" textures) is now loaded at startup but kept out of the default rotation. A new "Include image-texture presets" checkbox in the Scenes accordion (same row as "Hide non-reactive presets") merges them into the active pool when enabled. Textures are lazy-loaded via `imageData.min.js` on first enable. If `loadExtraImages()` is available on the butterchurn instance it is called immediately; otherwise `window.imageData` is set for butterchurn to pick up at preset-load time. Silent detection handles any presets that render black due to missing texture support.
+
+### Changed
+- **Preset library trimmed** — `md1.min.js` removed from the load chain (−57 presets, oldest/lowest-rated). `nonMinimal.min.js` also removed (it is the union of base+extra+md1 minus minimal and contributed 0 net presets).
+- **extra2 added** — `butterchurnPresetsExtra2.min.js` from butterchurn-presets@2.4.7 added to the procedural load chain. Net-new count logged on first launch; if <20 it is flagged in the console.
+- **Library log updated** — boot now prints `[IKANDY] Library: N procedural + M image-texture presets` (visible in BUG panel).
+
 ## [1.0.10] - 2026-05-02
 
 ### Added
