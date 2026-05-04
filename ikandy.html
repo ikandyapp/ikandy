@@ -11000,6 +11000,7 @@ vec3 rainbow(float t){
 }
 
 void main(){
+  if(v_height<0.15) discard;
   vec3 N=normalize(v_normal);
   vec3 L=normalize(vec3(0.,1.,.1));
   vec3 V=normalize(uCamPos-v_worldPos);
