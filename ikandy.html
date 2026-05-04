@@ -1897,6 +1897,16 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
 .cs-src-btn:hover { color: rgba(255,255,255,.85); border-color: rgba(255,255,255,.28); }
 .cs-src-btn.active { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 50%, transparent); background: var(--acc-dim); }
 .cs-sep { height: 1px; background: rgba(255,255,255,.07); margin: 10px 0; }
+.cs-disconnect-notice {
+  display: none; margin-bottom: 12px; padding: 9px 12px;
+  background: rgba(224,80,80,.08); border-left: 2px solid rgba(224,80,80,.45);
+  font-size: 11px; line-height: 1.55; color: rgba(255,255,255,.65);
+}
+.cs-disconnect-notice .cs-dn-label {
+  display: block; font-size: 8.5px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: #ff6b6b; margin-bottom: 5px;
+}
 .cs-about { font-size: 11px; color: rgba(255,255,255,.45); line-height: 1.7; }
 .cs-about strong { color: rgba(255,255,255,.7); }
 .cs-about-list { display: flex; flex-direction: column; gap: 3px; margin: 6px 0 4px; }
@@ -2770,6 +2780,10 @@ body.source-picker-open #sp-overlay { display: block; }
     <!-- SOURCE -->
     <div class="cs-pane active" id="csp-source">
       <div class="cs-h">Audio Source</div>
+      <div id="cs-disconnect-notice" class="cs-disconnect-notice">
+        <span class="cs-dn-label">Disconnected</span>
+        Looks like the music stopped. Your source app may have closed, paused for a while, or handed off to another device. Press play in your music app, then pick a source below to reconnect.
+      </div>
       <div class="cs-src-grid">
         <button class="cs-src-btn" data-src="spotify"  onclick="csPickSource('spotify')">Spotify Premium</button>
         <button class="cs-src-btn" data-src="foobar"   onclick="csPickSource('foobar')">foobar2000</button>
@@ -5381,6 +5395,7 @@ async function _audioAutoReconnect(logMsg) {
         console.warn('[IKANDY] Auto-reconnect circuit breaker tripped — manual Reconnect required');
         toast('Audio not detected — click 🎤 Reconnect');
         updateBadge(false, 'Auto-reconnect stopped');
+        openConsoleSettings({ reason: 'disconnect' });
       }
     }
     // Hold 4s after all attempts before re-arming — gives the new stream time to
@@ -9489,9 +9504,19 @@ function toggleConsoleSettings() {
   else openConsoleSettings();
 }
 
-function openConsoleSettings() {
+function openConsoleSettings(opts) {
   const modal = el('cs-modal');
   if (!modal) return;
+  const isDisconnect = opts?.reason === 'disconnect';
+  const notice = el('cs-disconnect-notice');
+  if (notice) notice.style.display = isDisconnect ? 'block' : 'none';
+  if (isDisconnect) {
+    const gear = el('c-gear-btn');
+    if (gear) gear.classList.remove('gear-err');
+    // Modal already open — notice is now visible; don't disturb the active tab
+    if (modal.classList.contains('open')) return;
+    csShowTab('source');
+  }
   closeAllPanels();
   csOnOpen();
   modal.classList.add('open');
