@@ -117,10 +117,16 @@ html, body {
   z-index: 9; pointer-events: none; opacity: 0; transition: opacity .6s;
   mix-blend-mode: screen;
 }
+/* FERROFLUID — metallic displaced plane, audio-reactive magnetic spikes */
+#ferrofluid-canvas {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: 10; pointer-events: none; opacity: 0; transition: opacity .6s;
+  mix-blend-mode: screen;
+}
 /* PULSE — image-sourced light glow layer */
 #pulse-canvas {
   position: fixed; inset: 0; width: 100%; height: 100%;
-  z-index: 10; pointer-events: none; opacity: 0; transition: opacity .4s;
+  z-index: 11; pointer-events: none; opacity: 0; transition: opacity .4s;
   mix-blend-mode: screen;
 }
 #viz { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
@@ -2151,6 +2157,7 @@ body.source-picker-open #sp-overlay { display: block; }
 <canvas id="fire-canvas"></canvas>
 <canvas id="singularity-canvas"></canvas>
 <canvas id="voyager-canvas"></canvas>
+<canvas id="ferrofluid-canvas"></canvas>
 <canvas id="pulse-canvas"></canvas>
 
 <input type="file" id="bg-file-input" accept="image/*" style="display:none" onchange="onBgFileChange(this)">
@@ -2616,6 +2623,7 @@ body.source-picker-open #sp-overlay { display: block; }
       <button class="vibe-btn" id="scene-pawrticles" onclick="selectScene('pawrticles')">Starfield</button>
       <button class="vibe-btn" id="scene-singularity" onclick="selectScene('singularity')">Singularity</button>
       <button class="vibe-btn" id="scene-voyager"     onclick="selectScene('voyager')">Voyager</button>
+      <button class="vibe-btn" id="scene-ferrofluid"  onclick="selectScene('ferrofluid')">Ferrofluid</button>
     </div>
     <span class="lbl">Intensity</span>
     <div class="svr">
@@ -3064,6 +3072,7 @@ body.source-picker-open #sp-overlay { display: block; }
   <button class="c-scene-btn" data-scene="pawrticles"  onclick="vcSelectScene('pawrticles')">Starfield</button>
   <button class="c-scene-btn" data-scene="singularity" onclick="vcSelectScene('singularity')">Singularity</button>
   <button class="c-scene-btn" data-scene="voyager"     onclick="vcSelectScene('voyager')">Voyager</button>
+  <button class="c-scene-btn" data-scene="ferrofluid" onclick="vcSelectScene('ferrofluid')">Ferrofluid</button>
   <div class="c-scene-pop-sep"></div>
   <div class="c-scene-pop-intensity">
     <span>Intensity</span>
@@ -10861,6 +10870,348 @@ function stopVoyagerLoop() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   FERROFLUID — metallic displaced plane, audio-reactive magnetic spikes
+   Simplex noise vertex displacement. Heat-map: deep indigo → purple →
+   blood red → hot orange → gold at spike tips.
+   Auto-orbit camera; mouse drag overrides, returns to orbit after 5s.
+   Mouse repel active by default. Raw WebGL2, no Three.js.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const FERRO_GRID = 256; // increase to 400 for high-end GPU, 128 for integrated
+
+const ferrofluidCanvas = document.getElementById('ferrofluid-canvas');
+const ferroGl = ferrofluidCanvas ? ferrofluidCanvas.getContext('webgl2') : null;
+let _ferroRAF  = null;
+let _ferroTime = 0;
+
+// Camera — spherical coordinates, auto-orbit
+let _ferroAzimuth = 0.8;
+const _ferroPolar  = 0.48;  // ~27° from zenith, fixed elevation
+const _ferroRadius = 32.0;
+
+// Mouse state
+let _ferroDragActive    = false;
+let _ferroLastInputTime = 0;
+let _ferroDragStartAz   = 0;
+let _ferroDragStartX    = 0;
+let _ferroMouseWX       = 9999;
+let _ferroMouseWZ       = 9999;
+let _ferroHoverActive   = false;
+let _ferroEventsAdded   = false;
+
+// Audio — 128 smoothed bins, lazy raw buffer
+const _ferroSmoothed = new Uint8Array(128);
+let   _ferroRawBuf   = null;
+
+// ── Vertex shader ─────────────────────────────────────────────────────────────
+const FERRO_VERT = `#version 300 es
+precision highp float;
+in vec3 a_pos;
+in vec2 a_uv;
+uniform float uTime;
+uniform float uForce;
+uniform float uDensity;
+uniform float uSharpness;
+uniform float uScale;
+uniform vec2  uMousePos;
+uniform float uHoverActive;
+uniform sampler2D uAudioData;
+uniform mat4  uMVP;
+out float v_height;
+out vec3  v_normal;
+out vec3  v_worldPos;
+
+vec3 _m3(vec3 x){return x-floor(x*(1./289.))*289.;}
+vec4 _m4(vec4 x){return x-floor(x*(1./289.))*289.;}
+vec4 _pe(vec4 x){return _m4(((x*34.)+1.)*x);}
+vec4 _ti(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1./6.,1./3.);const vec4 D=vec4(0.,.5,1.,2.);
+  vec3 i=floor(v+dot(v,C.yyy));vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz);vec3 l=1.-g;
+  vec3 i1=min(g.xyz,l.zxy);vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx;vec3 x2=x0-i2+2.*C.xxx;vec3 x3=x0-1.+3.*C.xxx;
+  i=_m3(i);
+  vec4 p=_pe(_pe(_pe(i.z+vec4(0.,i1.z,i2.z,1.))+i.y+vec4(0.,i1.y,i2.y,1.))+i.x+vec4(0.,i1.x,i2.x,1.));
+  float n_=1./7.;vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.*floor(p*ns.z*ns.z);vec4 x_=floor(j*ns.z);vec4 y_=floor(j-7.*x_);
+  vec4 x=x_*ns.x+ns.yyyy;vec4 y=y_*ns.x+ns.yyyy;vec4 h=1.-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy);vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.+1.;vec4 s1=floor(b1)*2.+1.;vec4 sh=-step(h,vec4(0.));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy;vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x);vec3 p1=vec3(a0.zw,h.y);vec3 p2=vec3(a1.xy,h.z);vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=_ti(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.);m=m*m;
+  return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}
+
+float getMask(vec2 uv){
+  vec2 s=(uv-.5)*(1./uScale)+.5;
+  return smoothstep(.52,.32,length(s-.5));
+}
+float getH(vec3 p,vec2 uv){
+  float mask=getMask(uv);
+  float mf=1.;
+  if(uHoverActive>.5){float d=distance(p.xz,uMousePos);mf=smoothstep(0.,4.,d);}
+  float nd=clamp(length(p.xz)/12.,0.,1.);
+  float freq=texture(uAudioData,vec2(nd,.5)).r;
+  float n=snoise(vec3(p.x*uDensity,p.z*uDensity,uTime));
+  float spikes=pow(abs(n),uSharpness);
+  return spikes*uForce*mask*mf*freq;
+}
+
+void main(){
+  vec3 p=a_pos;float h=getH(p,a_uv);p.y+=h;
+  float eps=.05;
+  vec3 pX=a_pos+vec3(eps,0.,0.);pX.y+=getH(pX,a_uv+vec2(eps/24.,0.));
+  vec3 pZ=a_pos+vec3(0.,0.,eps);pZ.y+=getH(pZ,a_uv+vec2(0.,eps/24.));
+  v_normal=normalize(cross(normalize(pZ-p),normalize(pX-p)));
+  v_height=h;v_worldPos=p;
+  gl_Position=uMVP*vec4(p,1.);
+}`;
+
+// ── Fragment shader ───────────────────────────────────────────────────────────
+const FERRO_FRAG = `#version 300 es
+precision highp float;
+in float v_height;
+in vec3  v_normal;
+in vec3  v_worldPos;
+uniform float uForce;
+uniform vec3  uCamPos;
+out vec4 fragColor;
+
+vec3 heatmap(float t){
+  vec3 c0=vec3(.04,.07,.22),c1=vec3(.18,.04,.40),c2=vec3(.62,.06,.28),
+       c3=vec3(.92,.30,.06),c4=vec3(1.,.80,.35);
+  if(t<.25) return mix(c0,c1,t*4.);
+  if(t<.55) return mix(c1,c2,(t-.25)*3.333);
+  if(t<.80) return mix(c2,c3,(t-.55)*4.);
+            return mix(c3,c4,(t-.80)*5.);
+}
+
+void main(){
+  vec3 N=normalize(v_normal);
+  vec3 L=normalize(vec3(0.,1.,.1));
+  vec3 V=normalize(uCamPos-v_worldPos);
+  vec3 H=normalize(L+V);
+  float diff=max(dot(N,L),0.);
+  float spec=pow(max(dot(N,H),0.),120.)*.8;
+  float hemi=dot(N,vec3(0.,1.,0.))*.5+.5;
+  vec3 ambient=mix(vec3(.03,.03,.06),vec3(.12,.15,.28),hemi);
+  float fresnel=pow(1.-max(dot(N,V),0.),4.);
+  vec3 rim=vec3(.4,.6,1.)*fresnel*.5;
+  float t=clamp(v_height/(uForce*1.1),0.,1.);
+  vec3 col=heatmap(t);
+  fragColor=vec4(col*(diff*.7+ambient)+vec3(spec)+rim,1.);
+}`;
+
+// ── Matrix helpers (column-major, matching GLSL convention) ──────────────────
+function _fSub3(a,b){return[a[0]-b[0],a[1]-b[1],a[2]-b[2]];}
+function _fDot3(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+function _fCross(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+function _fNorm3(v){const l=Math.sqrt(_fDot3(v,v))||1;return[v[0]/l,v[1]/l,v[2]/l];}
+function _fPersp(fovDeg,asp,n,f){
+  const t=1/Math.tan(fovDeg*Math.PI/360),nf=1/(n-f);
+  return new Float32Array([t/asp,0,0,0, 0,t,0,0, 0,0,(f+n)*nf,-1, 0,0,2*f*n*nf,0]);
+}
+function _fLookAt(eye,tgt){
+  const z=_fNorm3(_fSub3(eye,tgt));
+  const x=_fNorm3(_fCross([0,1,0],z));
+  const y=_fCross(z,x);
+  return new Float32Array([
+    x[0],y[0],z[0],0, x[1],y[1],z[1],0, x[2],y[2],z[2],0,
+    -_fDot3(x,eye),-_fDot3(y,eye),-_fDot3(z,eye),1
+  ]);
+}
+function _fMul4(a,b){
+  const r=new Float32Array(16);
+  for(let col=0;col<4;col++) for(let row=0;row<4;row++) for(let k=0;k<4;k++)
+    r[col*4+row]+=a[k*4+row]*b[col*4+k];
+  return r;
+}
+
+// ── Ray-plane unproject (mouse → world XZ at y=0) ────────────────────────────
+function _ferroUnproject(cx,cy,W,H,eye){
+  const z=_fNorm3(_fSub3(eye,[0,0,0]));
+  const x=_fNorm3(_fCross([0,1,0],z));
+  const y=_fCross(z,x);
+  const nx=(cx/W)*2-1, ny=-((cy/H)*2-1);
+  const ht=Math.tan(25*Math.PI/360), asp=W/H;
+  const rd=_fNorm3([nx*asp*ht*x[0]+ny*ht*y[0]-z[0],
+                    nx*asp*ht*x[1]+ny*ht*y[1]-z[1],
+                    nx*asp*ht*x[2]+ny*ht*y[2]-z[2]]);
+  if(Math.abs(rd[1])<1e-6) return null;
+  const t=-eye[1]/rd[1]; if(t<0) return null;
+  return [eye[0]+t*rd[0], eye[2]+t*rd[2]];
+}
+
+// ── WebGL2 resources (initialised once on first start) ───────────────────────
+let _ferroProg     = null;
+let _ferroVAO      = null;
+let _ferroIdxCount = 0;
+let _ferroAudioTex = null;
+let _ferroU        = {};
+
+function _ferroInit(){
+  const gl=ferroGl; if(!gl||_ferroProg) return;
+  function mkShader(type,src){
+    const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){
+      console.error('[IKANDY Ferrofluid] Shader:',gl.getShaderInfoLog(s)); return null;
+    } return s;
+  }
+  const vs=mkShader(gl.VERTEX_SHADER,FERRO_VERT);
+  const fs=mkShader(gl.FRAGMENT_SHADER,FERRO_FRAG);
+  if(!vs||!fs) return;
+  const prog=gl.createProgram();
+  gl.attachShader(prog,vs); gl.attachShader(prog,fs); gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){
+    console.error('[IKANDY Ferrofluid] Link:',gl.getProgramInfoLog(prog)); return;
+  }
+  _ferroProg=prog;
+  ['uTime','uForce','uDensity','uSharpness','uScale','uMousePos',
+   'uHoverActive','uAudioData','uMVP','uCamPos'].forEach(n=>{
+    _ferroU[n]=gl.getUniformLocation(prog,n);
+  });
+
+  // Plane geometry — FERRO_GRID × FERRO_GRID quads, 24×24 world units
+  const N=FERRO_GRID, vc=(N+1)*(N+1);
+  const pos=new Float32Array(vc*3), uvs=new Float32Array(vc*2);
+  const idx=new Uint32Array(N*N*6);
+  let vi=0,ui=0,ii=0;
+  for(let z=0;z<=N;z++) for(let x=0;x<=N;x++){
+    pos[vi++]=(x/N-.5)*24; pos[vi++]=0; pos[vi++]=(z/N-.5)*24;
+    uvs[ui++]=x/N; uvs[ui++]=z/N;
+  }
+  for(let z=0;z<N;z++) for(let x=0;x<N;x++){
+    const tl=z*(N+1)+x,tr=tl+1,bl=tl+(N+1),br=bl+1;
+    idx[ii++]=tl;idx[ii++]=bl;idx[ii++]=tr;
+    idx[ii++]=tr;idx[ii++]=bl;idx[ii++]=br;
+  }
+  _ferroIdxCount=idx.length;
+
+  _ferroVAO=gl.createVertexArray(); gl.bindVertexArray(_ferroVAO);
+  const posL=gl.getAttribLocation(prog,'a_pos');
+  const uvL =gl.getAttribLocation(prog,'a_uv');
+  const pb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,pb);
+  gl.bufferData(gl.ARRAY_BUFFER,pos,gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(posL); gl.vertexAttribPointer(posL,3,gl.FLOAT,false,0,0);
+  const ub=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,ub);
+  gl.bufferData(gl.ARRAY_BUFFER,uvs,gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(uvL); gl.vertexAttribPointer(uvL,2,gl.FLOAT,false,0,0);
+  const ib=gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,idx,gl.STATIC_DRAW);
+  gl.bindVertexArray(null);
+
+  // 128×1 R8 audio texture
+  _ferroAudioTex=gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D,_ferroAudioTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,128,1,0,gl.RED,gl.UNSIGNED_BYTE,_ferroSmoothed);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+}
+
+// ── Mouse handlers (attached on first start, never removed) ──────────────────
+function _ferroDown(e){
+  _ferroDragActive=true; _ferroDragStartAz=_ferroAzimuth;
+  _ferroDragStartX=e.clientX; _ferroLastInputTime=Date.now();
+}
+function _ferroMove(e){
+  _ferroLastInputTime=Date.now(); _ferroHoverActive=true;
+  if(_ferroDragActive) _ferroAzimuth=_ferroDragStartAz+(e.clientX-_ferroDragStartX)*0.005;
+  const W=window.innerWidth,H=window.innerHeight,r=_ferroRadius;
+  const az=_ferroAzimuth,pol=_ferroPolar;
+  const eye=[r*Math.sin(pol)*Math.sin(az),r*Math.cos(pol),r*Math.sin(pol)*Math.cos(az)];
+  const hit=_ferroUnproject(e.clientX,e.clientY,W,H,eye);
+  if(hit){_ferroMouseWX=hit[0];_ferroMouseWZ=hit[1];}
+}
+function _ferroUp(){ _ferroDragActive=false; _ferroLastInputTime=Date.now(); }
+function _ferroLeave(){
+  _ferroDragActive=false; _ferroHoverActive=false;
+  _ferroMouseWX=9999; _ferroMouseWZ=9999;
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function renderFerrofluid(){
+  const gl=ferroGl; if(!gl||!_ferroProg||!_ferroVAO) return;
+  const W=window.innerWidth,H=window.innerHeight;
+  if(ferrofluidCanvas.width!==W||ferrofluidCanvas.height!==H){
+    ferrofluidCanvas.width=W; ferrofluidCanvas.height=H; gl.viewport(0,0,W,H);
+  }
+
+  // Auto-orbit resumes 5s after last mouse activity
+  if(!_ferroDragActive&&Date.now()-_ferroLastInputTime>5000) _ferroAzimuth+=0.003;
+
+  const az=_ferroAzimuth,pol=_ferroPolar,r=_ferroRadius;
+  const eye=[r*Math.sin(pol)*Math.sin(az),r*Math.cos(pol),r*Math.sin(pol)*Math.cos(az)];
+
+  // Update audio texture from shared analyserNode
+  if(analyserNode){
+    if(!_ferroRawBuf||_ferroRawBuf.length!==analyserNode.frequencyBinCount)
+      _ferroRawBuf=new Uint8Array(analyserNode.frequencyBinCount);
+    analyserNode.getByteFrequencyData(_ferroRawBuf);
+    const step=_ferroRawBuf.length/128;
+    for(let i=0;i<128;i++){
+      const v=_ferroRawBuf[Math.floor(i*step)];
+      _ferroSmoothed[i]=v>_ferroSmoothed[i]?v:_ferroSmoothed[i]+(v-_ferroSmoothed[i])*.10;
+    }
+    gl.bindTexture(gl.TEXTURE_2D,_ferroAudioTex);
+    gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,128,1,gl.RED,gl.UNSIGNED_BYTE,_ferroSmoothed);
+  }
+
+  const proj=_fPersp(25,W/H,0.1,500);
+  const view=_fLookAt(eye,[0,0,0]);
+  const mvp=_fMul4(proj,view);
+  const force=_sceneIntensity*15.0;
+
+  gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.useProgram(_ferroProg);
+  const u=_ferroU;
+  gl.uniformMatrix4fv(u.uMVP,false,mvp);
+  gl.uniform3f(u.uCamPos,eye[0],eye[1],eye[2]);
+  gl.uniform1f(u.uTime,_ferroTime);
+  gl.uniform1f(u.uForce,force);
+  gl.uniform1f(u.uDensity,3.0);
+  gl.uniform1f(u.uSharpness,4.15);
+  gl.uniform1f(u.uScale,1.0);
+  gl.uniform2f(u.uMousePos,_ferroMouseWX,_ferroMouseWZ);
+  gl.uniform1f(u.uHoverActive,_ferroHoverActive?1.0:0.0);
+  gl.uniform1i(u.uAudioData,0);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,_ferroAudioTex);
+  gl.bindVertexArray(_ferroVAO);
+  gl.drawElements(gl.TRIANGLES,_ferroIdxCount,gl.UNSIGNED_INT,0);
+  gl.bindVertexArray(null);
+
+  // Time advance — bass subtly speeds up fluid motion
+  _ferroTime+=(_slowMoActive?0.004:0.016)*(0.2+_bassSmoothed*0.3);
+}
+
+function startFerrofluidLoop(){
+  if(_ferroRAF) return;
+  _ferroInit();
+  ferrofluidCanvas.style.pointerEvents='auto';
+  if(!_ferroEventsAdded){
+    ferrofluidCanvas.addEventListener('mousedown', _ferroDown);
+    ferrofluidCanvas.addEventListener('mousemove', _ferroMove);
+    ferrofluidCanvas.addEventListener('mouseup',   _ferroUp);
+    ferrofluidCanvas.addEventListener('mouseleave',_ferroLeave);
+    _ferroEventsAdded=true;
+  }
+  function loop(){renderFerrofluid();_ferroRAF=requestAnimationFrame(loop);}
+  loop();
+}
+function stopFerrofluidLoop(){
+  if(_ferroRAF){cancelAnimationFrame(_ferroRAF);_ferroRAF=null;}
+  _ferroDragActive=false; _ferroHoverActive=false;
+  ferrofluidCanvas.style.pointerEvents='none';
+  const gl=ferroGl; if(gl) gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    PULSE — image-sourced light glow layer
    Reads bright saturated pixels (lights[]) extracted by mood-worker,
    renders each as an audio-reactive radial Gaussian glow on a
@@ -12163,6 +12514,7 @@ function setScene(name) {
     waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
     voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
+    ferrofluidCanvas.style.opacity = '0'; _deferStop(() => stopFerrofluidLoop());
   } else if (name === 'pawrticles') {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
@@ -12173,6 +12525,7 @@ function setScene(name) {
     waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
     voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
+    ferrofluidCanvas.style.opacity = '0'; _deferStop(() => stopFerrofluidLoop());
   } else if (name === 'ripple') {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
@@ -12183,6 +12536,7 @@ function setScene(name) {
     waverayCanvas.style.opacity = '0'; _deferStop(() => stopWaverayLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
     voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
+    ferrofluidCanvas.style.opacity = '0'; _deferStop(() => stopFerrofluidLoop());
   } else if (name === 'waveray') {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0'; _deferStop(() => stopAuroraLoop());
@@ -12193,6 +12547,7 @@ function setScene(name) {
     fireCanvas.style.opacity = '0';  _deferStop(() => stopFireLoop());
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
     voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
+    ferrofluidCanvas.style.opacity = '0'; _deferStop(() => stopFerrofluidLoop());
   } else if (name === 'fire') {
     _auroraActive = false;
     auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
@@ -12202,6 +12557,7 @@ function setScene(name) {
     fireCanvas.style.opacity = '1';     startFireLoop();
     singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
     voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
+    ferrofluidCanvas.style.opacity = '0'; _deferStop(() => stopFerrofluidLoop());
   } else if (name === 'singularity') {
     // PATCH 11: black hole scene — turn off all others, fire up the singularity
     _auroraActive = false;
@@ -12213,26 +12569,40 @@ function setScene(name) {
     singularityCanvas.style.opacity = '1';
     startSingularityLoop();
     voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
+    ferrofluidCanvas.style.opacity = '0'; _deferStop(() => stopFerrofluidLoop());
   } else if (name === 'voyager') {
     // Voyager — gas giant + starfield, raymarched in fragment shader
     _auroraActive = false;
-    auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
-    pawCanvas.style.opacity = '0';      _deferStop(() => stopPawrticlesLoop());
-    rippleCanvas.style.opacity = '0';   _deferStop(() => stopSceneRippleLoop());
-    waverayCanvas.style.opacity = '0';  _deferStop(() => stopWaverayLoop());
-    fireCanvas.style.opacity = '0';     _deferStop(() => stopFireLoop());
-    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
+    auroraCanvas.style.opacity = '0';        _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';           _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0';        _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0';       _deferStop(() => stopWaverayLoop());
+    fireCanvas.style.opacity = '0';          _deferStop(() => stopFireLoop());
+    singularityCanvas.style.opacity = '0';   _deferStop(() => stopSingularityLoop());
+    ferrofluidCanvas.style.opacity = '0';    _deferStop(() => stopFerrofluidLoop());
     voyagerCanvas.style.opacity = '1';
     startVoyagerLoop();
+  } else if (name === 'ferrofluid') {
+    _auroraActive = false;
+    auroraCanvas.style.opacity = '0';        _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';           _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0';        _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0';       _deferStop(() => stopWaverayLoop());
+    fireCanvas.style.opacity = '0';          _deferStop(() => stopFireLoop());
+    singularityCanvas.style.opacity = '0';   _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '0';       _deferStop(() => stopVoyagerLoop());
+    ferrofluidCanvas.style.opacity = '1';
+    startFerrofluidLoop();
   } else {
     _auroraActive = false;
-    auroraCanvas.style.opacity = '0';   _deferStop(() => stopAuroraLoop());
-    pawCanvas.style.opacity = '0';      _deferStop(() => stopPawrticlesLoop());
-    rippleCanvas.style.opacity = '0';   _deferStop(() => stopSceneRippleLoop());
-    waverayCanvas.style.opacity = '0';  _deferStop(() => stopWaverayLoop());
-    fireCanvas.style.opacity = '0';     _deferStop(() => stopFireLoop());
-    singularityCanvas.style.opacity = '0'; _deferStop(() => stopSingularityLoop());
-    voyagerCanvas.style.opacity = '0'; _deferStop(() => stopVoyagerLoop());
+    auroraCanvas.style.opacity = '0';        _deferStop(() => stopAuroraLoop());
+    pawCanvas.style.opacity = '0';           _deferStop(() => stopPawrticlesLoop());
+    rippleCanvas.style.opacity = '0';        _deferStop(() => stopSceneRippleLoop());
+    waverayCanvas.style.opacity = '0';       _deferStop(() => stopWaverayLoop());
+    fireCanvas.style.opacity = '0';          _deferStop(() => stopFireLoop());
+    singularityCanvas.style.opacity = '0';   _deferStop(() => stopSingularityLoop());
+    voyagerCanvas.style.opacity = '0';       _deferStop(() => stopVoyagerLoop());
+    ferrofluidCanvas.style.opacity = '0';    _deferStop(() => stopFerrofluidLoop());
   }
   localStorage.setItem('IKANDY-scene', name);
 }
