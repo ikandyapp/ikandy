@@ -13,7 +13,7 @@
  */
 
 const { app, BrowserWindow, ipcMain, session, shell, desktopCapturer, dialog, safeStorage, globalShortcut, screen } = require('electron');
-console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-02 r11');
+console.log('[IKANDY] main.js loaded — multi-monitor build 2026-05-03 r17');
 
 // Enable Windows Graphics Capture API for proper hardware-accelerated capture.
 // Without these flags, Electron uses BitBlt which silently returns black frames
@@ -84,7 +84,8 @@ let foobarPassword = '';
 // the user clicks Connect. Mirrors VLC's perceived behavior.
 let foobarConnected = false;
 let foobarVolBounds = { min: -100, max: 0, type: 'db' }; // cached from last poll
-const SOURCE_FILE = () => path.join(app.getPath('userData'), 'IKANDY-source.json');
+const SOURCE_FILE   = () => path.join(app.getPath('userData'), 'IKANDY-source.json');
+const VERSION_FILE  = () => path.join(app.getPath('userData'), 'IKANDY-app-version.json');
 function loadSource() {
   try {
     const s = JSON.parse(fs.readFileSync(SOURCE_FILE(), 'utf8'));
@@ -260,23 +261,32 @@ async function refreshAccessToken() {
     });
     const res  = await httpsPost('https://accounts.spotify.com/api/token', body);
     const data = JSON.parse(res.body);
-    if (!data.access_token) return false;
+    if (!data.access_token) {
+      const reason = data.error_description || data.error || `HTTP ${res.status}`;
+      console.error('[IKANDY] Token refresh failed — Spotify returned:', reason);
+      return false;
+    }
     saveTokens({
       access_token:  data.access_token,
-      refresh_token: data.refresh_token || tokens.refresh_token,
+      refresh_token: data.refresh_token || tokens.refresh_token, // save rotated token if Spotify issued one
       expires_at:    Date.now() + data.expires_in * 1000,
     });
     console.log('[IKANDY] Token refreshed, expires in', data.expires_in, 's');
     return true;
   } catch(e) {
-    console.error('[IKANDY] Token refresh failed:', e.message);
+    console.error('[IKANDY] Token refresh error:', e.message);
     return false;
   }
 }
 
 async function ensureValidToken() {
-  if (!tokens.access_token) return false;
-  if (tokens.expires_at && Date.now() > tokens.expires_at - 60000) {
+  // No access token — try refresh if we have one, otherwise fail
+  if (!tokens.access_token) {
+    if (tokens.refresh_token) return await refreshAccessToken();
+    return false;
+  }
+  // Missing expiry or within 60s of expiry — proactively refresh
+  if (!tokens.expires_at || Date.now() > tokens.expires_at - 60000) {
     return await refreshAccessToken();
   }
   return true;
@@ -377,7 +387,18 @@ async function pollCurrentTrack() {
 async function fetchLyrics(title, artist) {
   console.log('[IKANDY] Fetching lyrics for:', title, '—', artist);
   const cleanArtist = artist.split(/[,&]/)[0].trim();
-  const cleanTitle  = title.replace(/\s*[\(\[].*[\)\]]/g, '').trim();
+
+  // Strip streaming version/edition suffixes — Spotify frequently appends these
+  function stripSuffixes(t) {
+    // Bracket/paren forms: (Remastered 2009), [Radio Edit], (Live at MSG), etc.
+    t = t.replace(/\s*[(\[]\s*(?:\d{4}\s+)?(?:remaster(?:ed)?(?:\s+\d{4})?|single version|album version|radio edit|extended(?: mix| version)?|original mix|live(?: at [^)\]]*)?|acoustic(?: version)?|bonus track|from [^)\]]*|deluxe(?: edition)?|explicit)\s*[)\]]/gi, '').trim();
+    // Dash-separated forms: " - 2012 - Remaster", " - Remastered", " - Radio Edit", etc.
+    t = t.replace(/\s+-\s+(?:\d{4}\s+-\s+)?(?:remaster(?:ed)?(?:\s+\d{4})?|\d{4}\s+remaster(?:ed)?|single version|album version|radio edit|extended(?: mix| version)?|original mix|live(?: at .+)?|acoustic(?: version)?|bonus track.*|from .+|deluxe.*)$/i, '').trim();
+    return t;
+  }
+
+  const cleanTitle = stripSuffixes(title);
+  if (cleanTitle !== title) console.log(`[IKANDY] Lyrics search: cleaned '${title}' → '${cleanTitle}'`);
 
   // Helper: fetch one LRCLIB url and extract lyrics payload
   // Validates returned track name matches what we asked for (prevents false positives)
@@ -401,17 +422,19 @@ async function fetchLyrics(title, artist) {
     } catch(e) { return null; }
   }
 
-  // Fire all LRCLIB strategies IN PARALLEL — take fastest winner that has synced lyrics,
-  // fall back to plain if no synced found, all in one round-trip time
+  // Four LRCLIB strategies IN PARALLEL: clean title is primary, original title is implicit fallback.
+  // get = exact match, search = fuzzy. Cleaned title first in results preference order.
   const base = 'https://lrclib.net/api';
-  const [r1, r2, r3] = await Promise.all([
-    tryLrclib(`${base}/get?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`, cleanTitle),
-    tryLrclib(`${base}/search?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`, cleanTitle),
-    tryLrclib(`${base}/get?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`, cleanTitle),
+  const enc  = encodeURIComponent;
+  const [r1, r2, r3, r4] = await Promise.all([
+    tryLrclib(`${base}/get?artist_name=${enc(cleanArtist)}&track_name=${enc(cleanTitle)}`, cleanTitle),
+    tryLrclib(`${base}/search?artist_name=${enc(cleanArtist)}&track_name=${enc(cleanTitle)}`, cleanTitle),
+    tryLrclib(`${base}/get?artist_name=${enc(artist)}&track_name=${enc(title)}`, cleanTitle),
+    tryLrclib(`${base}/search?artist_name=${enc(artist)}&track_name=${enc(title)}`, cleanTitle),
   ]);
 
-  // Prefer synced over plain, prefer earlier strategies
-  const results = [r1, r2, r3].filter(Boolean);
+  // Prefer synced over plain; among same type, prefer earlier (clean before original)
+  const results = [r1, r2, r3, r4].filter(Boolean);
   const synced  = results.find(r => r.type === 'synced');
   const plain   = results.find(r => r.type === 'plain');
   const winner  = synced || plain;
@@ -424,7 +447,7 @@ async function fetchLyrics(title, artist) {
 
   // Fallback: lyrics.ovh (only if LRCLIB completely missed)
   try {
-    const res = await httpsGet(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(title)}`);
+    const res = await httpsGet(`https://api.lyrics.ovh/v1/${enc(cleanArtist)}/${enc(cleanTitle)}`);
     if (res.status === 200) {
       const data = JSON.parse(res.body);
       if (data.lyrics) {
@@ -659,6 +682,45 @@ ipcMain.handle('start-auth', async () => {
     mainWindow?.webContents.send('auth-result', { success: false, needsSetup: true });
     return { ok: false, error: 'No Client ID' };
   }
+
+  // ── Silent refresh path ────────────────────────────────────────────────────
+  // If a refresh token is stored, try to get a new access token silently.
+  // Only fall through to full PKCE if refresh fails or no token is stored.
+  if (tokens.refresh_token) {
+    console.log('[IKANDY] Spotify: stored refresh token found, attempting silent refresh');
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      console.log('[IKANDY] Spotify: silent refresh succeeded — no browser needed');
+      mainWindow?.webContents.send('auth-result', {
+        success: true, restored: true, product: lastKnownProduct || undefined,
+      });
+      startPolling();
+      // Async /me to confirm product tier (non-blocking)
+      httpsGet('https://api.spotify.com/v1/me', { Authorization: 'Bearer ' + tokens.access_token })
+        .then(me => {
+          if (me.status === 200) {
+            try {
+              const parsed = JSON.parse(me.body);
+              if (parsed.product) {
+                lastKnownProduct = parsed.product;
+                mainWindow?.webContents.send('auth-result', {
+                  success: true, restored: true,
+                  product: parsed.product, productConfirmed: true,
+                });
+              }
+            } catch(_) {}
+          }
+        })
+        .catch(e => console.warn('[IKANDY] Spotify: /me check after silent refresh failed:', e.message));
+      return { ok: true };
+    }
+    const lastErr = tokens.refresh_token ? 'refresh token rejected by Spotify' : 'no refresh token';
+    console.log('[IKANDY] Spotify: silent refresh failed (' + lastErr + ') — falling back to full OAuth');
+  } else {
+    console.log('[IKANDY] Spotify: no stored refresh token — running full OAuth flow');
+  }
+
+  // ── Full PKCE flow ─────────────────────────────────────────────────────────
   // Generate PKCE in main process
   const { randomBytes, createHash } = require('crypto');
   const verifier  = randomBytes(64).toString('base64url');
@@ -1497,6 +1559,29 @@ ipcMain.handle('broken-presets-clear', async () => {
   return writeBroken([]) ? { ok: true } : { ok: false };
 });
 
+ipcMain.handle('broken-preset-remove', async (_e, name) => {
+  if (typeof name !== 'string' || !name) return { ok: false };
+  const cur = readBroken();
+  const filtered = cur.filter(e => e.name !== name);
+  if (filtered.length === cur.length) return { ok: true, notFound: true };
+  return writeBroken(filtered) ? { ok: true } : { ok: false };
+});
+
+// Hidden presets — user-driven manual exclusion from rotation
+const HIDDEN_FILE = () => path.join(app.getPath('userData'), 'IKANDY-preset-hidden.json');
+ipcMain.handle('hidden-presets-load', async () => {
+  try {
+    const raw = fs.readFileSync(HIDDEN_FILE(), 'utf8');
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter(n => typeof n === 'string' && n) : [];
+  } catch(e) { return []; }
+});
+ipcMain.handle('hidden-presets-save', async (_e, names) => {
+  if (!Array.isArray(names)) return { ok: false };
+  try { fs.writeFileSync(HIDDEN_FILE(), JSON.stringify(names)); return { ok: true }; }
+  catch(e) { console.warn('[IKANDY] writeHidden:', e.message); return { ok: false }; }
+});
+
 // Preset reactivity cache — maps preset name → reactivity score (0–1)
 const REACTIVITY_FILE = () => path.join(app.getPath('userData'), 'IKANDY-preset-reactivity.json');
 
@@ -1512,6 +1597,41 @@ ipcMain.handle('preset-reactivity-save', async (_e, data) => {
   if (!data || typeof data !== 'object') return { ok: false };
   try { fs.writeFileSync(REACTIVITY_FILE(), JSON.stringify(data)); return { ok: true }; }
   catch(e) { console.warn('[IKANDY] writeReactivity:', e.message); return { ok: false }; }
+});
+
+// Preset duplicate cache — names of presets identified as name or visual duplicates
+const DUPLICATES_FILE = () => path.join(app.getPath('userData'), 'IKANDY-preset-duplicates.json');
+
+ipcMain.handle('preset-duplicates-load', async () => {
+  try {
+    const raw = fs.readFileSync(DUPLICATES_FILE(), 'utf8');
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch(e) { return []; }
+});
+
+ipcMain.handle('preset-duplicates-save', async (_e, names) => {
+  if (!Array.isArray(names)) return { ok: false };
+  try { fs.writeFileSync(DUPLICATES_FILE(), JSON.stringify(names)); return { ok: true }; }
+  catch(e) { console.warn('[IKANDY] writePresetDuplicates:', e.message); return { ok: false }; }
+});
+
+// ── Preset favorites ──────────────────────────────────────────────────────────
+const FAVORITES_FILE = () => path.join(app.getPath('userData'), 'IKANDY-preset-favorites.json');
+
+ipcMain.handle('favorites-load', async () => {
+  try {
+    const raw = fs.readFileSync(FAVORITES_FILE(), 'utf8');
+    const data = JSON.parse(raw);
+    const arr = Array.isArray(data) ? data : (Array.isArray(data?.favorites) ? data.favorites : []);
+    return arr.filter(n => typeof n === 'string');
+  } catch(e) { return []; }
+});
+
+ipcMain.handle('favorites-save', async (_e, names) => {
+  if (!Array.isArray(names)) return { ok: false };
+  try { fs.writeFileSync(FAVORITES_FILE(), JSON.stringify({ favorites: names })); return { ok: true }; }
+  catch(e) { console.warn('[IKANDY] writeFavorites:', e.message); return { ok: false }; }
 });
 
 // ── Mood detection cache ──────────────────────────────────────────────────────
@@ -1541,6 +1661,54 @@ ipcMain.handle('mood-cache-save', async (_e, entries) => {
     fs.writeFileSync(MOOD_CACHE_FILE(), JSON.stringify(trimmed));
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// ── Version migration ─────────────────────────────────────────────────────────
+// Runs once on first launch after upgrading from any pre-1.1.0 version.
+// Deletes stale scan caches that don't match the new clean bundle.
+// Renderer handles broken-preset filtering and the upgrade toast.
+// SAFE on fresh installs: no VERSION_FILE → prevVersion is null → skips migration.
+ipcMain.handle('run-migration', () => {
+  const currentVersion = app.getVersion();
+  let prevVersion = null;
+  try {
+    prevVersion = (JSON.parse(fs.readFileSync(VERSION_FILE(), 'utf8')) || {}).version || null;
+  } catch (e) { /* no file = fresh install or first launch with this feature */ }
+
+  // Write current version now so the migration only fires once even if something later throws
+  try { fs.writeFileSync(VERSION_FILE(), JSON.stringify({ version: currentVersion })); } catch (e) {}
+
+  // Fresh install: no migration needed
+  if (!prevVersion) {
+    console.log(`[IKANDY] Fresh install at v${currentVersion} — no migration needed`);
+    return { migrated: false };
+  }
+
+  // Only migrate when upgrading FROM pre-1.1.0 TO >= 1.1.0
+  // semverGt('1.1.0', prevVersion) is true when prevVersion < 1.1.0
+  if (!semverGt('1.1.0', prevVersion)) return { migrated: false };
+
+  console.log(`[IKANDY] Migrating from version ${prevVersion} to ${currentVersion}`);
+
+  const staleFiles = [
+    path.join(app.getPath('userData'), 'IKANDY-preset-duplicates.json'),
+    path.join(app.getPath('userData'), 'IKANDY-preset-reactivity.json'),
+    path.join(app.getPath('userData'), 'IKANDY-preset-fingerprints.json'),
+  ];
+  const cleared = [];
+  for (const file of staleFiles) {
+    try {
+      fs.unlinkSync(file);
+      const name = path.basename(file);
+      console.log(`[IKANDY] Cleared stale cache: ${name}`);
+      cleared.push(name);
+    } catch (e) {
+      if (e.code !== 'ENOENT') console.warn(`[IKANDY] Migration: could not clear ${path.basename(file)}:`, e.message);
+    }
+  }
+
+  console.log('[IKANDY] Migration complete');
+  return { migrated: true, fromVersion: prevVersion, toVersion: currentVersion, cleared };
 });
 
 ipcMain.handle('pick-image-folder', async () => {
@@ -1834,6 +2002,11 @@ function createWindow() {
 
   // ── Auto-updater ──────────────────────────────────────────────────────────────
   if (app.isPackaged) {
+    // TODO: remove this line once Certum cert is wired and builds are signed.
+    // With no code-signing cert in place, leaving verifyUpdateCodeSignature at its
+    // default (true) produces undefined behavior — explicitly disable until cert lands.
+    autoUpdater.verifyUpdateCodeSignature = false;
+
     autoUpdater.checkForUpdatesAndNotify();
 
     autoUpdater.on('update-available', () => {
@@ -2735,94 +2908,11 @@ app.whenReady().then(() => {
   loadSource();
   createWindow();
 
-  // Wait for renderer to signal it has registered IPC listeners (after boot())
-  // This prevents auth-result arriving before setupSpotifyIPC() runs
-  ipcMain.once('renderer-ready', async () => {
-    console.log('[IKANDY] Renderer ready — checking source mode:', sourceMode);
-
-    // If user hasn't picked a source yet (first launch), tell renderer so it
-    // can fade the loading screen and show the source picker prompt.
-    if (!sourceMode) {
-      console.log('[IKANDY] No source selected — waiting for user to pick one');
-      mainWindow?.webContents.send('auth-result', { noSource: true });
-      return;
-    }
-
-    // If they previously had a non-Spotify source, auto-connect it (foobar/VLC)
-    // so polling starts and controls work without the user clicking Test Connection.
-    if (sourceMode !== 'spotify') {
-      console.log('[IKANDY] Source mode:', sourceMode, '— skipping Spotify auto-auth');
-      if (sourceMode === 'foobar') {
-        try {
-          const res = await httpGet(`http://localhost:${foobarPort}/api/player`, foobarAuthHeaders());
-          if (res.status === 200) {
-            foobarConnected = true;
-            console.log('[IKANDY] foobar auto-connect succeeded on launch');
-            startPolling();
-          }
-        } catch(e) { console.log('[IKANDY] foobar auto-connect on launch failed:', e.message); }
-      } else if (sourceMode === 'vlc') {
-        try {
-          const auth = Buffer.from(`:${vlcPassword}`).toString('base64');
-          const res = await httpGet(`http://localhost:${vlcPort}/requests/status.json`,
-            { Authorization: 'Basic ' + auth });
-          if (res.status === 200) {
-            vlcConnected = true;
-            console.log('[IKANDY] VLC auto-connect succeeded on launch');
-            startPolling();
-          }
-        } catch(e) { console.log('[IKANDY] VLC auto-connect on launch failed:', e.message); }
-      }
-      mainWindow?.webContents.send('auth-result', { noSource: true });
-      return;
-    }
-
-    // Spotify mode — try to restore session
-    if (!getClientId()) {
-      console.log('[IKANDY] No Client ID — showing setup screen');
-      mainWindow?.webContents.send('auth-result', { success: false, needsSetup: true });
-      return;
-    }
-    const valid = await ensureValidToken();
-    if (valid) {
-      console.log('[IKANDY] Valid token found — restoring session');
-      // Send auth-result with cached product if known, or undefined (don't trigger Free check)
-      mainWindow?.webContents.send('auth-result', {
-        success: true,
-        restored: true,
-        product: lastKnownProduct || undefined,
-      });
-      startPolling();
-      try {
-        const me = await httpsGet('https://api.spotify.com/v1/me',
-          { Authorization: 'Bearer ' + tokens.access_token });
-        console.log('[IKANDY] restore /me status:', me.status);
-        if (me.status === 200) {
-          try {
-            const parsed = JSON.parse(me.body);
-            if (parsed.product) {
-              lastKnownProduct = parsed.product;
-              console.log('[IKANDY] restore /me product:', parsed.product);
-              mainWindow?.webContents.send('auth-result', {
-                success: true, restored: true,
-                product: parsed.product, productConfirmed: true,
-              });
-            } else {
-              console.log('[IKANDY] restore /me has no product field — keys:', Object.keys(parsed).join(','));
-            }
-          } catch(parseErr) {
-            console.log('[IKANDY] restore /me parse error:', parseErr.message);
-          }
-        } else {
-          console.log('[IKANDY] restore /me non-200:', me.body?.substring(0, 200));
-        }
-      } catch(e) {
-        console.log('[IKANDY] restore /me fetch failed:', e.message);
-      }
-    } else {
-      console.log('[IKANDY] No valid token — showing login');
-      mainWindow?.webContents.send('auth-result', { success: false });
-    }
+  // Source picker shows on every launch — just fade the loading screen and let the
+  // picker handle source selection. No auto-auth or auto-connect on startup.
+  ipcMain.once('renderer-ready', () => {
+    console.log('[IKANDY] Renderer ready — showing source picker');
+    mainWindow?.webContents.send('auth-result', { noSource: true });
   });
 
   app.on('activate', () => {

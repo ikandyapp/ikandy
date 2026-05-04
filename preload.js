@@ -32,13 +32,31 @@ contextBridge.exposeInMainWorld('IKANDY', {
   addBrokenPreset:    (entry)  => ipcRenderer.invoke('broken-presets-add', entry),
   clearBrokenPresets: ()       => ipcRenderer.invoke('broken-presets-clear'),
 
+  // Hidden presets (user-driven manual exclusion from rotation)
+  loadHiddenPresets:  ()      => ipcRenderer.invoke('hidden-presets-load'),
+  saveHiddenPresets:  (names) => ipcRenderer.invoke('hidden-presets-save', names),
+
+  // Broken-preset individual removal (undo path for manual Mark as Broken / Mark as Silent)
+  removeBrokenPreset: (name)  => ipcRenderer.invoke('broken-preset-remove', name),
+
   // Preset reactivity cache (name → score, persisted across sessions)
   loadPresetReactivity: ()     => ipcRenderer.invoke('preset-reactivity-load'),
   savePresetReactivity: (data) => ipcRenderer.invoke('preset-reactivity-save', data),
 
+  // Preset duplicate cache (names of name/visual duplicates, persisted across sessions)
+  loadPresetDuplicates: ()      => ipcRenderer.invoke('preset-duplicates-load'),
+  savePresetDuplicates: (names) => ipcRenderer.invoke('preset-duplicates-save', names),
+
+  // Preset favorites
+  loadFavorites: ()      => ipcRenderer.invoke('favorites-load'),
+  saveFavorites: (names) => ipcRenderer.invoke('favorites-save', names),
+
   // Mood detection cache
   loadMoodCache: ()        => ipcRenderer.invoke('mood-cache-load'),
   saveMoodCache: (entries) => ipcRenderer.invoke('mood-cache-save', entries),
+
+  // Version migration — runs once on first launch after upgrading from pre-1.1.0
+  runMigration:  ()        => ipcRenderer.invoke('run-migration'),
 
   // Playlists
   getPlaylists: ()     => ipcRenderer.invoke('get-playlists'),

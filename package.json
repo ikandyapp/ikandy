@@ -1,6 +1,6 @@
 {
   "name": "IKANDY",
-  "version": "1.0.10",
+  "version": "1.0.12",
   "description": "IKANDY — Music visualizer (Butterchurn / MilkDrop)",
   "main": "main.js",
   "author": "Felix Bag of Tricks",
@@ -27,6 +27,8 @@
       "main.js",
       "preload.js",
       "IKANDY.html",
+      "mirror.html",
+      "mood-worker.js",
       "assets/**/*",
       "node_modules/**/*"
     ],
