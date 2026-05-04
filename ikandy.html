@@ -10886,7 +10886,7 @@ let _ferroTime = 0;
 
 // Camera — spherical coordinates, auto-orbit
 let _ferroAzimuth = 0.8;
-const _ferroPolar  = 0.48;  // ~27° from zenith, fixed elevation
+let _ferroPolar  = 0.48;  // elevation from zenith, user-adjustable
 const _ferroRadius = 32.0;
 
 // Mouse state
@@ -10894,6 +10894,8 @@ let _ferroDragActive    = false;
 let _ferroLastInputTime = 0;
 let _ferroDragStartAz   = 0;
 let _ferroDragStartX    = 0;
+let _ferroDragStartPol  = 0;
+let _ferroDragStartY    = 0;
 let _ferroMouseWX       = 9999;
 let _ferroMouseWZ       = 9999;
 let _ferroHoverActive   = false;
@@ -10981,13 +10983,20 @@ uniform float uForce;
 uniform vec3  uCamPos;
 out vec4 fragColor;
 
-vec3 heatmap(float t){
-  vec3 c0=vec3(.04,.07,.22),c1=vec3(.18,.04,.40),c2=vec3(.62,.06,.28),
-       c3=vec3(.92,.30,.06),c4=vec3(1.,.80,.35);
-  if(t<.25) return mix(c0,c1,t*4.);
-  if(t<.55) return mix(c1,c2,(t-.25)*3.333);
-  if(t<.80) return mix(c2,c3,(t-.55)*4.);
-            return mix(c3,c4,(t-.80)*5.);
+vec3 rainbow(float t){
+  vec3 c0=vec3(.30,.05,.50);
+  vec3 c1=vec3(.10,.20,.85);
+  vec3 c2=vec3(.10,.85,.85);
+  vec3 c3=vec3(.20,.90,.30);
+  vec3 c4=vec3(.95,.85,.15);
+  vec3 c5=vec3(1.0,.50,.10);
+  vec3 c6=vec3(1.0,.15,.15);
+  if(t<.166) return mix(c0,c1,t*6.024);
+  if(t<.333) return mix(c1,c2,(t-.166)*5.988);
+  if(t<.500) return mix(c2,c3,(t-.333)*5.988);
+  if(t<.666) return mix(c3,c4,(t-.500)*6.024);
+  if(t<.833) return mix(c4,c5,(t-.666)*5.988);
+             return mix(c5,c6,(t-.833)*5.988);
 }
 
 void main(){
@@ -11001,8 +11010,8 @@ void main(){
   vec3 ambient=mix(vec3(.03,.03,.06),vec3(.12,.15,.28),hemi);
   float fresnel=pow(1.-max(dot(N,V),0.),4.);
   vec3 rim=vec3(.4,.6,1.)*fresnel*.5;
-  float t=clamp(v_height/(uForce*1.1),0.,1.);
-  vec3 col=heatmap(t);
+  float t=clamp(v_height/(uForce*0.6),0.,1.);
+  vec3 col=rainbow(t);
   fragColor=vec4(col*(diff*.7+ambient)+vec3(spec)+rim,1.);
 }`;
 
@@ -11116,12 +11125,15 @@ function _ferroInit(){
 
 // ── Mouse handlers (attached on first start, never removed) ──────────────────
 function _ferroDown(e){
-  _ferroDragActive=true; _ferroDragStartAz=_ferroAzimuth;
-  _ferroDragStartX=e.clientX; _ferroLastInputTime=Date.now();
+  _ferroDragActive=true; _ferroDragStartAz=_ferroAzimuth; _ferroDragStartPol=_ferroPolar;
+  _ferroDragStartX=e.clientX; _ferroDragStartY=e.clientY; _ferroLastInputTime=Date.now();
 }
 function _ferroMove(e){
   _ferroLastInputTime=Date.now(); _ferroHoverActive=true;
-  if(_ferroDragActive) _ferroAzimuth=_ferroDragStartAz+(e.clientX-_ferroDragStartX)*0.005;
+  if(_ferroDragActive){
+    _ferroAzimuth=_ferroDragStartAz+(e.clientX-_ferroDragStartX)*0.005;
+    _ferroPolar=Math.max(0.05,Math.min(Math.PI/2-0.05,_ferroDragStartPol+(e.clientY-_ferroDragStartY)*0.005));
+  }
   const W=window.innerWidth,H=window.innerHeight,r=_ferroRadius;
   const az=_ferroAzimuth,pol=_ferroPolar;
   const eye=[r*Math.sin(pol)*Math.sin(az),r*Math.cos(pol),r*Math.sin(pol)*Math.cos(az)];
