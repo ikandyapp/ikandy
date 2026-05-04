@@ -3390,6 +3390,7 @@ let _reconnectZeroCount = 0;     // consecutive full reconnect calls that ended 
 let _reconnectCircuitOpen = false; // tripped after 3 consecutive zero-peak reconnects
 let _lastReconnectRate = null;   // sample rate from the last reconnect (for flap detection)
 let _lastReconnectRateTime = 0;  // timestamp of _lastReconnectRate reading
+let _lastCtxRebuildAt = 0;       // cooldown — prevents rapid AudioContext rebuilds
 // True once we've seen real audio signal at any point this session. Lets us
 // distinguish first-time-user-hasn't-pressed-play (helpful flyout) from
 // just-paused-and-reconnected (no flyout needed — user already knows).
@@ -5338,15 +5339,6 @@ async function _audioAutoReconnect(logMsg) {
       _lastReconnectRate = _newRate || _lastReconnectRate;
       _lastReconnectRateTime = Date.now();
 
-      // Immediate peak sample
-      let peak = 0;
-      if (analyserNode) {
-        const buf = new Uint8Array(analyserNode.frequencyBinCount);
-        analyserNode.getByteFrequencyData(buf);
-        for (let i = 0; i < buf.length; i++) if (buf[i] > peak) peak = buf[i];
-      }
-      console.log('[IKANDY] Reconnect succeeded (attempt ' + attempt + ') — peak:', peak, '| AudioCtx:', audioCtx?.state);
-
       // Post-reconnect verification: wait 2s, sample again to confirm audio is flowing
       await new Promise(r => setTimeout(r, 2000));
       let peak2 = 0;
@@ -5355,10 +5347,11 @@ async function _audioAutoReconnect(logMsg) {
         analyserNode.getByteFrequencyData(buf2);
         for (let i = 0; i < buf2.length; i++) if (buf2[i] > peak2) peak2 = buf2[i];
       }
-      console.log('[IKANDY] Post-reconnect verification — peak:', peak2);
+      console.log('[IKANDY] Post-reconnect verification — peak:', peak2, '| trackPlaying:', trackPlaying);
 
       if (peak2 > 0 || !trackPlaying) {
         // Audio flowing, or music wasn't playing — either way we're done
+        console.log('[IKANDY] Reconnect verified (attempt ' + attempt + ') — peak:', peak2, '| AudioCtx:', audioCtx?.state);
         _reconSucceeded = true;
         break;
       }
@@ -5370,7 +5363,7 @@ async function _audioAutoReconnect(logMsg) {
       if (mutedNow.length) console.warn('[IKANDY] Muted tracks on live stream:', mutedNow.map(t => t.label).join(', '));
 
       if (attempt >= MAX_ATTEMPTS) {
-        console.warn('[IKANDY] Auto-reconnect succeeded mechanically but no audio detected after 2s. Manual reconnect may be needed.');
+        console.info('[IKANDY] Auto-reconnect succeeded mechanically but no audio detected after 2s (between-track silence is normal).');
         toast('⚠ Auto-reconnect: no audio detected. Click 🎤 to reconnect manually.');
       }
       // else: loop continues with attempt + 1
@@ -5440,7 +5433,7 @@ setInterval(() => {
   let peak = 0;
   for (let i = 0; i < buf.length; i++) if (buf[i] > peak) peak = buf[i];
   if (peak === 0) {
-    if (++_silentTicks >= 5) _audioAutoReconnect('Audio stream stale (5s silence) — auto-reconnecting');
+    if (++_silentTicks >= 8) _audioAutoReconnect('Audio stream stale (8s silence) — auto-reconnecting');
   } else {
     // Audio is flowing — reset failure state so circuit breaker disarms
     if (_reconnectZeroCount > 0 || _reconnectCircuitOpen) {
@@ -5715,47 +5708,13 @@ async function captureAudioDiagnostics(stream, reason = 'manual') {
 window.ikandyDiag = () => captureAudioDiagnostics(_systemAudioStream, 'manual');
 
 async function connectAudioStream(stream, label, silent = false, _isRetry = false, _acquireAttempted = false) {
-  // ─── Realtek non-default-format fix ─────────────────────────────────────
-  // If the captured track's sample rate doesn't match audioCtx, Chromium's
-  // implicit resampler can deliver silent buffers (esp. 24-bit / 96k / 192k
-  // Realtek loopback). Rebuild AudioContext + analyser + Butterchurn at the
-  // track's actual rate when there's a mismatch.
   const _track = stream.getAudioTracks()[0];
   const _trackRate = _track && _track.getSettings ? _track.getSettings().sampleRate : null;
   const _trackCh   = _track && _track.getSettings ? _track.getSettings().channelCount : null;
   console.log('[IKANDY] Track rate:', _trackRate, '| ch:', _trackCh, '| Ctx rate:', audioCtx && audioCtx.sampleRate);
   if (_trackRate && audioCtx && _trackRate !== audioCtx.sampleRate) {
-    console.warn('[IKANDY] Sample rate mismatch — rebuilding AudioContext at', _trackRate);
-    const _oldCtx = audioCtx;
-    try { if (_systemAudioSrc) _systemAudioSrc.disconnect(); } catch(e) {}
-    _systemAudioSrc = null;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)({
-      sampleRate: _trackRate, latencyHint: 'playback'
-    });
-    analyserNode = audioCtx.createAnalyser();
-    analyserNode.fftSize = 2048;
-    analyserNode.smoothingTimeConstant = 0.75;
-    analyserNode.minDecibels = -100;
-    analyserNode.maxDecibels = 0;
-    // Channel handling left at default — boostGain handles the downmix
-    gainNode = audioCtx.createGain();
-    gainNode.gain.value = 0.8;
-    gainNode.connect(audioCtx.destination);
-    if (visualizer && typeof butterchurn !== 'undefined') {
-      const bc = butterchurn.default || butterchurn;
-      visualizer = bc.createVisualizer(audioCtx, vizCanvas, {
-        width: W || window.innerWidth, height: H || window.innerHeight,
-        pixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
-      });
-      visualizer.connectAudio(analyserNode);
-      // Reload current preset against the fresh context
-      if (typeof currentIdx === 'number' && typeof loadPreset === 'function') {
-        try { loadPreset(currentIdx, 0); } catch(e) { console.warn('[IKANDY] Preset reload after ctx rebuild failed:', e); }
-      }
-    }
-    try { await _oldCtx.close(); } catch(e) {}
+    console.info('[IKANDY] Track rate ' + _trackRate + ' ≠ Ctx rate ' + audioCtx.sampleRate + ' — browser resamples; skipping context rebuild');
   }
-  // ─── end Realtek fix ────────────────────────────────────────────────────
 
   if (_systemAudioSrc) { try { _systemAudioSrc.disconnect(); } catch(e) {} _systemAudioSrc = null; }
   _systemAudioStream = stream;
@@ -5809,6 +5768,11 @@ async function connectAudioStream(stream, label, silent = false, _isRetry = fals
           console.warn('[IKANDY] No signal after connect — attempting one self-heal rebuild');
           (async () => {
             try {
+              if (Date.now() - _lastCtxRebuildAt <= 10000) {
+                console.warn('[IKANDY] Self-heal rebuild suppressed — cooldown active (' + Math.round((Date.now() - _lastCtxRebuildAt) / 1000) + 's since last rebuild)');
+                return;
+              }
+              _lastCtxRebuildAt = Date.now();
               const freshRate = _track.getSettings().sampleRate || 48000;
               try { _systemAudioSrc.disconnect(); } catch(e) {}
               _systemAudioSrc = null;
