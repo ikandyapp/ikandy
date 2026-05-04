@@ -423,7 +423,7 @@ html, body {
   border-radius: 20px; padding: 6px 12px;
 }
 #vol-row svg { width: 14px; height: 14px; fill: var(--dim); flex-shrink: 0; }
-#vol-sl { width: 72px; accent-color: var(--sp); cursor: pointer; }
+#vol-sl { width: 72px; accent-color: var(--acc); cursor: pointer; }
 
 /* ─── PRESET NAV (top-center) ─── */
 #pnav {
@@ -440,7 +440,7 @@ html, body {
   text-shadow: 0 1px 4px rgba(0,0,0,.8);
 }
 .nvb:hover      { border-color: var(--acc); color: var(--acc-txt); }
-.nvb.on         { border-color: var(--sp);  color: var(--sp);  background: rgba(29,185,84,.12); }
+.nvb.on         { border-color: var(--acc); color: var(--acc); background: var(--acc-dim); }
 .nvb.nav-arrow  { border-color: transparent !important; color: rgba(255,255,255,.4); background: rgba(4,4,6,.6) !important; backdrop-filter: blur(4px); outline: none !important; }
 .nvb.nav-arrow:hover { border-color: rgba(255,255,255,.2) !important; color: rgba(255,255,255,.8) !important; }
 .nvb.nav-arrow:focus, .nvb.nav-arrow:focus-visible { outline: none !important; border-color: transparent !important; }
@@ -666,13 +666,13 @@ body.force-hide-status #status-badge {
   user-select: none;
 }
 .ho-opt:hover { color: var(--txt); background: rgba(255,255,255,.04); }
-.ho-opt.on { color: var(--sp); }
+.ho-opt.on { color: var(--acc); }
 .ho-draw-color {
   font-size:14px; cursor:pointer; color:rgba(255,255,255,.25);
   padding:2px 5px; border-radius:3px; transition:color .15s;
 }
 .ho-draw-color:hover { color:rgba(255,255,255,.7); }
-.ho-draw-color.on { color:var(--sp); }
+.ho-draw-color.on { color:var(--acc); }
 .ho-opt::before {
   content: ''; display: inline-block;
   width: 11px; margin-right: 10px; font-size: 11px;
@@ -687,7 +687,7 @@ body.force-hide-status #status-badge {
   position: relative; cursor: pointer; flex-shrink: 0;
   transition: background .15s;
 }
-.ho-show-toggle.on { background: var(--sp); }
+.ho-show-toggle.on { background: var(--acc); }
 .ho-show-toggle::after {
   content: ''; position: absolute;
   width: 12px; height: 12px;
@@ -927,7 +927,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 }
 #plp-header h2 {
   font-family: var(--display); font-size: 32px; letter-spacing: .1em;
-  color: var(--sp); flex: 1; margin: 0;
+  color: var(--acc); flex: 1; margin: 0;
 }
 #plp-count { font-size: 12px; color: var(--dim); }
 #plp-close {
@@ -1114,7 +1114,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   transition: all .12s; white-space: nowrap;
 }
 .pp-pill:hover  { border-color: rgba(184,154,90,.5); color: var(--txt); }
-.pp-pill.active { border-color: var(--sp); background: rgba(29,185,84,.1); color: var(--sp); }
+.pp-pill.active { border-color: var(--acc); background: var(--acc-dim); color: var(--acc); }
 
 /* ── Category tabs ── */
 #pp-tabs {
@@ -1130,7 +1130,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
   transition: color .12s, border-color .12s; font-family: var(--ui);
 }
 .pp-tab:hover  { color: var(--txt); }
-.pp-tab.active { color: var(--sp); border-bottom-color: var(--sp); }
+.pp-tab.active { color: var(--acc); border-bottom-color: var(--acc); }
 
 /* Scan notice — shown in place of REACTIVE/AMBIENT tabs when scan hasn't run */
 #pp-scan-notice {
@@ -1162,7 +1162,7 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 .pp-tbtn { font-size:10px;font-weight:600;padding:5px 11px;border:1px solid var(--bdr2);border-radius:0;background:transparent;color:var(--dim);cursor:pointer;letter-spacing:.07em;font-family:var(--ui);transition:color .12s,background .12s; }
 #pp-tempo-btns .pp-tbtn:first-child { border-radius:var(--r) 0 0 var(--r); }
 #pp-tempo-btns .pp-tbtn:last-child  { border-radius:0 var(--r) var(--r) 0; }
-.pp-tbtn.active { background:rgba(29,185,84,.1);color:var(--sp);border-color:var(--sp); }
+.pp-tbtn.active { background:var(--acc-dim);color:var(--acc);border-color:var(--acc); }
 .pp-tbtn + .pp-tbtn { border-left:none; }
 
 /* ── Visual Quality selector ── */
@@ -1170,9 +1170,9 @@ input[type=range] { accent-color: var(--acc); cursor: pointer; width: 100%; }
 #vq-btns .vq-btn:first-child { border-radius:var(--r) 0 0 var(--r); }
 #vq-btns .vq-btn:last-child  { border-radius:0 var(--r) var(--r) 0; }
 #vq-btns .vq-btn + .vq-btn   { border-left:none; }
-.vq-btn.active { background:rgba(29,185,84,.1);color:var(--sp);border-color:var(--sp); }
+.vq-btn.active { background:var(--acc-dim);color:var(--acc);border-color:var(--acc); }
 #vq-btns .vq-btn.active,
-.csp-4col .vq-btn.active { border-left: 1px solid var(--sp); }
+.csp-4col .vq-btn.active { border-left: 1px solid var(--acc); }
 
 /* ── Preset card star ── */
 .pstar {
@@ -1688,14 +1688,14 @@ body.ui-hidden #console-bar {
 .c-cb svg { width: 18px; height: 18px; fill: currentColor; pointer-events: none; }
 .c-cb-main { width: 38px; height: 38px; }
 .c-cb-main svg { width: 22px; height: 22px; }
-.c-cb.on { color: #1db954; }
-.c-cb.smart { color: #1db954; }
+.c-cb.on { color: var(--acc); }
+.c-cb.smart { color: var(--acc); }
 /* Browse presets is the primary viz action — slightly larger to read as such */
 #c-btn-browse { width: 37px; height: 37px; }
 #c-btn-browse svg { width: 21px; height: 21px; }
 .c-vol-wrap { display: flex; align-items: center; gap: 5px; margin-left: 4px; }
 .c-vol-wrap > svg { width: 14px; height: 14px; fill: rgba(255,255,255,.35); flex-shrink: 0; pointer-events: none; }
-#c-vol-sl { width: 52px; height: 3px; cursor: pointer; accent-color: #d4a843; }
+#c-vol-sl { width: 52px; height: 3px; cursor: pointer; accent-color: var(--acc); }
 
 /* Console — Preset zone (single row of buttons; name floats above via absolute) */
 #cz-viz {
@@ -1726,15 +1726,15 @@ body.ui-hidden #console-bar {
   flex-shrink: 0; transition: color .12s, border-color .12s, background .12s;
 }
 .c-auto-btn:hover { color: rgba(255,255,255,.7); border-color: rgba(255,255,255,.3); }
-.c-auto-btn.on     { color: #1db954; border-color: rgba(29,185,84,.4); background: rgba(29,185,84,.08); }
-.c-auto-btn.locked { color: var(--acc); border-color: rgba(212,168,67,.4); background: rgba(212,168,67,.06); }
+.c-auto-btn.on     { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 40%, transparent); background: var(--acc-dim); }
+.c-auto-btn.locked { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 40%, transparent); background: var(--acc-dim); }
 
 /* Console — Utility zone */
 #cz-utility { padding: 0 4px; gap: 3px; }
 .cz-utility { flex: 2; justify-content: center; }
-.c-btn-fav.on { color: #1db954; }
-.c-btn-fs.on  { color: #1db954; }
-.c-btn-hud.on { color: #1db954; }
+.c-btn-fav.on { color: var(--acc); }
+.c-btn-fs.on  { color: var(--acc); }
+.c-btn-hud.on { color: var(--acc); }
 #c-btn-scene, #c-btn-pulse { width: 36px; height: 36px; }
 #c-btn-scene svg, #c-btn-pulse svg { width: 21px; height: 21px; }
 
@@ -1753,7 +1753,7 @@ body.ui-hidden #console-bar {
   flex-shrink: 0; transition: color .12s, border-color .12s, background .12s;
 }
 .c-ca-btn:hover { color: rgba(255,255,255,.7); border-color: rgba(255,255,255,.3); }
-.c-ca-btn.on { color: #1db954; border-color: rgba(29,185,84,.45); background: rgba(29,185,84,.08); }
+.c-ca-btn.on { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 45%, transparent); background: var(--acc-dim); }
 .c-scene-btn {
   background: none; border: 1px solid rgba(255,255,255,.14); border-radius: 5px;
   color: rgba(255,255,255,.38); cursor: pointer; padding: 5px 12px;
@@ -1762,7 +1762,7 @@ body.ui-hidden #console-bar {
 }
 .c-scene-btn:hover { color: rgba(255,255,255,.65); border-color: rgba(255,255,255,.25); }
 .c-scene-btn.active,
-.c-scene-btn.on { color: #1db954; border-color: rgba(29,185,84,.4); background: rgba(29,185,84,.07); }
+.c-scene-btn.on { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 40%, transparent); background: var(--acc-dim); }
 
 /* Console — Settings zone */
 #cz-settings { padding: 0 8px; gap: 5px; }
@@ -1832,7 +1832,7 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
   padding: 9px 9px 7px; transition: color .12s; flex-shrink: 0;
 }
 .cs-tab:hover { color: rgba(255,255,255,.6); }
-.cs-tab.active { color: rgba(255,255,255,.9); border-bottom-color: #1db954; }
+.cs-tab.active { color: rgba(255,255,255,.9); border-bottom-color: var(--acc); }
 .cs-close {
   margin-left: auto; background: none; border: none; color: rgba(255,255,255,.25);
   cursor: pointer; font-size: 18px; padding: 4px 8px; transition: color .12s; flex-shrink: 0;
@@ -1865,9 +1865,9 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
   transition: color .12s, border-color .12s, background .12s; flex-shrink: 0;
 }
 .cs-btn:hover { color: rgba(255,255,255,.75); border-color: rgba(255,255,255,.3); }
-.cs-btn.on { color: #1db954; border-color: rgba(29,185,84,.45); background: rgba(29,185,84,.08); }
-.cs-btn.primary { color: #d4a843; border-color: rgba(212,168,67,.4); }
-.cs-btn.primary:hover { background: rgba(212,168,67,.1); }
+.cs-btn.on { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 45%, transparent); background: var(--acc-dim); }
+.cs-btn.primary { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 40%, transparent); }
+.cs-btn.primary:hover { background: var(--acc-dim); }
 .cs-ifx-grid {
   display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 5px; margin-bottom: 6px;
@@ -1883,7 +1883,7 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
 .cs-lyric-swatch.on { border-color: rgba(255,255,255,.85); transform: scale(1.2); }
 .cs-lyric-pos-grid.locked .cs-btn { opacity: .3; pointer-events: none; }
 .vc-lyric-hint { font-size: 9px; color: rgba(255,255,255,.28); text-align: center; margin: -4px 0 8px; letter-spacing: .04em; }
-.cs-sl { flex: 1; cursor: pointer; accent-color: #d4a843; min-width: 80px; }
+.cs-sl { flex: 1; cursor: pointer; accent-color: var(--acc); min-width: 80px; }
 .cs-status { font-size: 10px; color: var(--dim); padding: 2px 0 6px; min-height: 16px; }
 .cs-conn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sp); flex-shrink: 0; }
 .cs-cid-mono { font-family: monospace; font-size: 10px; color: rgba(255,255,255,.45); letter-spacing: .03em; flex-shrink: 0; }
@@ -1895,7 +1895,7 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
   transition: all .12s; text-align: center;
 }
 .cs-src-btn:hover { color: rgba(255,255,255,.85); border-color: rgba(255,255,255,.28); }
-.cs-src-btn.active { color: #1db954; border-color: rgba(29,185,84,.5); background: rgba(29,185,84,.08); }
+.cs-src-btn.active { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 50%, transparent); background: var(--acc-dim); }
 .cs-sep { height: 1px; background: rgba(255,255,255,.07); margin: 10px 0; }
 .cs-about { font-size: 11px; color: rgba(255,255,255,.45); line-height: 1.7; }
 .cs-about strong { color: rgba(255,255,255,.7); }
@@ -1920,7 +1920,7 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
 .csp-4col .vq-btn,
 .csp-2col .cs-btn { width: 100%; text-align: center; padding: 6px 4px; min-width: 0; border-radius: var(--r); border-left: 1px solid var(--bdr2); }
 /* Restore active/on left border — the base rule above overrides it to dim via shorthand */
-.csp-2col .cs-btn.on { border-left: 1px solid rgba(29,185,84,.45); }
+.csp-2col .cs-btn.on { border-left: 1px solid color-mix(in srgb, var(--acc) 45%, transparent); }
 
 /* ── Console theme button ── */
 .c-theme-btn {
@@ -1975,9 +1975,9 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
   font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   color: rgba(255,255,255,.32); font-family: var(--ui);
 }
-.c-scene-pop-intensity input[type=range] { flex: 1; cursor: pointer; accent-color: var(--sp); min-width: 0; }
+.c-scene-pop-intensity input[type=range] { flex: 1; cursor: pointer; accent-color: var(--acc); min-width: 0; }
 .c-scene-pop-intensity .c-scene-pop-iv { min-width: 26px; text-align: right; font-weight: 400; letter-spacing: 0; }
-.c-btn-scene.on { color: #1db954; }
+.c-btn-scene.on { color: var(--acc); }
 
 #pulse-popover {
   display: none; position: fixed; z-index: 300;
@@ -1989,7 +1989,7 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
 }
 #pulse-popover.open { display: flex; flex-direction: column; gap: 5px; animation: crack-enter .15s both; }
 #pulse-popover .c-scene-btn { width: 100%; text-align: left; }
-#c-btn-pulse.on { color: #1db954; }
+#c-btn-pulse.on { color: var(--acc); }
 
 /* ── First-launch source picker overlay ── */
 #sp-overlay {
@@ -2340,7 +2340,7 @@ body.source-picker-open #sp-overlay { display: block; }
   </div>
   <div id="pp-scan-notice">
     <span>REACTIVE · AMBIENT filters need a reactivity scan to classify presets.</span>
-    <button onclick="triggerReactivityScan()">Run Scan</button>
+    <button id="pp-scan-btn" onclick="triggerReactivityScan()">Run Scan</button>
   </div>
   <div id="pp-tempo">
     <span class="pp-tlabel">TEMPO</span>
@@ -2620,7 +2620,7 @@ body.source-picker-open #sp-overlay { display: block; }
       <div id="reactivity-progress" style="display:none;">
         <div id="reactivity-status" style="font-size:11px;color:var(--dim);margin-bottom:4px;">Analyzing presets…</div>
         <div style="height:3px;background:var(--bdr);border-radius:2px;overflow:hidden;">
-          <div id="reactivity-bar" style="height:100%;width:0%;background:var(--sp);transition:width .2s;"></div>
+          <div id="reactivity-bar" style="height:100%;width:0%;background:var(--acc);transition:width .2s;"></div>
         </div>
         <button onclick="cancelReactivityScan()" style="margin-top:5px;font-size:11px;color:var(--dim);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">Cancel</button>
       </div>
@@ -3559,8 +3559,8 @@ function setFpsOverlayEnabled(on) {
   const btn = document.getElementById('fps-toggle-btn');
   if (btn) {
     btn.textContent = _fpsOverlayEnabled ? '● On' : '○ Off';
-    btn.style.color = _fpsOverlayEnabled ? 'var(--sp)' : '';
-    btn.style.borderColor = _fpsOverlayEnabled ? 'var(--sp)' : '';
+    btn.style.color = _fpsOverlayEnabled ? 'var(--acc)' : '';
+    btn.style.borderColor = _fpsOverlayEnabled ? 'var(--acc)' : '';
   }
 }
 
@@ -3799,8 +3799,8 @@ function setFxLayerEnabled(on) {
   const btn = document.getElementById('fxl-toggle-btn');
   if (btn) {
     btn.textContent = _fxLayerEnabled ? '● On' : '○ Off';
-    btn.style.color = _fxLayerEnabled ? 'var(--sp)' : '';
-    btn.style.borderColor = _fxLayerEnabled ? 'var(--sp)' : '';
+    btn.style.color = _fxLayerEnabled ? 'var(--acc)' : '';
+    btn.style.borderColor = _fxLayerEnabled ? 'var(--acc)' : '';
   }
   vcSyncCABtn();
   // Render one frame immediately so toggle feels instant even when paused
@@ -3997,8 +3997,8 @@ function setPbEnabled(on) {
   const btn = document.getElementById('pb-toggle-btn');
   if (btn) {
     btn.textContent = _pbEnabled ? '● On' : '○ Off';
-    btn.style.color = _pbEnabled ? 'var(--sp)' : '';
-    btn.style.borderColor = _pbEnabled ? 'var(--sp)' : '';
+    btn.style.color = _pbEnabled ? 'var(--acc)' : '';
+    btn.style.borderColor = _pbEnabled ? 'var(--acc)' : '';
   }
   // Console pulse button glow
   const cbtn = el('c-btn-pulse');
@@ -7455,6 +7455,10 @@ let _favoritesOnly = false; // Scenes-level "shuffle from favorites only" overri
 // Reactivity scan state
 let _reactivityData = {};
 let _reactivityScanRunning = false, _reactivityScanCancelled = false;
+let _silentScanRunning       = false;
+let _autoScanTimer           = null;
+let _pendingScanNames        = null;
+let _autoScanActivityHandler = null;
 let _fpScanWarnCount = 0; // batched setRendererSize warnings while scan is running
 const REACTIVITY_THRESHOLD = 0.25;
 
@@ -7954,6 +7958,9 @@ function applyCustomPresets(result) {
   if (folderRow)  folderRow.style.display  = 'flex';
   if (folderName) folderName.textContent   = `📂 ${result.dir} (${result.count} presets)`;
   if (folderBtn)  folderBtn.style.display  = 'none';
+  // Queue silent scan for any custom presets not yet scored
+  const newNames = Object.keys(result.presets).filter(n => _reactivityData[n] === undefined);
+  if (newNames.length > 0) _scheduleAutoScan(newNames, 10000);
 }
 
 function advancePreset() {
@@ -7974,8 +7981,8 @@ function syncAutoState() {
   // Sidebar AUTO-CYCLE button
   const autoSb = el('auto-sb');
   if (autoSb) {
-    autoSb.style.color       = autoCycle ? 'var(--sp)' : '';
-    autoSb.style.borderColor = autoCycle ? 'var(--sp)' : '';
+    autoSb.style.color       = autoCycle ? 'var(--acc)' : '';
+    autoSb.style.borderColor = autoCycle ? 'var(--acc)' : '';
   }
   // Console AUTO button — shows lock state when a preset is locked
   const cAutoBtn = el('c-btn-auto');
@@ -8063,16 +8070,159 @@ async function _loadImageData() {
 }
 
 /* ── REACTIVITY SCAN ── */
+function _scanRenderFrames(viz, n) {
+  return new Promise(resolve => {
+    let f = 0;
+    function frame() {
+      try { viz.render(); } catch(e) {}
+      if (++f < n) requestAnimationFrame(frame); else resolve();
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+function _scanSampleBrightness(sampleCtx, testCanvas) {
+  try {
+    sampleCtx.drawImage(testCanvas, 0, 0, 8, 8);
+    const px = sampleCtx.getImageData(0, 0, 8, 8).data;
+    let sum = 0;
+    for (let i = 0; i < px.length; i += 4) sum += (px[i] + px[i+1] + px[i+2]) / 3;
+    return sum / 64;
+  } catch(e) { return 0; }
+}
+
+const SILENT_SCAN_SAVE_CHUNK = 25;
+
 function triggerReactivityScan() {
   const progressEl = el('reactivity-progress');
   if (progressEl) progressEl.style.display = '';
-  runReactivityScan();
+  const scanBtn = el('pp-scan-btn');
+  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = 'Scanning…'; }
+  runReactivityScan().catch(() => {
+    if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = 'Scan failed — retry'; }
+  });
 }
 
 function cancelReactivityScan() {
   if (_reactivityScanRunning) _reactivityScanCancelled = true;
   const progressEl = el('reactivity-progress');
   if (progressEl) progressEl.style.display = 'none';
+  const scanBtn = el('pp-scan-btn');
+  if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = 'Run Scan'; }
+}
+
+function _scheduleAutoScan(names, delayMs = 30000) {
+  if (!names || names.length === 0) return;
+  if (_pendingScanNames) {
+    // Merge into existing pending scan; use shorter delay so new presets don't wait longer
+    _pendingScanNames = [...new Set([..._pendingScanNames, ...names])];
+    clearTimeout(_autoScanTimer);
+    _autoScanTimer = setTimeout(_fireAutoScan, Math.min(delayMs, 10000));
+    return;
+  }
+  _pendingScanNames = names;
+  _autoScanActivityHandler = () => {
+    clearTimeout(_autoScanTimer);
+    _autoScanTimer = setTimeout(_fireAutoScan, delayMs);
+  };
+  document.addEventListener('mousemove', _autoScanActivityHandler, { passive: true });
+  document.addEventListener('keydown',   _autoScanActivityHandler);
+  _autoScanTimer = setTimeout(_fireAutoScan, delayMs);
+}
+
+function _fireAutoScan() {
+  if (_autoScanActivityHandler) {
+    document.removeEventListener('mousemove', _autoScanActivityHandler);
+    document.removeEventListener('keydown',   _autoScanActivityHandler);
+    _autoScanActivityHandler = null;
+  }
+  const toScan = _pendingScanNames;
+  _pendingScanNames = null;
+  if (toScan?.length) _runSilentScan(toScan);
+}
+
+async function _runSilentScan(names) {
+  if (_silentScanRunning || _reactivityScanRunning || !names?.length) return;
+  _silentScanRunning = true;
+  console.log(`[IKANDY] Silent scan starting: ${names.length} preset(s)`);
+
+  const testCanvas   = document.createElement('canvas');
+  testCanvas.width   = testCanvas.height = 64;
+  const sampleCanvas = document.createElement('canvas');
+  sampleCanvas.width = sampleCanvas.height = 8;
+  const sampleCtx    = sampleCanvas.getContext('2d', { willReadFrequently: true });
+
+  const testAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc          = testAudioCtx.createOscillator();
+  osc.frequency.value = 80;
+  const gainNode     = testAudioCtx.createGain();
+  gainNode.gain.value = 0;
+  const testAnalyser = testAudioCtx.createAnalyser();
+  testAnalyser.fftSize = 2048;
+  osc.connect(gainNode); gainNode.connect(testAnalyser); osc.start();
+
+  await waitForButterchurn();
+  const bc      = butterchurn.default || butterchurn;
+  const testViz = bc.createVisualizer(testAudioCtx, testCanvas, { width: 64, height: 64, pixelRatio: 1 });
+  testViz.connectAudio(testAnalyser);
+
+  const results = {};
+
+  for (let i = 0; i < names.length; i++) {
+    if (_reactivityScanRunning) break;  // manual scan started — yield immediately
+
+    const name = names[i];
+    const idx  = allNames.indexOf(name);
+    if (idx < 0) continue;             // preset removed since scan was scheduled
+
+    let thisScore;
+    try { testViz.loadPreset(allPresets[idx], 0); } catch(e) { thisScore = 0; }
+    if (thisScore === undefined) {
+      gainNode.gain.value = 0;
+      await _scanRenderFrames(testViz, 10);
+      const bQuiet = _scanSampleBrightness(sampleCtx, testCanvas);
+      gainNode.gain.value = 3.0;
+      await _scanRenderFrames(testViz, 20);
+      const bLoud  = _scanSampleBrightness(sampleCtx, testCanvas);
+      const maxB   = Math.max(bQuiet, bLoud, 1);
+      thisScore = Math.round(Math.abs(bLoud - bQuiet) / maxB * 100) / 100;
+    }
+    results[name] = thisScore;
+
+    // Incremental save every 25 scored presets — resume-safe if app closes mid-scan
+    if (Object.keys(results).length % SILENT_SCAN_SAVE_CHUNK === 0 && window.IKANDY?.savePresetReactivity) {
+      const merged = Object.assign({}, _reactivityData, results);
+      window.IKANDY.savePresetReactivity({
+        version: 2, scoredCount: Object.keys(merged).length,
+        scores: merged, tempos: _presetTempo
+      }).catch(() => {});
+    }
+
+    await new Promise(resolve => {
+      typeof requestIdleCallback === 'function'
+        ? requestIdleCallback(resolve, { timeout: 2000 })
+        : setTimeout(resolve, 16);
+    });
+  }
+
+  osc.stop();
+  testAudioCtx.close().catch(() => {});
+
+  const n = Object.keys(results).length;
+  if (n > 0) {
+    Object.assign(_reactivityData, results);
+    if (window.IKANDY?.savePresetReactivity) {
+      window.IKANDY.savePresetReactivity({
+        version: 2, scoredCount: Object.keys(_reactivityData).length,
+        scores: _reactivityData, tempos: _presetTempo
+      }).catch(e => console.warn('[IKANDY] saveReactivity (silent):', e));
+    }
+    _refillBag();
+    updateCategoryTabCounts();
+    console.log(`[IKANDY] Silent scan done: ${n} new score(s), ${Object.keys(_reactivityData).length} total`);
+  }
+
+  _silentScanRunning = false;
 }
 
 async function runReactivityScan() {
@@ -8107,26 +8257,7 @@ async function runReactivityScan() {
   const testViz = bc.createVisualizer(testAudioCtx, testCanvas, { width: 64, height: 64, pixelRatio: 1 });
   testViz.connectAudio(testAnalyser);
 
-  function sampleBrightness() {
-    try {
-      sampleCtx.drawImage(testCanvas, 0, 0, 8, 8);
-      const px = sampleCtx.getImageData(0, 0, 8, 8).data;
-      let sum = 0;
-      for (let i = 0; i < px.length; i += 4) sum += (px[i] + px[i+1] + px[i+2]) / 3;
-      return sum / 64;
-    } catch(e) { return 0; }
-  }
-
-  function renderFrames(n) {
-    return new Promise(resolve => {
-      let f = 0;
-      function frame() {
-        try { testViz.render(); } catch(e) {}
-        if (++f < n) requestAnimationFrame(frame); else resolve();
-      }
-      requestAnimationFrame(frame);
-    });
-  }
+  const scanBtn = el('pp-scan-btn');
 
   for (let i = 0; i < total; i++) {
     if (_reactivityScanCancelled) break;
@@ -8135,13 +8266,14 @@ async function runReactivityScan() {
     const barEl    = document.getElementById('reactivity-bar');
     if (statusEl) statusEl.textContent = `Analyzing presets… ${i + 1}/${total}`;
     if (barEl) barEl.style.width = Math.round(i / total * 100) + '%';
+    if (scanBtn) scanBtn.textContent = `Scanning… ${i + 1} / ${total}`;
     try { testViz.loadPreset(allPresets[i], 0); } catch(e) { results[name] = 0; continue; }
     gainNode.gain.value = 0;
-    await renderFrames(10); // settle with silence
-    const bQuiet = sampleBrightness();
+    await _scanRenderFrames(testViz, 10); // settle with silence
+    const bQuiet = _scanSampleBrightness(sampleCtx, testCanvas);
     gainNode.gain.value = 3.0;
-    await renderFrames(20); // measure with loud bass
-    const bLoud = sampleBrightness();
+    await _scanRenderFrames(testViz, 20); // measure with loud bass
+    const bLoud = _scanSampleBrightness(sampleCtx, testCanvas);
     const maxB = Math.max(bQuiet, bLoud, 1);
     results[name] = Math.round(Math.abs(bLoud - bQuiet) / maxB * 100) / 100;
     // Frame 1 fingerprint — captured right after the loud-bass measurement
@@ -8154,7 +8286,7 @@ async function runReactivityScan() {
       function frame() {
         try { testViz.render(); } catch(e) {}
         if (f % 30 === 0) {
-          const b = sampleBrightness();
+          const b = _scanSampleBrightness(sampleCtx, testCanvas);
           if (_tPrev !== null) _tSamples.push(Math.abs(b - _tPrev) / 255);
           _tPrev = b;
         }
@@ -8180,7 +8312,7 @@ async function runReactivityScan() {
     _reactivityData = results;
     _presetTempo = tempos;
     if (window.IKANDY?.savePresetReactivity) {
-      window.IKANDY.savePresetReactivity(Object.assign({}, results, { __tempos__: tempos })).catch(e => console.warn('[IKANDY] savePresetReactivity:', e));
+      window.IKANDY.savePresetReactivity({ version: 2, scoredCount: Object.keys(results).length, scores: results, tempos }).catch(e => console.warn('[IKANDY] savePresetReactivity:', e));
     }
     // Visual dedup — pairwise hamming on 8×8 fingerprints captured during scan
     const visualDups = _runVisualDedup();
@@ -8197,11 +8329,15 @@ async function runReactivityScan() {
       const reactive = Object.values(results).filter(s => s >= REACTIVITY_THRESHOLD).length;
       statusEl.textContent = `Done — ${reactive}/${total} reactive, ${window._dupPresets.size} dupes filtered`;
     }
+    const reactive = Object.values(results).filter(s => s >= REACTIVITY_THRESHOLD).length;
+    const ambient  = total - reactive;
+    if (scanBtn) scanBtn.textContent = `✓ Scanned ${total} presets — ${reactive} reactive, ${ambient} ambient`;
     updateCategoryTabCounts();
     setTimeout(() => {
       const progressEl = document.getElementById('reactivity-progress');
       if (progressEl) progressEl.style.display = 'none';
-    }, 4000);
+      if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = 'Run Scan'; }
+    }, 3000);
   }
   if (_fpScanWarnCount > 0) {
     console.warn(`[IKANDY] ${_fpScanWarnCount} preset(s) had setRendererSize warnings during scan`);
@@ -14201,16 +14337,13 @@ async function bootApp() {
   // Sync pool count UI with default filter state (bag was already filled by loadPresets)
   _syncPoolCountUI(_buildActivePool().length);
 
-  // Always load reactivity scores so REACTIVE/AMBIENT tabs show correct counts
+  // Load reactivity scores; diff against known presets to schedule silent scan for any gaps
   if (window.IKANDY?.loadPresetReactivity) {
     window.IKANDY.loadPresetReactivity().then(saved => {
-      if (saved && typeof saved === 'object' && Object.keys(saved).length > 0) {
-        const savedTempos = saved.__tempos__;
-        if (savedTempos && typeof savedTempos === 'object') _presetTempo = savedTempos;
-        const scores = {};
-        for (const [k, v] of Object.entries(saved)) { if (k !== '__tempos__') scores[k] = v; }
-        if (Object.keys(scores).length === 0) return;
-        _reactivityData = scores;
+      const hasV2 = saved?.version === 2 && saved.scores && typeof saved.scores === 'object';
+      if (hasV2) {
+        if (saved.tempos && typeof saved.tempos === 'object') _presetTempo = saved.tempos;
+        _reactivityData = saved.scores;
         _refillBag();
         _syncPoolCountUI(_buildActivePool().length);
         updateCategoryTabCounts();
@@ -14227,6 +14360,14 @@ async function bootApp() {
         const nFast = Object.values(_presetTempo).filter(t => t === 'fast').length;
         console.log(`[IKANDY] Preset categories — Reactive: ${reactive}, Ambient: ${ambient}, Image-texture: ${_imagePresetNames.size}`);
         if (nSlow + nMed + nFast > 0) console.log(`[IKANDY] Tempo data — Slow: ${nSlow}, Medium: ${nMed}, Fast: ${nFast}`);
+      }
+      // Schedule silent scan for any presets not yet scored
+      const unscored = allNames.filter(n =>
+        !_imagePresetNames.has(n) && !_customPresetNames.has(n) && _reactivityData[n] === undefined
+      );
+      if (unscored.length > 0) {
+        console.log(`[IKANDY] ${unscored.length} preset(s) unscored — scheduling silent scan`);
+        _scheduleAutoScan(unscored, 30000);
       }
     }).catch(() => {});
   }

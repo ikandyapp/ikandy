@@ -1587,14 +1587,14 @@ const REACTIVITY_FILE = () => path.join(app.getPath('userData'), 'IKANDY-preset-
 
 ipcMain.handle('preset-reactivity-load', async () => {
   try {
-    const raw = fs.readFileSync(REACTIVITY_FILE(), 'utf8');
-    const obj = JSON.parse(raw);
-    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
-  } catch(e) { return {}; }
+    const obj = JSON.parse(fs.readFileSync(REACTIVITY_FILE(), 'utf8'));
+    if (obj?.version === 2 && obj.scores && typeof obj.scores === 'object') return obj;
+    return { version: 0, scores: {}, tempos: {} };   // old flat format → treat as cache miss
+  } catch(e) { return { version: 0, scores: {}, tempos: {} }; }
 });
 
 ipcMain.handle('preset-reactivity-save', async (_e, data) => {
-  if (!data || typeof data !== 'object') return { ok: false };
+  if (data?.version !== 2 || typeof data.scores !== 'object') return { ok: false };
   try { fs.writeFileSync(REACTIVITY_FILE(), JSON.stringify(data)); return { ok: true }; }
   catch(e) { console.warn('[IKANDY] writeReactivity:', e.message); return { ok: false }; }
 });
