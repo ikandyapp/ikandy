@@ -803,7 +803,7 @@ ipcMain.handle('clear-client-id', () => {
 ipcMain.handle('open-external', async (_e, url) => {
   try {
     if (typeof url !== 'string') return { ok: false };
-    if (!/^https:\/\/(github\.com\/IKANDYapp\/|objects\.githubusercontent\.com\/)/i.test(url)) return { ok: false };
+    if (!/^https:\/\/(github\.com\/(IKANDYapp|jberg)\/|objects\.githubusercontent\.com\/)/i.test(url)) return { ok: false };
     await shell.openExternal(url);
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
@@ -1419,7 +1419,9 @@ function getSavedPresetFolder() {
 
 function loadPresetsFromFolder(dir) {
   try {
-    const files = fs.readdirSync(dir).filter(f => {
+    const allFiles = fs.readdirSync(dir);
+    const milkCount = allFiles.filter(f => path.extname(f).toLowerCase() === '.milk').length;
+    const files = allFiles.filter(f => {
       if (path.extname(f).toLowerCase() !== '.json') return false;
       const full = path.resolve(dir, f);
       if (!full.startsWith(path.resolve(dir))) return false;
@@ -1433,7 +1435,7 @@ function loadPresetsFromFolder(dir) {
         presets[name] = data;
       } catch(e) {}
     }
-    return { ok: true, presets, count: Object.keys(presets).length, dir };
+    return { ok: true, presets, count: Object.keys(presets).length, milkCount, dir };
   } catch(e) { return { ok: false, error: e.message }; }
 }
 
@@ -1445,8 +1447,9 @@ ipcMain.handle('pick-preset-folder', async () => {
   if (result.canceled || !result.filePaths.length) return { ok: false };
   const dir = result.filePaths[0];
   if (!path.isAbsolute(dir)) return { ok: false, error: 'Invalid path' };
-  fs.writeFileSync(PRESET_FOLDER_FILE(), dir, 'utf8');
-  return loadPresetsFromFolder(dir);
+  const loaded = loadPresetsFromFolder(dir);
+  if (loaded.ok && loaded.count > 0) fs.writeFileSync(PRESET_FOLDER_FILE(), dir, 'utf8');
+  return loaded;
 });
 
 ipcMain.handle('get-preset-folder', () => {

@@ -2001,6 +2001,10 @@ body.layout-console.c-idle #vc-modal { opacity: 0; pointer-events: none; transit
 #pulse-popover .c-scene-btn { width: 100%; text-align: left; }
 #c-btn-pulse.on { color: var(--acc); }
 
+/* ── Milk file detection modal ── */
+#milk-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 10000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
+#milk-modal.open { display: flex; }
+
 /* ── First-launch source picker overlay ── */
 #sp-overlay {
   display: none; position: fixed; inset: 0;
@@ -7940,11 +7944,33 @@ function _initCRackTimings() {
 async function pickPresetFolder() {
   const result = await window.IKANDY.pickPresetFolder();
   if (!result?.ok) return;
+  const { count, milkCount = 0 } = result;
+  if (count === 0 && milkCount > 0) {
+    showMilkModal(0, milkCount);
+    return;
+  }
   applyCustomPresets(result);
-  toast(`✓ Loaded ${result.count} presets from folder`);
-  // Reset disk-load flag so we re-check disk for the new preset name set
+  if (milkCount > 0) {
+    showMilkModal(count, milkCount);
+  } else {
+    toast(`✓ Loaded ${count} presets from folder`);
+  }
   _thumbDiskLoaded = false;
   prewarmThumbs();
+}
+
+function showMilkModal(jsonCount, milkCount) {
+  const body = el('milk-modal-body');
+  if (body) {
+    body.textContent = jsonCount === 0
+      ? `IKANDY found ${milkCount} .milk file${milkCount !== 1 ? 's' : ''} but can't load them. Butterchurn uses a JSON preset format — use the converter to transform your .milk files first.`
+      : `IKANDY loaded ${jsonCount} preset${jsonCount !== 1 ? 's' : ''} but skipped ${milkCount} .milk file${milkCount !== 1 ? 's' : ''}. Use the converter to transform them into the JSON format IKANDY understands.`;
+  }
+  el('milk-modal')?.classList.add('open');
+}
+
+function closeMilkModal() {
+  el('milk-modal')?.classList.remove('open');
 }
 
 async function clearPresetFolder() {
@@ -10058,7 +10084,8 @@ document.addEventListener('keydown', e => {
         el('sp-guide-modal')?.style.display === 'flex' ||
         el('sp-free-modal')?.style.display === 'flex' ||
         el('src-help-modal')?.classList.contains('open') ||
-        el('seizure-modal')?.classList.contains('open');
+        el('seizure-modal')?.classList.contains('open') ||
+        el('milk-modal')?.classList.contains('open');
       if (modalOpen) break;
       randPreset();
       break;
@@ -10075,6 +10102,7 @@ document.addEventListener('keydown', e => {
       if (_themePopoverOpen) { closeThemePopover(); break; }
       if (el('cs-modal')?.classList.contains('open')) { closeConsoleSettings(); break; }
       if (el('vc-modal')?.classList.contains('open')) { closeVizConfig(); break; }
+      if (el('milk-modal')?.classList.contains('open')) { closeMilkModal(); break; }
       if (document.fullscreenElement) document.exitFullscreen();
       else closePresetPanel();
       break;
@@ -14646,6 +14674,19 @@ boot().catch(e => { console.error('[IKANDY] Boot failed:', e); toast('Boot error
     <p style="margin:0 0 12px;color:rgba(200,190,220,.85);">Spotify's API doesn't allow Free accounts to control playback. But you can still use IKANDY!</p>
     <p style="margin:0 0 16px;color:rgba(200,190,220,.85);"><b style="color:#fff;">Now Playing</b> reads whatever is playing on your computer — including Spotify Free. You'll get full transport control with no setup.</p>
     <button onclick="switchToNowPlaying()" style="width:100%;padding:11px 0;border-radius:5px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#7b2fff,#b44fff);color:#fff;">Switch to Now Playing →</button>
+  </div>
+</div>
+
+<!-- Milk file detection modal -->
+<div id="milk-modal" onclick="if(event.target===this)closeMilkModal()">
+  <div style="background:linear-gradient(160deg,#0d0d14 60%,#14100d);border:1px solid rgba(255,165,0,.2);border-radius:10px;max-width:480px;width:100%;padding:30px;color:#ccc;font-size:13px;line-height:1.7;">
+    <div style="font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,165,0,.7);margin-bottom:6px;">Preset format</div>
+    <h2 style="font-size:22px;color:#fff;margin:0 0 12px 0;font-weight:700;">.milk files aren't supported</h2>
+    <p id="milk-modal-body" style="margin:0 0 16px;color:rgba(200,190,220,.85);"></p>
+    <div style="display:flex;gap:10px;">
+      <button onclick="closeMilkModal()" style="flex:1;padding:11px 0;border-radius:5px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:rgba(255,255,255,.1);color:#fff;">Got it</button>
+      <button onclick="window.IKANDY.openExternal('https://github.com/jberg/butterchurn-converter')" style="flex:1;padding:11px 0;border-radius:5px;border:none;font-size:13px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#2f7fff,#4fbfff);color:#fff;">Open Converter on GitHub ↗</button>
+    </div>
   </div>
 </div>
 
