@@ -11017,6 +11017,59 @@ void main(){
   fragColor=vec4(col*(diff*.7+ambient)+vec3(spec)+rim,1.);
 }`;
 
+// ── Background star shaders ───────────────────────────────────────────────────
+const FERRO_BG_VERT = `#version 300 es
+in vec2 a_pos;
+out vec2 v_uv;
+void main(){v_uv=a_pos*.5+.5;gl_Position=vec4(a_pos,0.,1.);}`;
+
+const FERRO_BG_FRAG = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform vec3  uCamRight;
+uniform vec3  uCamUp;
+uniform vec3  uCamFwd;
+uniform float uAspect;
+uniform float uHalfTan;
+uniform float uTime;
+uniform float uBass;
+out vec4 fragColor;
+
+const float PI=3.14159265;
+const float DENSITY=500.;
+
+float h1(vec2 p){p=fract(p*vec2(234.34,435.345));p+=dot(p,p+34.23);return fract(p.x*p.y);}
+vec2  h2(vec2 p){return vec2(h1(p),h1(p+vec2(7.53,3.17)));}
+
+void main(){
+  vec2 ndc=v_uv*2.-1.;
+  vec3 ray=normalize(uCamFwd+ndc.x*uAspect*uHalfTan*uCamRight+ndc.y*uHalfTan*uCamUp);
+  float theta=atan(ray.z,ray.x);
+  float phi=asin(clamp(ray.y,-0.9999,0.9999));
+  vec2 sky=vec2(theta/(2.*PI)+.5,phi/PI+.5)*DENSITY;
+  vec3 col=vec3(0.);
+  for(int dy=-1;dy<=1;dy++){
+    for(int dx=-1;dx<=1;dx++){
+      vec2 cell=floor(sky)+vec2(float(dx),float(dy));
+      float raw=h1(cell+vec2(31.71,17.43));
+      if(raw<0.85) continue;
+      vec2 sv=cell+h2(cell);
+      float dist=length(sky-sv);
+      float brt=pow((raw-0.85)/0.15,2.2);
+      float radius=0.04+brt*0.06;
+      float glow=exp(-dist*dist/(radius*radius)*3.);
+      if(glow<0.001) continue;
+      float twH=h1(cell+vec2(5.91,2.37));
+      brt*=0.85+0.15*sin(uTime*10.*(2.+twH*2.)+twH*6.2832);
+      brt*=1.+uBass*0.3;
+      float ch=h1(cell+vec2(9.13,4.47));
+      vec3 sc=ch<0.07?vec3(.70,.85,1.):ch<0.18?vec3(1.,.90,.60):vec3(1.);
+      col+=sc*glow*brt;
+    }
+  }
+  fragColor=vec4(col,1.);
+}`;
+
 // ── Matrix helpers (column-major, matching GLSL convention) ──────────────────
 function _fSub3(a,b){return[a[0]-b[0],a[1]-b[1],a[2]-b[2]];}
 function _fDot3(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
@@ -11063,6 +11116,9 @@ let _ferroVAO      = null;
 let _ferroIdxCount = 0;
 let _ferroAudioTex = null;
 let _ferroU        = {};
+let _ferroBgProg   = null;
+let _ferroBgVAO    = null;
+let _ferroBgU      = {};
 
 function _ferroInit(){
   const gl=ferroGl; if(!gl||_ferroProg) return;
@@ -11123,6 +11179,26 @@ function _ferroInit(){
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+
+  // Background star program + fullscreen quad
+  const bgVs=mkShader(gl.VERTEX_SHADER,FERRO_BG_VERT);
+  const bgFs=mkShader(gl.FRAGMENT_SHADER,FERRO_BG_FRAG);
+  if(bgVs&&bgFs){
+    const bgP=gl.createProgram();
+    gl.attachShader(bgP,bgVs); gl.attachShader(bgP,bgFs); gl.linkProgram(bgP);
+    if(gl.getProgramParameter(bgP,gl.LINK_STATUS)){
+      _ferroBgProg=bgP;
+      ['uCamRight','uCamUp','uCamFwd','uAspect','uHalfTan','uTime','uBass'].forEach(n=>{
+        _ferroBgU[n]=gl.getUniformLocation(bgP,n);
+      });
+      _ferroBgVAO=gl.createVertexArray(); gl.bindVertexArray(_ferroBgVAO);
+      const bb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,bb);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+      const bpL=gl.getAttribLocation(bgP,'a_pos');
+      gl.enableVertexAttribArray(bpL); gl.vertexAttribPointer(bpL,2,gl.FLOAT,false,0,0);
+      gl.bindVertexArray(null);
+    } else { console.error('[IKANDY Ferrofluid] BG link:',gl.getProgramInfoLog(bgP)); }
+  }
 }
 
 // ── Mouse handlers (attached on first start, never removed) ──────────────────
@@ -11182,6 +11258,29 @@ function renderFerrofluid(){
   const force=_sceneIntensity*15.0;
 
   gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+  // Camera basis for star ray reconstruction (same math as inside _fLookAt)
+  const z=_fNorm3(eye);
+  const x=_fNorm3(_fCross([0,1,0],z));
+  const y=_fCross(z,x);
+
+  // Background stars — drawn before spikes, depth-test off so they fill discarded regions
+  if(_ferroBgProg&&_ferroBgVAO){
+    gl.disable(gl.DEPTH_TEST);
+    gl.useProgram(_ferroBgProg);
+    const bu=_ferroBgU;
+    gl.uniform3f(bu.uCamRight, x[0],x[1],x[2]);
+    gl.uniform3f(bu.uCamUp,    y[0],y[1],y[2]);
+    gl.uniform3f(bu.uCamFwd,  -z[0],-z[1],-z[2]);
+    gl.uniform1f(bu.uAspect,  W/H);
+    gl.uniform1f(bu.uHalfTan, Math.tan(25*Math.PI/360));
+    gl.uniform1f(bu.uTime,    _ferroTime);
+    gl.uniform1f(bu.uBass,    _aBass);
+    gl.bindVertexArray(_ferroBgVAO);
+    gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    gl.bindVertexArray(null);
+  }
+
   gl.enable(gl.DEPTH_TEST);
   gl.useProgram(_ferroProg);
   const u=_ferroU;
