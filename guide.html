@@ -721,7 +721,7 @@
 <header class="page-header">
   <p class="page-eyebrow">📖 The Manual</p>
   <h1 class="page-title">User Guide</h1>
-  <p class="page-sub"><strong style="color:var(--txt);">IKANDY paints your music.</strong> Press play in any music app and watch your screen come alive &mdash; colors, light and shapes that move with every beat. This guide walks you through everything: getting IKANDY installed, picking a music source, choosing presets and scenes, adding FX, and what to do when things misbehave.</p>
+  <p class="page-sub"><strong style="color:var(--txt);">IKANDY paints your music.</strong> Press play in any music app and watch your screen come alive &mdash; colors, light and shapes that move with every beat. This guide covers everything: getting set up, picking a music source, presets, scenes, FX, lyrics, and what to do when things misbehave.</p>
 </header>
 
 <!-- TOC -->
@@ -751,7 +751,7 @@
   <ol class="steps">
     <li>Download <code>IKANDY.Setup.exe</code> from the <strong>home page</strong> or the GitHub releases page.</li>
     <li>Run the installer. It places IKANDY in your AppData folder and creates a Start Menu and desktop shortcut.</li>
-    <li>The first launch may take a few extra seconds while the preset library indexes itself.</li>
+    <li>On first launch IKANDY indexes the preset library and runs a background reactivity scan — this takes a few seconds and happens silently while you use the app.</li>
   </ol>
 
   <div class="callout warn">
@@ -759,12 +759,9 @@
     Windows will show <em>"Windows protected your PC"</em> on the very first launch. This is because IKANDY is in beta and the Certum code-signing certificate is still in verification. Click <strong>More info → Run anyway</strong>. Once the certificate is issued, the warning disappears for everyone. The full source code is public at github.com/IKANDYapp/IKANDY.
   </div>
 
-  <h3>What you'll see</h3>
-  <p class="body">A loading screen with the IKANDY mark fades in, then the main window opens with a default Butterchurn preset already running. The bottom of the screen shows the audio source selector. Pick a source to start hearing the visuals react to your music.</p>
-
   <div class="callout tip">
-    <span class="callout-label">First-time tip</span>
-    The fastest path to seeing IKANDY work: start playing music in any app on your computer (Spotify, YouTube, anything), then in IKANDY pick <strong>Now Playing</strong> as the source. No setup, no auth &mdash; IKANDY listens to whatever Windows is currently playing and starts reacting immediately.
+    <span class="callout-label">Fastest path to visuals</span>
+    Start playing music in any app on your computer, then in IKANDY pick <strong>Now Playing</strong> as the source. No setup, no auth — IKANDY listens to whatever Windows is currently playing and starts reacting immediately.
   </div>
 </section>
 
@@ -797,33 +794,31 @@
   </div>
 
   <h3>Top bar</h3>
-  <p class="body">The top bar is your nerve centre. The IKANDY logo sits left, with a status badge showing which source is connected. The source selector lets you switch between <strong>Spotify</strong>, <strong>foobar2000</strong>, <strong>VLC</strong> and <strong>Now Playing</strong> at any time. The hide button on the right collapses both sidebars for a clean fullscreen view.</p>
+  <p class="body">The IKANDY logo sits left with a status badge showing which source is connected. The source selector lets you switch between <strong>Spotify</strong>, <strong>foobar2000</strong>, <strong>VLC</strong> and <strong>Now Playing</strong> at any time. Hit <strong>Hide</strong> on the right to collapse both sidebars for a clean fullscreen view — click any edge to bring the panels back.</p>
 
   <h3>Right sidebar — accordions</h3>
-  <p class="body">Click any accordion header to expand or collapse it. The <strong>⊞ All</strong> button at the top expands or collapses every section at once. The four sections are:</p>
+  <p class="body">Click any accordion header to expand or collapse it. The <strong>⊞ All</strong> button expands or collapses every section at once. The four sections are:</p>
   <ul class="b">
     <li><strong>Master</strong> — Reactivity and Smoothness sliders. These affect everything: presets, scenes, lyrics.</li>
-    <li><strong>Presets</strong> — Auto-cycle interval, blend time, animation speed, visualizer opacity.</li>
+    <li><strong>Presets</strong> — Auto-cycle interval, blend time, animation speed, visualizer opacity, reactivity filter.</li>
     <li><strong>Scenes</strong> — Toggle and pick from the 5 custom audio-reactive scenes. Intensity slider.</li>
-    <li><strong>Vibe &amp; FX</strong> — Load a background image, then layer one of 12 GLSL shaders over it.</li>
+    <li><strong>Vibe &amp; FX</strong> — Load a background image, layer one of 12 GLSL shaders, and control multi-monitor output.</li>
   </ul>
 
-  <div class="callout tip">
-    <span class="callout-label">Bigger picture</span>
-    Hit <strong>Hide</strong> in the top bar to collapse both sidebars and let the visuals take the whole window. Click anywhere on the edge to bring the panels back.
-  </div>
+  <h3>Multi-monitor</h3>
+  <p class="body">The <strong>Vibe &amp; FX</strong> accordion has a multi-monitor toggle. Enable it to send the visuals to every secondary display connected to your machine. Two modes:</p>
+  <ul class="b">
+    <li><strong>Mirror</strong> — opens a frameless, always-on-top window on each secondary that mirrors the main canvas. Choose <strong>Fit</strong> (letterbox) or <strong>Fill</strong> (stretch) depending on whether your monitors match aspect ratios.</li>
+    <li><strong>Span</strong> — stretches the main IKANDY window across all selected secondaries into one giant canvas. Best when monitors are the same resolution; mixed resolutions get black filler in the gaps.</li>
+  </ul>
+  <p class="body">Per-display checkboxes let you include or exclude individual monitors. Hot-plug is handled automatically — connecting a new monitor opens a mirror on it; disconnecting one closes it without touching the rest.</p>
 </section>
 
 <!-- 03 SOURCES -->
 <section id="sources">
   <p class="section-tag">03 — Audio Sources</p>
   <h2>Connect<br>Your Music</h2>
-  <p class="lead">IKANDY can connect to four different sources. Each one offers a different feature set depending on what its underlying API exposes. Switching between them automatically pauses the previous one so you don&rsquo;t get two streams playing at once.</p>
-
-  <div class="callout tip" style="margin-bottom:48px;">
-    <span class="callout-label">Tier guide</span>
-    <strong style="color:var(--green);">Full features</strong> &mdash; the richest experience. Playlist browse, search, every shuffle mode, transport, art, lyrics. <strong style="color:#ff6b35;">Standard</strong> &mdash; transport, shuffle on/off, art, lyrics. No library browse. <strong style="color:var(--ice);">Basic</strong> &mdash; transport only, depending on what the source app supports. No browse, no shuffle, no art.
-  </div>
+  <p class="lead">IKANDY can connect to four different sources. Each one offers a different feature set depending on what its underlying API exposes. Switching between them automatically pauses the previous one.</p>
 
   <!-- SPOTIFY -->
   <div class="source-block" style="--c:var(--green);">
@@ -832,26 +827,25 @@
       <span class="source-block-name">Spotify</span>
       <span class="source-block-meta" style="color:var(--green);">● Full features &middot; Premium recommended</span>
     </div>
-    <p class="body dim">The richest integration. Track info, album art, synced lyrics, playlist browser with search, drill-in to tracks, and full transport &mdash; play, pause, skip, shuffle modes (including Smart Shuffle detection), all the way down. IKANDY uses <em>Bring Your Own Key</em> auth: you create a free Spotify Developer app and paste the Client ID once. It&rsquo;s saved encrypted on your machine via Windows DPAPI and never leaves your computer.</p>
+    <p class="body dim">The richest integration. Track info, album art, synced lyrics, playlist browser with search, and full transport &mdash; play, pause, skip, shuffle modes including Smart Shuffle detection. IKANDY uses <em>Bring Your Own Key</em> auth: you create a free Spotify Developer app and paste the Client ID once. It&rsquo;s saved encrypted via Windows DPAPI and never leaves your machine.</p>
 
     <h3 class="first">One-time setup</h3>
     <ol class="steps">
-      <li>In IKANDY, open the source selector and choose <strong>Spotify</strong>. The Spotify settings panel will show you the exact <strong>Redirect URI</strong> to register.</li>
-      <li>Go to <code>developer.spotify.com/dashboard</code>, log in with your Spotify account, and click <strong>Create app</strong>.</li>
-      <li>Give it any name (e.g. <em>"My IKANDY"</em>) and any description. Under <strong>Redirect URIs</strong>, paste the exact URI shown in IKANDY.</li>
-      <li>Check the <strong>Web API</strong> box. Save.</li>
-      <li>Open the new app, go to <strong>Settings</strong>, copy the <strong>Client ID</strong>.</li>
-      <li>Paste the Client ID into IKANDY's Spotify settings and click <strong>Connect</strong>. Spotify will open in your browser to authorise. After approval, you're connected.</li>
+      <li>In IKANDY, open the source selector and choose <strong>Spotify</strong>. The settings panel shows the exact <strong>Redirect URI</strong> to register.</li>
+      <li>Go to <code>developer.spotify.com/dashboard</code>, log in, and click <strong>Create app</strong>.</li>
+      <li>Give it any name and description. Under <strong>Redirect URIs</strong>, paste the URI shown in IKANDY. Check the <strong>Web API</strong> box. Save.</li>
+      <li>Open the new app → <strong>Settings</strong> → copy the <strong>Client ID</strong>.</li>
+      <li>Paste the Client ID into IKANDY's Spotify settings and click <strong>Connect</strong>. Spotify opens in your browser to authorise. Done.</li>
     </ol>
 
     <div class="callout">
       <span class="callout-label">Why BYOK</span>
-      Most apps embed a single shared Client ID, which means Spotify rate-limits everyone using that app together. With BYOK, your IKANDY uses your own quota — no sharing, no throttling, no API outages affecting you.
+      Most apps embed a shared Client ID, so Spotify rate-limits everyone using that app together. With BYOK, your IKANDY uses your own quota — no sharing, no throttling.
     </div>
 
     <div class="callout warn">
       <span class="callout-label">Premium required for transport</span>
-      Spotify's Web API only allows playback control (play, pause, skip, shuffle) for Premium subscribers. Free accounts will see track info, album art, and lyrics, but the playback buttons will be greyed out. <strong>It works with both Spotify desktop AND the web player</strong> &mdash; whichever Spotify Connect device is active will follow IKANDY&rsquo;s commands.
+      Spotify's Web API only allows playback control for Premium subscribers. Free accounts get track info, album art, and lyrics, but playback buttons are greyed out. Works with Spotify desktop, the web player, or any Spotify Connect device.
     </div>
   </div>
 
@@ -862,22 +856,15 @@
       <span class="source-block-name">foobar2000</span>
       <span class="source-block-meta" style="color:var(--green);">● Full features &middot; Beefweb plugin</span>
     </div>
-    <p class="body dim">For the audiophile crowd. Connects to foobar2000 via the <strong>foo_beefweb</strong> component &mdash; a clean REST/JSON API that exposes the full library. Playlist browse with search, drill-in to tracks, every shuffle mode foobar supports (random, shuffle by track/album/folder, repeat playlist, repeat track), transport, album art, lyrics. The most feature-complete source IKANDY supports.</p>
+    <p class="body dim">For the audiophile crowd. Connects via the <strong>foo_beefweb</strong> component — a REST/JSON API that exposes the full library. Playlist browse with search, every shuffle mode foobar supports, transport, album art, lyrics. The most feature-complete source IKANDY offers.</p>
 
     <h3 class="first">One-time setup</h3>
     <ol class="steps">
-      <li>Download and install the <strong>foo_beefweb</strong> component from <code>github.com/hyperblast/beefweb/releases</code>.</li>
-      <li>Open foobar2000. Go to <strong>File → Preferences → Tools → Beefweb Remote Control</strong>.</li>
-      <li>Tick <strong>Enable HTTP server</strong>. The default port is <code>8880</code>.</li>
-      <li>Optionally set a password under <strong>Authentication</strong> if you want to require one.</li>
-      <li>Click Apply, then OK.</li>
-      <li>In IKANDY, choose <strong>foobar2000</strong>, leave port at <code>8880</code> (or change to match), enter the password if set, and click <strong>Connect</strong>.</li>
+      <li>Download and install <strong>foo_beefweb</strong> from <code>github.com/hyperblast/beefweb/releases</code>.</li>
+      <li>In foobar2000: <strong>File → Preferences → Tools → Beefweb Remote Control</strong>.</li>
+      <li>Tick <strong>Enable HTTP server</strong> (default port <code>8880</code>). Optionally set a password. Click Apply.</li>
+      <li>In IKANDY, choose <strong>foobar2000</strong>, leave port at <code>8880</code>, enter the password if set, and click <strong>Connect</strong>.</li>
     </ol>
-
-    <div class="callout tip">
-      <span class="callout-label">Why Beefweb</span>
-      Beefweb is the modern, actively-maintained way to control foobar2000 over HTTP. It supports album art, playlists, search, and every shuffle/repeat mode foobar offers natively.
-    </div>
   </div>
 
   <!-- VLC -->
@@ -887,58 +874,41 @@
       <span class="source-block-name">VLC</span>
       <span class="source-block-meta" style="color:#ff6b35;">● Standard &middot; Local HTTP</span>
     </div>
-    <p class="body dim">Connects to VLC&rsquo;s built-in web interface for transport control over local files &mdash; play, pause, skip, shuffle on/off, album art, synced lyrics. No library browse: VLC&rsquo;s playlist API isn&rsquo;t expressive enough for IKANDY&rsquo;s drill-in browser, so you control playback in IKANDY but pick what to play in VLC itself.</p>
+    <p class="body dim">Connects to VLC&rsquo;s built-in web interface — play, pause, skip, shuffle on/off, album art, synced lyrics. No library browse; pick what to play in VLC, control playback in IKANDY.</p>
 
     <h3 class="first">One-time setup</h3>
     <ol class="steps">
-      <li>Open VLC. Go to <strong>Tools → Preferences</strong>.</li>
-      <li>At the bottom-left, switch <strong>Show settings</strong> from "Simple" to <strong>All</strong>.</li>
+      <li>Open VLC → <strong>Tools → Preferences</strong>. Switch <strong>Show settings</strong> to <strong>All</strong>.</li>
       <li>Navigate to <strong>Interface → Main interfaces</strong> and tick <strong>Web</strong>.</li>
-      <li>Expand <strong>Main interfaces → Lua</strong>, set a <strong>Lua HTTP password</strong> (any password you'll remember), and save.</li>
-      <li>Restart VLC. The web interface is now running on <code>http://localhost:8080</code>.</li>
-      <li>In IKANDY, choose <strong>VLC</strong>, paste the password you set, and click <strong>Connect</strong>.</li>
+      <li>Expand <strong>Main interfaces → Lua</strong>, set a <strong>Lua HTTP password</strong>, and save.</li>
+      <li>Restart VLC. In IKANDY, choose <strong>VLC</strong>, paste the password, and click <strong>Connect</strong>.</li>
     </ol>
 
     <div class="callout tip">
       <span class="callout-label">Custom port</span>
-      If port 8080 is taken on your system, you can change it in the same VLC preferences pane. Just match it in IKANDY's VLC settings.
-    </div>
-
-    <div class="callout">
-      <span class="callout-label">Heads up</span>
-      If you mostly play music in a browser tab or in any other app besides VLC, <strong>Now Playing</strong> covers all of that without needing the VLC web interface set up. VLC&rsquo;s dedicated source is most useful when you specifically use VLC as your music player.
+      If port 8080 is taken, change it in the same VLC preferences pane. Match it in IKANDY's VLC settings.
     </div>
   </div>
 
-  <!-- NOW PLAYING (was: LOCAL) -->
+  <!-- NOW PLAYING -->
   <div class="source-block" style="--c:var(--ice);">
     <div class="source-block-head">
       <span class="source-block-icon">🎙️</span>
       <span class="source-block-name">Now Playing</span>
       <span class="source-block-meta" style="color:var(--ice);">● Basic &middot; Windows Media Controls &middot; Zero setup</span>
     </div>
-    <p class="body dim">The catch-all. Reads whatever app is currently playing music on Windows &mdash; Spotify desktop, Spotify Web Player, YouTube Music, Apple Music, browser tabs (Chrome, Edge), Tidal, anything that publishes to Windows Media Controls. Track info shows up automatically; transport controls (play, pause, next, previous) work on whatever app is the current SMTC owner. No browse, no shuffle, no album art.</p>
+    <p class="body dim">The catch-all. Reads whatever app is currently playing music on Windows &mdash; Spotify, YouTube Music, Apple Music, browser tabs, Tidal, anything that publishes to Windows Media Controls. Track info and transport controls (play, pause, next, prev) follow whatever is active. No browse, no shuffle, no album art.</p>
 
     <h3 class="first">How to use it</h3>
     <ol class="steps">
       <li>Start playing music in any app on your computer.</li>
       <li>In IKANDY, open the source selector and pick <strong>Now Playing</strong>.</li>
-      <li>Within a second, the track info and transport controls light up. Hit play/pause/next/prev in IKANDY to control whatever app is playing.</li>
+      <li>Track info and transport light up within a second. IKANDY shows or greys out individual buttons based on what the active source app actually supports.</li>
     </ol>
-
-    <div class="callout tip">
-      <span class="callout-label">What works depends on the app</span>
-      IKANDY dynamically shows or greys out individual transport buttons based on what the current source app supports. A YouTube single video may not expose Next/Previous, so those buttons grey out. A YouTube Mix or Spotify playlist will light them up. Hover any greyed-out button to see why it&rsquo;s locked.
-    </div>
 
     <div class="callout warn">
       <span class="callout-label">Firefox needs a flag</span>
-      Chrome and Edge bridge HTML5 Media Session to Windows Media Controls automatically. Firefox doesn&rsquo;t by default &mdash; if you use Firefox, open <code>about:config</code>, search <code>media.hardwaremediakeys.enabled</code>, set it to <strong>true</strong>, and restart Firefox.
-    </div>
-
-    <div class="callout warn">
-      <span class="callout-label">Windows only</span>
-      Now Playing relies on Windows Media Controls, which are part of Windows itself. The source isn&rsquo;t available on macOS or Linux.
+      Chrome and Edge bridge HTML5 Media Session to Windows Media Controls automatically. Firefox doesn&rsquo;t by default &mdash; open <code>about:config</code>, search <code>media.hardwaremediakeys.enabled</code>, set it to <strong>true</strong>, and restart Firefox.
     </div>
   </div>
 </section>
@@ -947,26 +917,35 @@
 <section id="presets">
   <p class="section-tag">04 — Visualizer &amp; Presets</p>
   <h2>350 MilkDrop<br>Presets</h2>
-  <p class="lead">The core visualiser is built on Butterchurn 3.0 — a WebGL port of Winamp's legendary MilkDrop engine. The library ships with 350 presets, hand-picked from the MilkDrop community archive across the years.</p>
+  <p class="lead">The core visualiser is built on Butterchurn 3.0 — a WebGL port of Winamp's legendary MilkDrop engine. The library ships with 350 presets hand-picked from the MilkDrop community archive, including a curated <strong>Image</strong> category of presets that layer especially well over a background photo.</p>
 
   <h3>Cycling presets</h3>
-  <p class="body">By default, IKANDY auto-cycles through presets at a fixed interval with a smooth blend between each one. Both knobs are in the <strong>Presets</strong> accordion in the right sidebar:</p>
+  <p class="body">IKANDY auto-cycles through presets at a fixed interval with a smooth blend between each one. Controls in the <strong>Presets</strong> accordion:</p>
   <ul class="b">
-    <li><strong>Auto-cycle interval</strong> — how long each preset stays on screen before moving to the next. Default is 30 seconds.</li>
-    <li><strong>Blend time</strong> — how long the morph between presets takes. Longer blends feel cinematic; shorter blends feel kinetic.</li>
-    <li><strong>Animation speed</strong> — global multiplier on preset motion. Boost it for a wilder ride, drop it for a chiller vibe.</li>
+    <li><strong>Auto-cycle interval</strong> — how long each preset stays before moving on. Default 30 seconds.</li>
+    <li><strong>Blend time</strong> — morph duration between presets. Longer = cinematic; shorter = kinetic.</li>
+    <li><strong>Animation speed</strong> — global motion multiplier across all presets.</li>
     <li><strong>Visualizer opacity</strong> — fade the preset back to let a background image or scene show through.</li>
   </ul>
 
+  <div class="callout tip">
+    <span class="callout-label">Shuffle bag</span>
+    Auto-cycle uses a shuffle bag — every preset in the active pool plays once before any can repeat. No more seeing the same preset twice in a row.
+  </div>
+
+  <h3>Reactivity scan</h3>
+  <p class="body">On first launch, IKANDY silently scans all presets in the background (after 30 seconds of keyboard/mouse idle) and rates each one for audio reactivity. The results are cached — future launches don't re-scan unless you add presets.</p>
+  <p class="body">Once the scan is complete, a <strong>Hide non-reactive presets</strong> checkbox appears in the Presets accordion. Enable it to filter the auto-cycle pool to only presets that visibly respond to beats. To run a manual scan or check the progress, click <strong>Run Scan</strong> — the button shows live progress (<em>Scanning… 42/350</em>) and a completion summary (<em>✓ Scanned 350 presets — 218 reactive, 132 ambient</em>).</p>
+
   <h3>The preset browser</h3>
-  <p class="body">Click <strong>Presets</strong> in the top bar to open the full preset browser. All 350 are listed with thumbnail previews. Hover any thumbnail for a live preview, click to load it as the current preset. Thumbnails are pre-cached on first launch so the browser opens instantly after that.</p>
+  <p class="body">Click <strong>Presets</strong> in the top bar to open the full preset browser. All 350 are listed with thumbnail previews — hover any thumbnail for a live preview, click to load it immediately. Thumbnails are pre-cached on first launch.</p>
 
   <h3>Custom preset folder</h3>
-  <p class="body">If you've collected your own <code>.milk</code> files over the years, IKANDY can load them. In the <strong>Presets</strong> accordion in the right sidebar, point the <strong>Custom preset folder</strong> at any directory containing <code>.milk</code> files. They'll be merged into the browser alongside the bundled library, and the path persists across restarts.</p>
+  <p class="body">In the <strong>Presets</strong> accordion, point <strong>Custom preset folder</strong> at any directory containing <code>.milk</code> files. They merge into the browser alongside the bundled library. The path persists across restarts, and adding a folder automatically queues a silent scan for any unscored presets.</p>
 
   <div class="callout tip">
-    <span class="callout-label">Tip</span>
-    Some legacy MilkDrop presets use math that produces invalid values on modern hardware. IKANDY automatically skips broken presets after the first frame and remembers them — so you only see warnings once, and the cycle keeps moving smoothly.
+    <span class="callout-label">Broken preset handling</span>
+    Some legacy MilkDrop presets produce invalid values on modern hardware. IKANDY automatically skips broken or near-black presets after the first frame and remembers them — warnings appear once, then the cycle keeps moving.
   </div>
 </section>
 
@@ -974,10 +953,10 @@
 <section id="scenes">
   <p class="section-tag">05 — Custom Scenes</p>
   <h2>Audio-Reactive,<br>Built In-House</h2>
-  <p class="lead">Five custom scenes, written from scratch for IKANDY. Unlike Butterchurn presets — which interpret a recipe of math — these are direct audio-reactive engines. Real-time FFT analysis on the input stream drives every pixel, frame by frame. The music literally makes the picture.</p>
+  <p class="lead">Five custom scenes written from scratch for IKANDY. Unlike Butterchurn presets — which interpret a recipe of math — these are direct audio-reactive engines driven by real-time FFT analysis. The music literally makes the picture.</p>
 
   <h3>Turning scenes on</h3>
-  <p class="body">Open the <strong>Scenes</strong> accordion in the right sidebar. The <strong>○ Off / ● On</strong> toggle at the top enables the scene layer. Below that, pick one of the five scenes. The <strong>Intensity</strong> slider controls how aggressively the scene reacts to the audio — from subtle ambient to maxed-out chaos.</p>
+  <p class="body">Open the <strong>Scenes</strong> accordion. The <strong>○ Off / ● On</strong> toggle enables the scene layer. Pick one of the five scenes below. The <strong>Intensity</strong> slider controls how aggressively the scene reacts to the audio.</p>
 
   <div class="fx-table">
     <div class="fx-item" style="--c:#ff6b35;">
@@ -1040,7 +1019,7 @@
 
   <div class="callout">
     <span class="callout-label">Bass-reactive vignette &amp; grain</span>
-    The Vibe &amp; FX accordion also has a global vignette and film grain that pulse softly with the bass. Subtle, but it ties the whole frame together. They work with or without an image loaded.
+    The Vibe &amp; FX accordion also has a global vignette and film grain that pulse softly with the bass. They work with or without an image loaded.
   </div>
 </section>
 
@@ -1051,10 +1030,10 @@
   <p class="lead">IKANDY pulls synced lyrics from <strong>LRCLIB</strong>, a free, open community lyrics database. Lyrics fetch automatically based on the artist and title of the playing track — no manual entry, no per-track configuration.</p>
 
   <h3 class="first">Classic mode</h3>
-  <p class="body">One line at a time, centred on screen. Clean, karaoke-style. Perfect for recording, screen-sharing, or just reading along. The current line glows; previous and upcoming lines are dim.</p>
+  <p class="body">One line at a time, centred on screen. Clean, karaoke-style. Perfect for recording, screen-sharing, or just reading along. The current line glows; surrounding lines are dim.</p>
 
   <h3>Physics mode</h3>
-  <p class="body">Words explode onto the screen and float in zero-gravity. They collide, bounce off the edges, and drift in response to the audio. Totally chaotic, totally beautiful — best paired with a busy preset for maximum overload, or against a clean scene for legibility.</p>
+  <p class="body">Words explode onto the screen and float in zero-gravity. They collide, bounce off the edges, and drift in response to the audio. Best paired with a busy preset for maximum overload, or against a clean scene for legibility.</p>
 
   <div class="callout tip">
     <span class="callout-label">Switching modes</span>
@@ -1063,7 +1042,7 @@
 
   <div class="callout warn">
     <span class="callout-label">No lyrics available</span>
-    LRCLIB is community-maintained, so very new releases or obscure tracks may not have synced lyrics yet. If a track has no LRC entry, IKANDY shows nothing instead of guessing.
+    LRCLIB is community-maintained — very new releases or obscure tracks may not have synced lyrics yet. If there's no LRC entry, IKANDY shows nothing instead of guessing.
   </div>
 </section>
 
@@ -1071,20 +1050,23 @@
 <section id="controls">
   <p class="section-tag">08 — Master Controls &amp; Themes</p>
   <h2>Tune the<br>Whole Thing</h2>
-  <p class="lead">The Master accordion has two sliders that affect everything in IKANDY at once — every preset, every scene, every lyric animation. Get these dialled to your taste and the rest of the app feels right.</p>
+  <p class="lead">The Master accordion has two sliders that affect everything in IKANDY at once — every preset, every scene, every lyric animation.</p>
 
   <h3 class="first">Reactivity</h3>
-  <p class="body">How aggressively the visuals respond to the audio. Low reactivity gives you a calm, ambient feel — visuals drift more than they react. High reactivity makes everything snap to the beat. Default sits in the middle and works for most music.</p>
+  <p class="body">How aggressively the visuals respond to the audio. Low reactivity gives a calm, ambient feel. High reactivity makes everything snap to the beat. Default sits in the middle and works for most music.</p>
 
   <h3>Smoothness</h3>
-  <p class="body">How much the audio analysis is averaged over time. High smoothness softens spikes and gives a more flowing feel; low smoothness makes the visuals chase every transient. For dub, ambient, or downtempo, crank smoothness up. For drum-and-bass or breakcore, drop it down.</p>
+  <p class="body">How much the audio analysis is averaged over time. High smoothness softens spikes and gives a flowing feel; low smoothness makes the visuals chase every transient. For dub or ambient, crank it up. For drum-and-bass or breakcore, drop it down.</p>
+
+  <h3>Progress bar</h3>
+  <p class="body">The playback progress bar is draggable — click and drag anywhere on it to seek to that position in the track. Works with all sources that support seeking.</p>
 
   <h3>Themes</h3>
-  <p class="body">IKANDY ships with <strong>6 colour themes</strong> that re-skin the entire UI — sidebars, accordions, buttons, accents. The themes don't change the visuals themselves, just the chrome. Pick one that matches your music or your mood.</p>
+  <p class="body">IKANDY ships with <strong>6 colour themes</strong> that re-skin the entire UI — sidebars, accordions, buttons, all accents. Themes don't change the visuals themselves, just the chrome around them.</p>
 
   <div class="callout tip">
     <span class="callout-label">Set it once, forget it</span>
-    All settings persist across sessions. Reactivity, theme, source preferences, custom preset folder, last-used scene — all saved automatically. Next launch picks up where you left off.
+    All settings persist across sessions. Reactivity, theme, source preferences, custom preset folder, last-used scene — all saved automatically.
   </div>
 </section>
 
@@ -1095,13 +1077,10 @@
 
   <ul class="b">
     <li><strong>Selecting a Vibe &amp; FX shader auto-disables Scenes.</strong> The image &amp; shader path looks best on its own — IKANDY clears the scene layer automatically. Re-enable it manually if you want to layer.</li>
-    <li><strong>Scenes layer over the Butterchurn visualizer.</strong> Drop the visualizer opacity to let the scene take centre stage, or keep it high to blend the two — some of the most striking results come from running both at once.</li>
-    <li><strong>Drop visualizer opacity to spotlight scenes or backgrounds.</strong> The Butterchurn preset can fade to 30–50% to let a background image or scene breathe through.</li>
-    <li><strong>Auto-cycle works while you're doing other things.</strong> Leave IKANDY running on a second monitor with auto-cycle on and forget about it — the show keeps changing.</li>
-    <li><strong>Custom preset folder + your own .milk files.</strong> Decades of MilkDrop archive content still works. Drop a folder of <code>.milk</code> files into the custom preset path and they'll be merged into the browser.</li>
-    <li><strong>Different sources, different lyrics.</strong> Spotify ships its own track metadata; foobar2000 and VLC use the file's tags; Now Playing reads whatever the source app reports to Windows. As long as title and artist are correct, lyrics fetch automatically. If lyrics aren&rsquo;t loading, double-check the metadata on the playing source.</li>
-    <li><strong>Volume control lives in the source app.</strong> IKANDY doesn&rsquo;t adjust volume directly &mdash; use the source app&rsquo;s own volume, or your Windows volume mixer. The volume slider in IKANDY is locked across all sources.</li>
-    <li><strong>For recording or streaming.</strong> Classic lyric mode + a clean scene like Spectrum + a Holo or Plasma shader gives you a polished look that reads well on video.</li>
+    <li><strong>Drop visualizer opacity to spotlight a scene or background.</strong> Fade the Butterchurn preset to 30–50% to let an image or scene breathe through. Some of the most striking results come from blending both at once.</li>
+    <li><strong>For recording or streaming.</strong> Classic lyric mode + Spectrum scene + Holo or Plasma shader gives a polished look that reads well on video.</li>
+    <li><strong>Lyrics need correct metadata.</strong> As long as artist and title are right, lyrics fetch automatically. If they&rsquo;re not loading, check the metadata on the playing source — wrong tags look up the wrong song.</li>
+    <li><strong>Volume lives in the source app.</strong> IKANDY doesn&rsquo;t adjust system volume — use the source app or your Windows volume mixer.</li>
   </ul>
 </section>
 
@@ -1116,12 +1095,12 @@
     <details class="tr">
       <summary>Now Playing says "Nothing is playing"</summary>
       <div class="tr-body">
-        <p>This means Windows reports no app is currently registered as the SMTC (Windows Media Controls) owner. To fix, simply <strong>start playing music in any app</strong> (Spotify, YouTube tab, Apple Music, etc.) and the message will disappear within a second.</p>
-        <p>If music is playing and Now Playing still doesn&rsquo;t see it, the source app probably isn&rsquo;t publishing to SMTC:</p>
+        <p>Windows reports no app is currently registered as the SMTC owner. Simply <strong>start playing music in any app</strong> and the message will disappear within a second.</p>
+        <p>If music is playing and Now Playing still doesn&rsquo;t see it:</p>
         <ul style="margin-top:8px;">
-          <li><strong>Firefox</strong> &mdash; doesn&rsquo;t bridge to SMTC by default. Open <code>about:config</code>, set <code>media.hardwaremediakeys.enabled</code> to <strong>true</strong>, restart Firefox.</li>
-          <li><strong>Chrome / Edge</strong> &mdash; usually works automatically. If not, check <code>chrome://flags</code> for <em>Hardware Media Key Handling</em> and set it to <strong>Enabled</strong>.</li>
-          <li><strong>Apple Music for Windows</strong> &mdash; can be inconsistent. Try pausing/resuming, or use the dedicated Spotify or foobar source instead if Apple Music is your main player.</li>
+          <li><strong>Firefox</strong> &mdash; open <code>about:config</code>, set <code>media.hardwaremediakeys.enabled</code> to <strong>true</strong>, restart Firefox.</li>
+          <li><strong>Chrome / Edge</strong> &mdash; check <code>chrome://flags</code> for <em>Hardware Media Key Handling</em> and set it to <strong>Enabled</strong>.</li>
+          <li><strong>Apple Music for Windows</strong> &mdash; can be inconsistent. Try pausing/resuming, or use a dedicated source instead.</li>
         </ul>
       </div>
     </details>
@@ -1129,26 +1108,25 @@
     <details class="tr">
       <summary>Now Playing controls grey out / Next or Previous don't work</summary>
       <div class="tr-body">
-        <p>This is by design. IKANDY queries the active source app for which transport commands it actually exposes &mdash; some apps (single YouTube videos, some podcasts) don&rsquo;t advertise Next or Previous, so IKANDY locks those buttons to be honest about what works.</p>
-        <p>Hover any greyed-out button to see the reason in the tooltip. If you want full transport, try a YouTube <strong>Mix</strong> or <strong>playlist</strong> URL, or use Spotify Web Player / Spotify desktop &mdash; those expose every transport command.</p>
+        <p>By design. IKANDY queries the active app for which transport commands it actually exposes — some apps (single YouTube videos, podcasts) don&rsquo;t advertise Next or Previous, so IKANDY locks those buttons.</p>
+        <p>Hover any greyed-out button to see the reason. For full transport, use a YouTube Mix or playlist URL, or Spotify desktop/web player.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>"Could not start audio source" / no audio reactivity</summary>
       <div class="tr-body">
-        <p>Even though IKANDY captures system audio (not your microphone), Windows treats them the same way for privacy purposes.</p>
-        <p><strong>Fix:</strong> go to <strong>Settings → Privacy &amp; security → Microphone</strong> and toggle <strong>Let desktop apps access your microphone</strong> on. Restart IKANDY.</p>
-        <p>If that doesn&rsquo;t help, click <strong>🎤 Reconnect System Audio</strong> in the Source panel to re-grab the loopback stream.</p>
+        <p>Windows treats system audio capture the same as microphone access for privacy purposes.</p>
+        <p><strong>Fix:</strong> <strong>Settings → Privacy &amp; security → Microphone</strong> → toggle <strong>Let desktop apps access your microphone</strong> on. Restart IKANDY.</p>
+        <p>If that doesn&rsquo;t help, click <strong>🎤 Reconnect System Audio</strong> in the Source panel.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>Spotify playback controls are greyed out</summary>
       <div class="tr-body">
-        <p>Spotify only allows external playback control for <strong>Premium</strong> subscribers — this is a Spotify API restriction, not an IKANDY one.</p>
-        <p>If you&rsquo;re on a Free account you&rsquo;ll still get track info, album art, and synced lyrics, but the play/pause/skip buttons will stay locked. Track info, lyrics, and visuals all still work normally.</p>
-        <p><strong>Premium users:</strong> the dedicated Spotify source works whether you&rsquo;re playing in Spotify desktop, Spotify Web Player, mobile, or a Spotify Connect speaker &mdash; whichever device is the active Connect target gets IKANDY&rsquo;s commands.</p>
+        <p>Spotify only allows external playback control for <strong>Premium</strong> subscribers — this is a Spotify API restriction. Free accounts still get track info, album art, and synced lyrics.</p>
+        <p>Premium users: the dedicated source works whether you&rsquo;re playing in Spotify desktop, web player, mobile, or a Spotify Connect speaker.</p>
       </div>
     </details>
 
@@ -1156,83 +1134,79 @@
       <summary>Spotify won't connect / authentication fails</summary>
       <div class="tr-body">
         <p><strong>Most common cause:</strong> the Redirect URI in your Spotify Developer app doesn't exactly match the one IKANDY shows.</p>
-        <p>Open IKANDY's Spotify settings, copy the Redirect URI shown, then go to <code>developer.spotify.com/dashboard</code>, open your app, click Settings, and paste it into <strong>Redirect URIs</strong>. Save. Then re-attempt the Connect from IKANDY.</p>
-        <p>If that's not it, double-check the Client ID is pasted with no leading or trailing spaces, and that the Web API box is ticked in the Spotify app settings.</p>
+        <p>Open IKANDY's Spotify settings, copy the Redirect URI, then go to <code>developer.spotify.com/dashboard</code> → your app → Settings → paste it into <strong>Redirect URIs</strong>. Save, then retry Connect from IKANDY.</p>
+        <p>Also check: Client ID pasted with no leading/trailing spaces, Web API box is ticked.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>VLC won't connect</summary>
       <div class="tr-body">
-        <p>Make sure VLC's web interface is actually running. Open <code>http://localhost:8080</code> in a browser — you should see the VLC web UI prompt for a password. If you don't, the Web interface isn't enabled.</p>
-        <p><strong>Fix:</strong> VLC → <strong>Tools → Preferences</strong> → switch <strong>Show settings</strong> to <strong>All</strong> → <strong>Interface → Main interfaces</strong> → tick <strong>Web</strong>. Then expand <strong>Lua</strong> below it and confirm a Lua HTTP password is set. Restart VLC.</p>
+        <p>Open <code>http://localhost:8080</code> in a browser — you should see the VLC web UI password prompt. If you don't, the web interface isn't enabled.</p>
+        <p><strong>Fix:</strong> VLC → <strong>Tools → Preferences</strong> → <strong>Show settings: All</strong> → <strong>Interface → Main interfaces</strong> → tick <strong>Web</strong>. Expand <strong>Lua</strong> below it and confirm a Lua HTTP password is set. Restart VLC.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>foobar2000 won't connect</summary>
       <div class="tr-body">
-        <p>Confirm Beefweb is installed and running. In foobar2000 → <strong>File → Preferences → Tools → Beefweb Remote Control</strong>, make sure <strong>Enable HTTP server</strong> is ticked.</p>
-        <p>Test by visiting <code>http://localhost:8880</code> in a browser. If you see the Beefweb player, the plugin is healthy and IKANDY should connect with the same port.</p>
-        <p>If you set a Beefweb password, paste it into IKANDY's foobar2000 settings exactly as configured.</p>
+        <p>In foobar2000 → <strong>File → Preferences → Tools → Beefweb Remote Control</strong>, confirm <strong>Enable HTTP server</strong> is ticked.</p>
+        <p>Test by visiting <code>http://localhost:8880</code> in a browser. If you see the Beefweb player, the plugin is healthy. If you set a password, paste it exactly as configured in IKANDY's foobar2000 settings.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>SmartScreen blocks the installer</summary>
       <div class="tr-body">
-        <p><em>"Windows protected your PC"</em> &mdash; this happens because IKANDY is in beta and the Certum code-signing certificate is still in verification.</p>
-        <p><strong>Fix:</strong> click <strong>More info</strong>, then <strong>Run anyway</strong>. The app is open source and the source is public on GitHub. Once the certificate is issued, future builds will be signed automatically and SmartScreen will stop warning everyone.</p>
+        <p><em>"Windows protected your PC"</em> &mdash; IKANDY is in beta and the Certum code-signing certificate is still in verification.</p>
+        <p><strong>Fix:</strong> click <strong>More info</strong>, then <strong>Run anyway</strong>. The app is open source on GitHub. Once the certificate is issued, future builds will be signed and SmartScreen stops warning.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>Visuals don't react to my music</summary>
       <div class="tr-body">
-        <p>Confirm the source is actually connected — the status badge in the top bar should show the source name (e.g. "Spotify") and a green dot.</p>
-        <p>Visuals react to <strong>system audio</strong> regardless of which source you&rsquo;ve picked for track info. If music is playing but the visualizer is static, audio isn&rsquo;t reaching IKANDY. Click <strong>🎤 Reconnect System Audio</strong> in the Source panel, and check Windows microphone permissions (Settings → Privacy &amp; security → Microphone → Let desktop apps access your microphone).</p>
+        <p>Confirm the source is connected — the status badge should show the source name and a green dot.</p>
+        <p>Visuals react to <strong>system audio</strong> regardless of which source you&rsquo;ve picked for track info. If the visualizer is static while music plays, audio isn&rsquo;t reaching IKANDY. Click <strong>🎤 Reconnect System Audio</strong> in the Source panel, and check Windows microphone permissions.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>I have 5.1 or 7.1 surround sound and the visuals barely move</summary>
       <div class="tr-body">
-        <p>IKANDY captures system audio as a stereo (2-channel) loopback stream. If your output device is configured for <strong>5.1 or 7.1 surround</strong>, Windows mixes most of the music into the rear/centre/sub channels, leaving the front L/R that IKANDY captures very quiet &mdash; so the visualizer barely reacts even though music is loud.</p>
+        <p>IKANDY captures a stereo loopback stream. With 5.1/7.1 configured, Windows mixes most music into rear/centre/sub channels, leaving the front L/R that IKANDY captures very quiet.</p>
         <p><strong>Fix:</strong> set your default output to <strong>Stereo (2 channel)</strong>:</p>
         <ol style="margin-top:8px;list-style-position:inside;">
-          <li>Right-click the speaker icon in the system tray → <strong>Sounds</strong>.</li>
-          <li>Open the <strong>Playback</strong> tab, right-click your active output device (speakers/headphones) → <strong>Configure Speakers</strong>.</li>
-          <li>Choose <strong>Stereo</strong>, click <strong>Next</strong> through the wizard, then <strong>Finish</strong>.</li>
-          <li>Back in the Playback tab, right-click the same device → <strong>Properties → Advanced</strong>, and pick a 2-channel format (e.g. <em>16 bit, 48000 Hz</em>) from the <strong>Default Format</strong> dropdown.</li>
-          <li>Click Apply, then in IKANDY hit <strong>🎤 Reconnect System Audio</strong>.</li>
+          <li>Right-click speaker icon → <strong>Sounds → Playback</strong> tab.</li>
+          <li>Right-click your active output → <strong>Configure Speakers</strong> → choose <strong>Stereo</strong>.</li>
+          <li>Right-click again → <strong>Properties → Advanced</strong> → pick a 2-channel format from <strong>Default Format</strong>.</li>
+          <li>Apply, then in IKANDY hit <strong>🎤 Reconnect System Audio</strong>.</li>
         </ol>
-        <p style="margin-top:10px;">Switch back to surround any time &mdash; the setting is just for IKANDY&rsquo;s capture. Some users keep stereo as the default and only switch to surround for movies; others toggle as needed.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>Lyrics aren't showing up</summary>
       <div class="tr-body">
-        <p>Lyrics come from <a href="https://lrclib.net" target="_blank" style="color:var(--ice);">LRCLIB</a>, which is community-maintained. If the track is very new or obscure, there may not be a synced lyrics file yet.</p>
-        <p>You can confirm by searching for the track on <code>lrclib.net</code> directly. If LRCLIB has no entry, IKANDY can't display anything.</p>
-        <p>Also: lyrics need correct artist and title metadata. If your local files have wrong tags, lyrics will look up the wrong song.</p>
+        <p>Lyrics come from <a href="https://lrclib.net" target="_blank" style="color:var(--ice);">LRCLIB</a>, which is community-maintained. Very new or obscure tracks may not have an entry. Search <code>lrclib.net</code> directly to confirm.</p>
+        <p>Also check: if your local files have incorrect artist/title tags, lyrics will look up the wrong song.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>Performance is choppy or stuttering</summary>
       <div class="tr-body">
-        <p>IKANDY is GPU-bound. If your GPU is busy with another task (game running, video encoding, another visualiser), frame rate will suffer.</p>
-        <p>Try: lower the <strong>Animation speed</strong> slider, drop <strong>Reactivity</strong>, or pick a simpler scene like Spectrum or Aurora instead of Starfield. Disable Vibe &amp; FX shaders to remove a full-frame post-process pass.</p>
-        <p>On laptops, make sure IKANDY is using the discrete GPU and not the integrated one. Check via Windows <strong>Settings → System → Display → Graphics</strong>.</p>
+        <p>IKANDY is GPU-bound. If your GPU is busy with another task, frame rate will suffer.</p>
+        <p>Try: lower <strong>Animation speed</strong>, drop <strong>Reactivity</strong>, pick a simpler scene (Spectrum or Aurora instead of Starfield), or disable Vibe &amp; FX shaders to remove a full-frame post-process pass.</p>
+        <p>On laptops, make sure IKANDY is using the discrete GPU: <strong>Settings → System → Display → Graphics</strong>.</p>
       </div>
     </details>
 
     <details class="tr">
       <summary>The app won't launch / crashes on startup</summary>
       <div class="tr-body">
-        <p>Try a clean reinstall: uninstall IKANDY via Settings → Apps, delete the AppData folder at <code>%APPDATA%\IKANDY</code>, and reinstall the latest build.</p>
-        <p>If it still crashes, open an issue on <a href="https://github.com/IKANDYapp/IKANDY/issues" target="_blank" style="color:var(--ice);">github.com/IKANDYapp/IKANDY/issues</a> with your Windows version, GPU, and any error message that appears.</p>
+        <p>Try a clean reinstall: uninstall via Settings → Apps, delete <code>%APPDATA%\IKANDY</code>, then reinstall the latest build.</p>
+        <p>If it still crashes, open an issue at <a href="https://github.com/IKANDYapp/IKANDY/issues" target="_blank" style="color:var(--ice);">github.com/IKANDYapp/IKANDY/issues</a> with your Windows version, GPU, and any error message shown.</p>
       </div>
     </details>
 
