@@ -803,7 +803,7 @@ ipcMain.handle('clear-client-id', () => {
 ipcMain.handle('open-external', async (_e, url) => {
   try {
     if (typeof url !== 'string') return { ok: false };
-    if (!/^https:\/\/(github\.com\/(IKANDYapp|jberg)\/|objects\.githubusercontent\.com\/)/i.test(url)) return { ok: false };
+    if (!/^https:\/\/(github\.com\/(IKANDYapp|jberg)\/|objects\.githubusercontent\.com\/|codepen\.io\/sabosugi\/)/i.test(url)) return { ok: false };
     await shell.openExternal(url);
     return { ok: true };
   } catch (e) { return { ok: false, error: e.message }; }
