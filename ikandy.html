@@ -11010,7 +11010,8 @@ void main(){
   vec3 ambient=mix(vec3(.03,.03,.06),vec3(.12,.15,.28),hemi);
   float fresnel=pow(1.-max(dot(N,V),0.),4.);
   vec3 rim=vec3(.4,.6,1.)*fresnel*.5;
-  float t=clamp(v_height/(uForce*0.6),0.,1.);
+  float t=clamp(v_height/(uForce*0.12),0.,1.);
+  t=pow(t,0.7);
   vec3 col=rainbow(t);
   fragColor=vec4(col*(diff*.7+ambient)+vec3(spec)+rim,1.);
 }`;
