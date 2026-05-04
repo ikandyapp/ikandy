@@ -475,6 +475,85 @@
     align-items: center;
   }
 
+  /* ── CONSOLE DIAGRAM ── */
+  .console-diagram {
+    margin: 32px 0;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(255,255,255,.015);
+    padding: 4px;
+    max-width: 880px;
+    display: grid;
+    grid-template-rows: 1fr 68px;
+    gap: 4px;
+  }
+
+  .cd-stage {
+    background:
+      radial-gradient(ellipse at 50% 50%, rgba(212,168,67,.06), transparent 60%),
+      radial-gradient(ellipse at 70% 30%, rgba(255,45,138,.05), transparent 50%),
+      rgba(255,255,255,.015);
+    border: 1px solid rgba(255,255,255,.06);
+    padding: 48px 24px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    position: relative;
+    min-height: 180px;
+  }
+
+  .cd-lyrics-badge {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ice);
+    opacity: .55;
+    border: 1px solid rgba(91,200,245,.25);
+    padding: 4px 14px;
+    white-space: nowrap;
+  }
+
+  .cd-bar {
+    display: flex;
+    gap: 4px;
+  }
+
+  .cd-zone {
+    flex: 1;
+    background: rgba(255,255,255,.025);
+    border: 1px solid rgba(255,255,255,.06);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 4px;
+  }
+
+  .cdz-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--gold);
+    text-align: center;
+  }
+
+  .cdz-desc {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    color: var(--dim);
+    text-align: center;
+    line-height: 1.4;
+    font-weight: 300;
+  }
+
   /* ── FX TABLE ── */
   .fx-table {
     display: grid;
@@ -696,6 +775,9 @@
     footer { padding: 24px; flex-direction: column; text-align: center; }
     .layout-diagram { grid-template-columns: 1fr; grid-template-rows: 56px repeat(3, 100px); aspect-ratio: auto; }
     .ld-top { grid-column: 1; }
+    .cd-bar { flex-wrap: wrap; }
+    .cd-zone { flex: 0 0 calc(50% - 2px); min-width: 0; }
+    .console-diagram { grid-template-rows: 1fr auto; }
   }
 
   @media (max-width: 600px) {
@@ -768,50 +850,63 @@
 <!-- 02 LAYOUT -->
 <section id="layout">
   <p class="section-tag">02 — The Layout</p>
-  <h2>Where<br>Everything Lives</h2>
-  <p class="lead">IKANDY is organised into four zones: a top bar, a left sidebar for lyrics, a centre stage for the visuals, and a right sidebar with all the controls.</p>
+  <h2>One Screen,<br>One Control Bar</h2>
+  <p class="lead">IKANDY has one layout: the full screen is the stage. A slim console bar lives at the bottom. Everything you need is in those five zones — no sidebars, no accordions.</p>
 
-  <div class="layout-diagram">
-    <div class="ld ld-top">
-      <span class="ld-tag">Top Bar</span>
-      <span style="font-size:13px;color:var(--dim);font-weight:300;">Logo · Status badge · Source selector · Hide toggle</span>
-    </div>
-    <div class="ld">
-      <span class="ld-tag">Left Sidebar</span>
-      <span class="ld-name">Lyrics</span>
-      <span class="ld-desc">Synced lyrics from LRCLIB. Switch between Classic and Physics modes.</span>
-    </div>
-    <div class="ld ld-stage">
-      <span class="ld-tag">Centre Stage</span>
+  <div class="console-diagram">
+    <div class="cd-stage">
+      <div class="cd-lyrics-badge">lyrics overlay</div>
+      <span class="ld-tag">Visualizer Stage</span>
       <span class="ld-name">The Show</span>
-      <span class="ld-desc">Your music, made visible. Full-bleed visuals at all times.</span>
+      <span class="ld-desc">Full-screen preset · scenes · FX image · lyrics float here</span>
     </div>
-    <div class="ld">
-      <span class="ld-tag">Right Sidebar</span>
-      <span class="ld-name">Control Panel</span>
-      <span class="ld-desc">Master, Presets, Scenes, Vibe &amp; FX. Each in its own collapsible accordion.</span>
+    <div class="cd-bar">
+      <div class="cd-zone">
+        <span class="cdz-label">Now Playing</span>
+        <span class="cdz-desc">Art · title · artist</span>
+      </div>
+      <div class="cd-zone">
+        <span class="cdz-label">Playback</span>
+        <span class="cdz-desc">Transport · seek bar</span>
+      </div>
+      <div class="cd-zone">
+        <span class="cdz-label">Visualiser</span>
+        <span class="cdz-desc">Browse ⊞ · count · shuffle</span>
+      </div>
+      <div class="cd-zone">
+        <span class="cdz-label">Utility</span>
+        <span class="cdz-desc">Scene ✦ · Viz Config ≡ · multi-mon</span>
+      </div>
+      <div class="cd-zone">
+        <span class="cdz-label">Settings ⚙</span>
+        <span class="cdz-desc">Source · theme · about</span>
+      </div>
     </div>
   </div>
 
-  <h3>Top bar</h3>
-  <p class="body">The IKANDY logo sits left with a status badge showing which source is connected. The source selector lets you switch between <strong>Spotify</strong>, <strong>foobar2000</strong>, <strong>VLC</strong> and <strong>Now Playing</strong> at any time. Hit <strong>Hide</strong> on the right to collapse both sidebars for a clean fullscreen view — click any edge to bring the panels back.</p>
-
-  <h3>Right sidebar — accordions</h3>
-  <p class="body">Click any accordion header to expand or collapse it. The <strong>⊞ All</strong> button expands or collapses every section at once. The four sections are:</p>
+  <h3>Console bar zones</h3>
   <ul class="b">
-    <li><strong>Master</strong> — Reactivity and Smoothness sliders. These affect everything: presets, scenes, lyrics.</li>
-    <li><strong>Presets</strong> — Auto-cycle interval, blend time, animation speed, visualizer opacity, reactivity filter.</li>
-    <li><strong>Scenes</strong> — Toggle and pick from the 5 custom audio-reactive scenes. Intensity slider.</li>
-    <li><strong>Vibe &amp; FX</strong> — Load a background image, layer one of 12 GLSL shaders, and control multi-monitor output.</li>
+    <li><strong>Now Playing</strong> — album art, track title, artist name. Click the album art to open the lyrics overlay.</li>
+    <li><strong>Playback</strong> — play/pause, skip, shuffle, seek bar. Drag the bar to seek anywhere in the track.</li>
+    <li><strong>Visualiser</strong> — <strong>Browse (⊞)</strong> opens the full preset browser. The live preset count (<em>ALL · 745</em>) and shuffle status are shown here.</li>
+    <li><strong>Utility</strong> — <strong>✦</strong> opens the Scene popover (7 scenes + Intensity slider); <strong>≡</strong> opens Viz Config (MILKDROP / IMAGE / LYRICS tabs); multi-monitor toggle.</li>
+    <li><strong>Settings (⚙)</strong> — source selector, theme palette, reconnect audio, about.</li>
+  </ul>
+
+  <h3>Two modals</h3>
+  <p class="body">Almost all visual controls live in two modals:</p>
+  <ul class="b">
+    <li><strong>Settings (⚙)</strong> — tabs: SOURCE · VIDEO · MOUSE · DEBUG · ABOUT</li>
+    <li><strong>Viz Config (≡)</strong> — tabs: MILKDROP (preset cycling, sensitivity, opacity) · IMAGE (background photo, FX shaders, vignette/grain) · LYRICS (mode, position, font size, opacity, colour)</li>
   </ul>
 
   <h3>Multi-monitor</h3>
-  <p class="body">The <strong>Vibe &amp; FX</strong> accordion has a multi-monitor toggle. Enable it to send the visuals to every secondary display connected to your machine. Two modes:</p>
+  <p class="body">The multi-monitor toggle is in the <strong>Utility</strong> zone of the console bar. Enable it to send visuals to every secondary display. Two modes:</p>
   <ul class="b">
-    <li><strong>Mirror</strong> — opens a frameless, always-on-top window on each secondary that mirrors the main canvas. Choose <strong>Fit</strong> (letterbox) or <strong>Fill</strong> (stretch) depending on whether your monitors match aspect ratios.</li>
-    <li><strong>Span</strong> — stretches the main IKANDY window across all selected secondaries into one giant canvas. Best when monitors are the same resolution; mixed resolutions get black filler in the gaps.</li>
+    <li><strong>Mirror</strong> — a frameless, always-on-top window on each secondary mirrors the main canvas. Choose <strong>Fit</strong> (letterbox) or <strong>Fill</strong> (stretch) depending on whether your monitors match aspect ratios.</li>
+    <li><strong>Span</strong> — stretches the IKANDY window across all selected secondaries into one giant canvas. Best when monitors share the same resolution; mixed resolutions get black filler in the gaps.</li>
   </ul>
-  <p class="body">Per-display checkboxes let you include or exclude individual monitors. Hot-plug is handled automatically — connecting a new monitor opens a mirror on it; disconnecting one closes it without touching the rest.</p>
+  <p class="body">Per-display checkboxes let you include or exclude individual monitors. Hot-plug is automatic — connecting a new monitor opens a mirror; disconnecting one closes it.</p>
 </section>
 
 <!-- 03 SOURCES -->
@@ -916,15 +1011,14 @@
 <!-- 04 PRESETS -->
 <section id="presets">
   <p class="section-tag">04 — Visualizer &amp; Presets</p>
-  <h2>350 MilkDrop<br>Presets</h2>
-  <p class="lead">The core visualiser is built on Butterchurn 3.0 — a WebGL port of Winamp's legendary MilkDrop engine. The library ships with 350 presets hand-picked from the MilkDrop community archive, including a curated <strong>Image</strong> category of presets that layer especially well over a background photo.</p>
+  <h2>745 MilkDrop<br>Presets</h2>
+  <p class="lead">The core visualiser is built on Butterchurn 3.0 — a WebGL port of Winamp's legendary MilkDrop engine. IKANDY ships with 745 presets — the base library, extra curated packs, and an <strong>Image</strong> category that layers especially well over a background photo.</p>
 
   <h3>Cycling presets</h3>
-  <p class="body">IKANDY auto-cycles through presets at a fixed interval with a smooth blend between each one. Controls in the <strong>Presets</strong> accordion:</p>
+  <p class="body">IKANDY auto-cycles through presets at a fixed interval with a smooth blend between each one. Controls in <strong>Viz Config (≡) → MILKDROP tab</strong>:</p>
   <ul class="b">
     <li><strong>Auto-cycle interval</strong> — how long each preset stays before moving on. Default 30 seconds.</li>
     <li><strong>Blend time</strong> — morph duration between presets. Longer = cinematic; shorter = kinetic.</li>
-    <li><strong>Animation speed</strong> — global motion multiplier across all presets.</li>
     <li><strong>Visualizer opacity</strong> — fade the preset back to let a background image or scene show through.</li>
   </ul>
 
@@ -935,17 +1029,22 @@
 
   <h3>Reactivity scan</h3>
   <p class="body">On first launch, IKANDY silently scans all presets in the background (after 30 seconds of keyboard/mouse idle) and rates each one for audio reactivity. The results are cached — future launches don't re-scan unless you add presets.</p>
-  <p class="body">Once the scan is complete, a <strong>Hide non-reactive presets</strong> checkbox appears in the Presets accordion. Enable it to filter the auto-cycle pool to only presets that visibly respond to beats. To run a manual scan or check the progress, click <strong>Run Scan</strong> — the button shows live progress (<em>Scanning… 42/350</em>) and a completion summary (<em>✓ Scanned 350 presets — 218 reactive, 132 ambient</em>).</p>
+  <p class="body">Once the scan is complete, a <strong>Hide non-reactive</strong> toggle appears in the console's visualiser zone. Enable it to filter the auto-cycle pool to only presets that visibly respond to beats. To run a manual scan or check progress, click <strong>Run Scan</strong> — it shows live progress (<em>Scanning… 42/745</em>) and a completion summary when done.</p>
 
   <h3>The preset browser</h3>
-  <p class="body">Click <strong>Presets</strong> in the top bar to open the full preset browser. All 350 are listed with thumbnail previews — hover any thumbnail for a live preview, click to load it immediately. Thumbnails are pre-cached on first launch.</p>
+  <p class="body">Click <strong>Browse (⊞)</strong> in the console's visualiser zone to open the full preset browser. All 745 are listed with thumbnail previews — hover any thumbnail for a live preview, click to load it immediately. Thumbnails are pre-cached on first launch.</p>
 
   <h3>Custom preset folder</h3>
-  <p class="body">In the <strong>Presets</strong> accordion, point <strong>Custom preset folder</strong> at any directory containing <code>.milk</code> files. They merge into the browser alongside the bundled library. The path persists across restarts, and adding a folder automatically queues a silent scan for any unscored presets.</p>
+  <p class="body">In the preset browser, switch to the <strong>CUSTOM</strong> tab. If no folder is loaded, the empty state shows a <strong>Load Folder</strong> button — click it to pick a directory of Butterchurn preset files. The folder merges into the browser alongside the bundled library and persists across restarts.</p>
+
+  <div class="callout warn">
+    <span class="callout-label">File format: .json, not .milk</span>
+    IKANDY uses Butterchurn's <code>.json</code> preset format — not the original MilkDrop <code>.milk</code> binary format. When downloading community preset packs, look for Butterchurn-compatible exports. Native <code>.milk</code> import is planned but not yet implemented.
+  </div>
 
   <div class="callout tip">
     <span class="callout-label">Broken preset handling</span>
-    Some legacy MilkDrop presets produce invalid values on modern hardware. IKANDY automatically skips broken or near-black presets after the first frame and remembers them — warnings appear once, then the cycle keeps moving.
+    Some presets produce invalid values on modern hardware. IKANDY automatically skips broken or near-black presets after the first frame and remembers them — warnings appear once, then the cycle keeps moving.
   </div>
 </section>
 
@@ -953,10 +1052,10 @@
 <section id="scenes">
   <p class="section-tag">05 — Custom Scenes</p>
   <h2>Audio-Reactive,<br>Built In-House</h2>
-  <p class="lead">Five custom scenes written from scratch for IKANDY. Unlike Butterchurn presets — which interpret a recipe of math — these are direct audio-reactive engines driven by real-time FFT analysis. The music literally makes the picture.</p>
+  <p class="lead">Seven custom scenes written from scratch for IKANDY. Unlike Butterchurn presets — which interpret a recipe of math — these are direct audio-reactive engines driven by real-time FFT analysis. The music literally makes the picture.</p>
 
   <h3>Turning scenes on</h3>
-  <p class="body">Open the <strong>Scenes</strong> accordion. The <strong>○ Off / ● On</strong> toggle enables the scene layer. Pick one of the five scenes below. The <strong>Intensity</strong> slider controls how aggressively the scene reacts to the audio.</p>
+  <p class="body">Click the <strong>✦</strong> button in the console's Utility zone to open the Scene popover. Pick one of the seven scenes below — the <strong>Intensity</strong> slider controls how aggressively the scene reacts to the audio. Click <strong>✦</strong> again or press Escape to close.</p>
 
   <div class="fx-table">
     <div class="fx-item" style="--c:#ff6b35;">
@@ -979,11 +1078,19 @@
       <div class="fx-item-name">Starfield</div>
       <div class="fx-item-desc">Beat-reactive cosmos. Stars sweep past while a central planet bounces with every kick — the harder the beat, the bigger the bloom.</div>
     </div>
+    <div class="fx-item" style="--c:#ff2d8a;">
+      <div class="fx-item-name">Singularity</div>
+      <div class="fx-item-desc">A gravitational lens at the centre pulls light inward, collapsing on every beat drop.</div>
+    </div>
+    <div class="fx-item" style="--c:#5bc8f5;">
+      <div class="fx-item-name">Voyager</div>
+      <div class="fx-item-desc">Cosmic depth-of-field flythrough — star clusters and nebulae drift past in sync with tempo.</div>
+    </div>
   </div>
 
   <div class="callout tip">
     <span class="callout-label">Layering</span>
-    Scenes layer over Butterchurn presets. Drop the visualizer opacity in the Presets accordion to let the scene take centre stage, or keep it high to blend the two. Some of the most striking results come from running both at once.
+    Scenes layer over Butterchurn presets — and over FX images. Drop the visualizer opacity in <strong>Viz Config (≡) → MILKDROP tab</strong> to let the scene take centre stage, or keep it high to blend the two. Scenes and FX shaders can run simultaneously.
   </div>
 </section>
 
@@ -995,7 +1102,7 @@
 
   <h3>Loading an image</h3>
   <ol class="steps">
-    <li>Open the <strong>Vibe &amp; FX</strong> accordion.</li>
+    <li>Open <strong>Viz Config (≡) → IMAGE tab</strong>.</li>
     <li>Click <strong>Load Image</strong> and pick any JPG or PNG.</li>
     <li>The image fills the background. The visualizer and scenes (if any) layer on top.</li>
     <li>Pick an FX shader from the grid. Use the <strong>Strength</strong> slider to dial it in.</li>
@@ -1004,22 +1111,22 @@
   <h3>The shaders</h3>
   <div class="fx-table">
     <div class="fx-item" style="--c:#5bc8f5;"><div class="fx-item-name">Rain</div><div class="fx-item-desc">Animated raindrops rippling across the image</div></div>
-    <div class="fx-item" style="--c:#aaa;"><div class="fx-item-name">Ink</div><div class="fx-item-desc">Bleeding ink absorption effect</div></div>
-    <div class="fx-item" style="--c:#ff6b35;"><div class="fx-item-name">VHS</div><div class="fx-item-desc">Warped tape glitch and chromatic shift</div></div>
+    <div class="fx-item" style="--c:#aaa;"><div class="fx-item-name">Ink Bleed</div><div class="fx-item-desc">Bleeding ink absorption effect</div></div>
+    <div class="fx-item" style="--c:#ff6b35;"><div class="fx-item-name">VHS Warp</div><div class="fx-item-desc">Warped tape glitch and chromatic shift</div></div>
     <div class="fx-item" style="--c:#bbb;"><div class="fx-item-name">Fog</div><div class="fx-item-desc">Drifting atmospheric haze</div></div>
-    <div class="fx-item" style="--c:#e8b4b8;"><div class="fx-item-name">Paint</div><div class="fx-item-desc">Wet watercolour bleeding and texture</div></div>
-    <div class="fx-item" style="--c:#c9a96e;"><div class="fx-item-name">Film</div><div class="fx-item-desc">Dust, scratches and film grain overlay</div></div>
-    <div class="fx-item" style="--c:#b8d4e8;"><div class="fx-item-name">Metal</div><div class="fx-item-desc">Liquid chrome surface distortion</div></div>
+    <div class="fx-item" style="--c:#e8b4b8;"><div class="fx-item-name">Watercolor</div><div class="fx-item-desc">Wet watercolour bleeding and texture</div></div>
+    <div class="fx-item" style="--c:#c9a96e;"><div class="fx-item-name">Dust Film</div><div class="fx-item-desc">Dust, scratches and film grain overlay</div></div>
+    <div class="fx-item" style="--c:#b8d4e8;"><div class="fx-item-name">Liquid Metal</div><div class="fx-item-desc">Liquid chrome surface distortion</div></div>
     <div class="fx-item" style="--c:#ff2d8a;"><div class="fx-item-name">Shatter</div><div class="fx-item-desc">Voronoi glass fracture pattern</div></div>
-    <div class="fx-item" style="--c:#00ff88;"><div class="fx-item-name">Corrupt</div><div class="fx-item-desc">Digital glitch and data corruption</div></div>
-    <div class="fx-item" style="--c:#9b72cf;"><div class="fx-item-name">Plasma</div><div class="fx-item-desc">Electric arc discharge overlay</div></div>
-    <div class="fx-item" style="--c:#5bc8f5;"><div class="fx-item-name">Holo</div><div class="fx-item-desc">Iridescent holographic shimmer</div></div>
-    <div class="fx-item" style="--c:#ff6b35;"><div class="fx-item-name">Heat</div><div class="fx-item-desc">Desert heat wave distortion</div></div>
+    <div class="fx-item" style="--c:#00ff88;"><div class="fx-item-name">Data Corrupt</div><div class="fx-item-desc">Digital glitch and data corruption</div></div>
+    <div class="fx-item" style="--c:#9b72cf;"><div class="fx-item-name">Plasma Arc</div><div class="fx-item-desc">Electric arc discharge overlay</div></div>
+    <div class="fx-item" style="--c:#5bc8f5;"><div class="fx-item-name">Hologram</div><div class="fx-item-desc">Iridescent holographic shimmer</div></div>
+    <div class="fx-item" style="--c:#ff6b35;"><div class="fx-item-name">Heat Wave</div><div class="fx-item-desc">Desert heat wave distortion</div></div>
   </div>
 
   <div class="callout">
     <span class="callout-label">Bass-reactive vignette &amp; grain</span>
-    The Vibe &amp; FX accordion also has a global vignette and film grain that pulse softly with the bass. They work with or without an image loaded.
+    The IMAGE tab also has a global vignette and film grain that pulse softly with the bass. They work with or without an image loaded.
   </div>
 </section>
 
@@ -1037,7 +1144,7 @@
 
   <div class="callout tip">
     <span class="callout-label">Switching modes</span>
-    Open the <strong>Lyrics</strong> accordion in the left sidebar. The mode toggle is at the top of the panel. You can flip between Classic and Physics mid-song.
+    Click the album art in the console's Now Playing zone to show the lyrics overlay. The mode toggle is at the top. You can flip between Classic and Physics mid-song. For fine-grained control — position, font size, opacity, text colour — open <strong>Viz Config (≡) → LYRICS tab</strong>.
   </div>
 
   <div class="callout warn">
@@ -1048,25 +1155,22 @@
 
 <!-- 08 CONTROLS -->
 <section id="controls">
-  <p class="section-tag">08 — Master Controls &amp; Themes</p>
+  <p class="section-tag">08 — Controls &amp; Themes</p>
   <h2>Tune the<br>Whole Thing</h2>
-  <p class="lead">The Master accordion has two sliders that affect everything in IKANDY at once — every preset, every scene, every lyric animation.</p>
+  <p class="lead">Preset cycling controls live in <strong>Viz Config (≡) → MILKDROP tab</strong>. The progress bar and themes are in the console bar.</p>
 
-  <h3 class="first">Reactivity</h3>
-  <p class="body">How aggressively the visuals respond to the audio. Low reactivity gives a calm, ambient feel. High reactivity makes everything snap to the beat. Default sits in the middle and works for most music.</p>
-
-  <h3>Smoothness</h3>
-  <p class="body">How much the audio analysis is averaged over time. High smoothness softens spikes and gives a flowing feel; low smoothness makes the visuals chase every transient. For dub or ambient, crank it up. For drum-and-bass or breakcore, drop it down.</p>
+  <h3 class="first">Sensitivity</h3>
+  <p class="body">In the MILKDROP tab, the <strong>Sensitivity</strong> slider controls how aggressively the visuals respond to the audio. Low gives a calm, ambient feel; high makes everything snap to the beat. Default sits in the middle and works for most music.</p>
 
   <h3>Progress bar</h3>
-  <p class="body">The playback progress bar is draggable — click and drag anywhere on it to seek to that position in the track. Works with all sources that support seeking.</p>
+  <p class="body">The playback progress bar in the console's Playback zone is draggable — click and drag anywhere on it to seek to that position in the track. Works with all sources that support seeking.</p>
 
   <h3>Themes</h3>
-  <p class="body">IKANDY ships with <strong>6 colour themes</strong> that re-skin the entire UI — sidebars, accordions, buttons, all accents. Themes don't change the visuals themselves, just the chrome around them.</p>
+  <p class="body">IKANDY ships with <strong>6 colour themes</strong> that re-skin the entire UI. Access them via the palette button in <strong>Settings (⚙)</strong>. Available themes: Gold, Neon, Forest, Dusk, Ice, White. Themes don't change the visuals themselves, just the chrome around them.</p>
 
   <div class="callout tip">
     <span class="callout-label">Set it once, forget it</span>
-    All settings persist across sessions. Reactivity, theme, source preferences, custom preset folder, last-used scene — all saved automatically.
+    All settings persist across sessions. Sensitivity, theme, source preferences, custom preset folder, last-used scene — all saved automatically.
   </div>
 </section>
 
@@ -1076,9 +1180,8 @@
   <h2>Get the Most<br>Out of It</h2>
 
   <ul class="b">
-    <li><strong>Selecting a Vibe &amp; FX shader auto-disables Scenes.</strong> The image &amp; shader path looks best on its own — IKANDY clears the scene layer automatically. Re-enable it manually if you want to layer.</li>
-    <li><strong>Drop visualizer opacity to spotlight a scene or background.</strong> Fade the Butterchurn preset to 30–50% to let an image or scene breathe through. Some of the most striking results come from blending both at once.</li>
-    <li><strong>For recording or streaming.</strong> Classic lyric mode + Spectrum scene + Holo or Plasma shader gives a polished look that reads well on video.</li>
+    <li><strong>Drop visualizer opacity to spotlight a scene or background.</strong> In <strong>Viz Config (≡) → MILKDROP tab</strong>, fade the preset to 30–50% to let an image or scene breathe through. Scenes and FX shaders can run simultaneously.</li>
+    <li><strong>For recording or streaming.</strong> Classic lyric mode + Spectrum scene + Hologram or Plasma Arc shader gives a polished look that reads well on video.</li>
     <li><strong>Lyrics need correct metadata.</strong> As long as artist and title are right, lyrics fetch automatically. If they&rsquo;re not loading, check the metadata on the playing source — wrong tags look up the wrong song.</li>
     <li><strong>Volume lives in the source app.</strong> IKANDY doesn&rsquo;t adjust system volume — use the source app or your Windows volume mixer.</li>
   </ul>
@@ -1118,7 +1221,7 @@
       <div class="tr-body">
         <p>Windows treats system audio capture the same as microphone access for privacy purposes.</p>
         <p><strong>Fix:</strong> <strong>Settings → Privacy &amp; security → Microphone</strong> → toggle <strong>Let desktop apps access your microphone</strong> on. Restart IKANDY.</p>
-        <p>If that doesn&rsquo;t help, click <strong>🎤 Reconnect System Audio</strong> in the Source panel.</p>
+        <p>If that doesn&rsquo;t help, click <strong>🎤 Reconnect Audio</strong> in <strong>Settings (⚙) → SOURCE tab</strong>.</p>
       </div>
     </details>
 
@@ -1166,8 +1269,8 @@
     <details class="tr">
       <summary>Visuals don't react to my music</summary>
       <div class="tr-body">
-        <p>Confirm the source is connected — the status badge should show the source name and a green dot.</p>
-        <p>Visuals react to <strong>system audio</strong> regardless of which source you&rsquo;ve picked for track info. If the visualizer is static while music plays, audio isn&rsquo;t reaching IKANDY. Click <strong>🎤 Reconnect System Audio</strong> in the Source panel, and check Windows microphone permissions.</p>
+        <p>Confirm the source is connected — the console bar's Now Playing zone should show the track name and source.</p>
+        <p>Visuals react to <strong>system audio</strong> regardless of which source you&rsquo;ve picked for track info. If the visualizer is static while music plays, audio isn&rsquo;t reaching IKANDY. Click <strong>🎤 Reconnect Audio</strong> in <strong>Settings (⚙) → SOURCE tab</strong>, and check Windows microphone permissions.</p>
       </div>
     </details>
 
@@ -1180,7 +1283,7 @@
           <li>Right-click speaker icon → <strong>Sounds → Playback</strong> tab.</li>
           <li>Right-click your active output → <strong>Configure Speakers</strong> → choose <strong>Stereo</strong>.</li>
           <li>Right-click again → <strong>Properties → Advanced</strong> → pick a 2-channel format from <strong>Default Format</strong>.</li>
-          <li>Apply, then in IKANDY hit <strong>🎤 Reconnect System Audio</strong>.</li>
+          <li>Apply, then in IKANDY hit <strong>🎤 Reconnect Audio</strong> in <strong>Settings (⚙) → SOURCE tab</strong>.</li>
         </ol>
       </div>
     </details>
@@ -1197,7 +1300,7 @@
       <summary>Performance is choppy or stuttering</summary>
       <div class="tr-body">
         <p>IKANDY is GPU-bound. If your GPU is busy with another task, frame rate will suffer.</p>
-        <p>Try: lower <strong>Animation speed</strong>, drop <strong>Reactivity</strong>, pick a simpler scene (Spectrum or Aurora instead of Starfield), or disable Vibe &amp; FX shaders to remove a full-frame post-process pass.</p>
+        <p>Try: open <strong>Viz Config (≡) → MILKDROP tab</strong>, lower <strong>Sensitivity</strong>, drop preset <strong>Opacity</strong>; pick a simpler scene (Spectrum or Aurora instead of Starfield); or open the <strong>IMAGE tab</strong> and disable FX shaders to remove a full-frame post-process pass.</p>
         <p>On laptops, make sure IKANDY is using the discrete GPU: <strong>Settings → System → Display → Graphics</strong>.</p>
       </div>
     </details>
